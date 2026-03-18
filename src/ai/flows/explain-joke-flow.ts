@@ -22,7 +22,7 @@ Break down the joke's structure, identify the pun or the source of the humor, an
  */
 export async function explainJoke(input: ExplainJokeInput): Promise<ReadableStream<any>> {
   const { stream } = ai.generateStream({
-    model: 'googleai/gemini-3-flash',
+    model: 'googleai/gemini-2.0-flash',
     system: systemInstruction,
     prompt: `Explain this joke: "${input.jokeText}"`,
   });
