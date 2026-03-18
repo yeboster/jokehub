@@ -299,21 +299,21 @@ async function getJokeDoc(jokeId: string) {
     
 export interface FetchTopJokesOptions {
   limit?: number;
-  minFunnyRate?: number;
+  minRating?: number;
 }
 
 export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise<Joke[]> {
-  const { limit: pageLimit = 10, minFunnyRate = 5 } = options;
+  const { limit: pageLimit = 10, minRating = 4 } = options;
   
   if (!db) {
     throw new Error('Firestore not initialized');
   }
   
-  // Query jokes with where clause and orderBy
+  // Query jokes with where clause on averageRating and orderBy
   const q = query(
     collection(db, JOKES_COLLECTION),
-    where('funnyRate', '>=', minFunnyRate),
-    orderBy('funnyRate', 'desc'),
+    where('averageRating', '>=', minRating),
+    orderBy('averageRating', 'desc'),
     limit(pageLimit)
   );
 
