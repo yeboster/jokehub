@@ -34,25 +34,20 @@ service cloud.firestore {
       allow read: if true;
 
       // Authenticated users can create jokes for themselves.
-      // Also allows API creation (auth == null) for Jarvis integration.
-      allow create: if (request.auth != null
+      // Ensures essential fields are present and valid.
+      allow create: if request.auth != null
                       && request.resource.data.userId == request.auth.uid
                       && request.resource.data.text is string && request.resource.data.text.size() > 0
                       && request.resource.data.category is string && request.resource.data.category.size() > 0
                       && request.resource.data.source is string && request.resource.data.source.size() <= 100
                       && request.resource.data.funnyRate is number
                       && request.resource.data.funnyRate >= 0 && request.resource.data.funnyRate <= 5
-                      && request.resource.data.dateAdded is timestamp // Handled by server/Timestamp.now()
+                      && request.resource.data.dateAdded is timestamp
                       && request.resource.data.used is bool
                       && request.resource.data.keywords is list
                       && (!('averageRating' in request.resource.data) || request.resource.data.averageRating is number)
                       && (!('ratingCount' in request.resource.data) || request.resource.data.ratingCount is number)
-                      && (!('explanation' in request.resource.data) || request.resource.data.explanation is string))
-                   || (request.auth == null
-                      && request.resource.data.userId == 'Zxb2vvsmjshTAyAxb31bEQOQVGs1' // API user
-                      && request.resource.data.text is string && request.resource.data.text.size() > 0
-                      && request.resource.data.category is string && request.resource.data.category.size() > 0
-                      && request.resource.data.source is string);
+                      && (!('explanation' in request.resource.data) || request.resource.data.explanation is string);
 
 
       // Update rules are split into two main cases: an owner editing, or the system updating ratings.
