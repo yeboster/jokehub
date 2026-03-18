@@ -303,26 +303,26 @@ export interface FetchTopJokesOptions {
 }
 
 export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise<Joke[]> {
-  const { limit = 10, minFunnyRate = 4 } = options;
+  const { limit = 10, minFunnyRate = 5 } = options;
   
-  // Query jokes ordered by funnyRate descending
+  // Query jokes ordered by funnyRate descending, filter in memory for safety
   const q = query(
     collection(db, JOKES_COLLECTION),
-    where('funnyRate', '>=', minFunnyRate),
     orderBy('funnyRate', 'desc'),
-    limit(limit)
+    limit(limit * 2) // Fetch more to filter
   );
 
   const snapshot = await getDocs(q);
   
-  const jokes = snapshot.docs.map(
-    (docSnapshot) =>
-      ({
-        id: docSnapshot.id,
-        ...docSnapshot.data(),
-        dateAdded: (docSnapshot.data().dateAdded as Timestamp).toDate(),
-      } as Joke)
-  );
+  // Filter by minFunnyRate in memory (Firestore doesn't support numeric comparisons well)
+  const jokes = snapshot.docs
+    .map((docSnapshot) => ({
+      id: docSnapshot.id,
+      ...docSnapshot.data(),
+      dateAdded: (docSnapshot.data().dateAdded as Timestamp).toDate(),
+    } as Joke))
+    .filter(joke => joke.funnyRate >= minFunnyRate)
+    .slice(0, limit);
 
   return jokes;
 }
