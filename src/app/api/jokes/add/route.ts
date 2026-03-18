@@ -27,12 +27,12 @@ export async function POST(request: NextRequest) {
 
     const { text, category, source } = parsedInput.data;
     
-    // Use a system user ID for jokes added via API
-    const systemUserId = 'api-user';
+    // Use Marco's user ID for jokes added via API
+    const userId = 'Zxb2vvsmjshTAyAxb31bEQOQVGs1';
     
     const joke = await addJoke(
       { text, category, source: source || 'Jarvis AI' },
-      systemUserId
+      userId
     );
 
     return NextResponse.json({ joke }, { status: 201 });
