@@ -32,7 +32,7 @@ export default function AddJokePage() {
   const [aiTopicHint, setAiTopicHint] = useState<string>('');
   const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
   const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
-  const [selectedModel, setSelectedModel] = useState('googleai/gemini-3-flash');
+  const [selectedModel, setSelectedModel] = useState('googleai/gemini-3.1-flash-lite-preview');
   const [temperature, setTemperature] = useState([0.8]);
   const [inspirationalJokes, setInspirationalJokes] = useState<string[]>([]);
   const [isLoadingInspirationalJokes, setIsLoadingInspirationalJokes] = useState(false);
@@ -220,8 +220,6 @@ export default function AddJokePage() {
                                 <SelectValue placeholder="Select a model" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="googleai/gemini-3-flash">Gemini 3 Flash</SelectItem>
-                                <SelectItem value="googleai/gemini-3.1-pro">Gemini 3.1 Pro</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Preview)</SelectItem>
                                 <SelectItem value="googleai/gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</SelectItem>
                                 <SelectItem value="googleai/gemini-3-flash-preview">Gemini 3 Flash (Preview)</SelectItem>
