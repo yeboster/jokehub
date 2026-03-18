@@ -303,7 +303,7 @@ export interface FetchTopJokesOptions {
 }
 
 export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise<Joke[]> {
-  const { limit = 10, minFunnyRate = 5 } = options;
+  const { limit: pageLimit = 10, minFunnyRate = 5 } = options;
   
   if (!db) {
     throw new Error('Firestore not initialized');
@@ -313,7 +313,7 @@ export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise
   const q = query(
     collection(db, JOKES_COLLECTION),
     orderBy('funnyRate', 'desc'),
-    limit(limit * 2)
+    limit(pageLimit * 2)
   );
 
   const snapshot = await getDocs(q);
@@ -326,7 +326,7 @@ export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise
       dateAdded: (docSnapshot.data().dateAdded as Timestamp).toDate(),
     } as Joke))
     .filter(joke => joke.funnyRate >= minFunnyRate)
-    .slice(0, limit);
+    .slice(0, pageLimit);
 
   return jokes;
 }
