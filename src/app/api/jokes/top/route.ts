@@ -10,9 +10,20 @@ export async function GET(request: NextRequest) {
     
     const jokes = await fetchTopJokes({ limit, minRating });
     
-    return NextResponse.json({ jokes }, { status: 200 });
+    return NextResponse.json({ 
+      jokes, 
+      query: { limit, minRating },
+      count: jokes.length 
+    }, { status: 200 });
   } catch (error: any) {
     console.error('Error fetching top jokes:', error);
+    // Check if it's a Firestore index error
+    if (error.message?.includes('requires an index')) {
+      return NextResponse.json({ 
+        error: 'Firestore index required. Please create composite index on jokes.averageRating.',
+        details: error.message 
+      }, { status: 500 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
