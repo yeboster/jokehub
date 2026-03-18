@@ -1,23 +1,44 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getFirestore as getAdminFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
 
-function initAdmin() {
+let adminDbInstance: Firestore | null = null;
+
+function getAdminDb(): Firestore {
+  if (adminDbInstance) {
+    return adminDbInstance;
+  }
+
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error('Firebase Admin credentials not configured. Missing: ' + 
+      JSON.stringify({ 
+        projectId: !!projectId, 
+        clientEmail: !!clientEmail, 
+        privateKey: !!privateKey 
+      })
+    );
+  }
+
   if (getApps().length === 0) {
-    // On Vercel, use implicit credentials from environment
-    // The FIREBASE_PROJECT_ID env var is automatically set by Vercel when Firebase is configured
-    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-    
-    if (!projectId) {
-      throw new Error('Firebase project ID not configured');
-    }
-
     initializeApp({
-      projectId,
-      // credential: cert({...}) is not needed on Vercel - uses attached service account automatically
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
     });
   }
-  return getFirestore();
+
+  adminDbInstance = getAdminFirestore();
+  return adminDbInstance;
 }
 
-export const adminDb = initAdmin();
 export { FieldValue };
+export const adminDb = new Proxy({} as Firestore, {
+  get(_, prop) {
+    return getAdminDb()[prop as keyof Firestore];
+  }
+});
