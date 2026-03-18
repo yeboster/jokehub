@@ -15,7 +15,7 @@ import { z } from 'genkit';
 const GenerateJokeInputSchema = z.object({
   topicHint: z.string().optional().describe('An optional topic or category hint for the joke.'),
   prefilledJokes: z.array(z.string()).optional().describe('A list of prefilled jokes to ensure the generated jokes are different.'),
-  model: z.enum(['googleai/gemini-3-flash', 'googleai/gemini-3.1-pro']).optional().describe('The model to use for generation.'),
+  model: z.enum(['googleai/gemini-3-flash', 'googleai/gemini-3.1-pro', 'googleai/gemini-3.1-flash-lite-preview', 'googleai/gemini-3.1-pro-preview', 'googleai/gemini-3-flash-preview']).optional().describe('The model to use for generation.'),
   temperature: z.number().min(0).max(2).optional().describe('Controls the randomness of the output. Higher values (e.g., 1.5) are more creative, lower values (e.g., 0.2) are more predictable.'),
 });
 
