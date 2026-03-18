@@ -15,7 +15,7 @@ import { z } from 'genkit';
 const GenerateJokeInputSchema = z.object({
   topicHint: z.string().optional().describe('An optional topic or category hint for the joke.'),
   prefilledJokes: z.array(z.string()).optional().describe('A list of prefilled jokes to ensure the generated jokes are different.'),
-  model: z.enum(['googleai/gemini-2.5-flash', 'googleai/gemini-2.5-pro']).optional().describe('The model to use for generation.'),
+  model: z.enum(['googleai/gemini-2.0-flash', 'googleai/gemini-1.5-pro', 'googleai/gemini-2.0-flash-lite', 'googleai/gemini-1.5-flash']).optional().describe('The model to use for generation.'),
   temperature: z.number().min(0).max(2).optional().describe('Controls the randomness of the output. Higher values (e.g., 1.5) are more creative, lower values (e.g., 0.2) are more predictable.'),
 });
 
@@ -48,7 +48,7 @@ const generateJokeFlow = ai.defineFlow(
 
     const res = await ai.generate({
       prompt,
-      model: input.model || 'googleai/gemini-2.5-flash', // Default to flash if not provided
+      model: input.model || 'googleai/gemini-1.5-flash', // Default to flash if not provided
       system: systemInstruction,
       output: { schema: GenerateJokeOutputSchema },
       config: {
