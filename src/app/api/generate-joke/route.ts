@@ -7,7 +7,7 @@ import { z } from 'zod';
 const ApiInputSchema = z.object({
   topicHint: z.string().optional(),
   prefilledJokes: z.array(z.string()).optional(),
-  model: z.enum(['googleai/gemini-2.5-flash', 'googleai/gemini-2.5-pro']).optional(),
+  model: z.enum(['googleai/gemini-3-flash', 'googleai/gemini-3.1-pro']).optional(),
   temperature: z.number().min(0).max(2).optional(),
 });
 

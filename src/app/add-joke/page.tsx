@@ -32,7 +32,7 @@ export default function AddJokePage() {
   const [aiTopicHint, setAiTopicHint] = useState<string>('');
   const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
   const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
-  const [selectedModel, setSelectedModel] = useState('googleai/gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('googleai/gemini-3-flash');
   const [temperature, setTemperature] = useState([0.8]);
   const [inspirationalJokes, setInspirationalJokes] = useState<string[]>([]);
   const [isLoadingInspirationalJokes, setIsLoadingInspirationalJokes] = useState(false);
@@ -220,8 +220,8 @@ export default function AddJokePage() {
                                 <SelectValue placeholder="Select a model" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="googleai/gemini-2.5-flash">Gemini 2.5 Flash (Fast)</SelectItem>
-                                <SelectItem value="googleai/gemini-2.5-pro">Gemini 2.5 Pro (Powerful)</SelectItem>
+                                <SelectItem value="googleai/gemini-3-flash">Gemini 3 Flash (Fast)</SelectItem>
+                                <SelectItem value="googleai/gemini-3.1-pro">Gemini 3.1 Pro (Powerful)</SelectItem>
                             </SelectContent>
                             </Select>
                         </div>
