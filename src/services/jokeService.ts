@@ -303,7 +303,7 @@ export interface FetchTopJokesOptions {
 }
 
 export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise<Joke[]> {
-  const { pageLimit = 10, minFunnyRate = 5 } = options;
+  const { limit: pageLimit = 10, minFunnyRate = 5 } = options;
   
   if (!db) {
     throw new Error('Firestore not initialized');
