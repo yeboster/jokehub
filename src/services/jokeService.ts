@@ -297,3 +297,32 @@ async function getJokeDoc(jokeId: string) {
   }
 
     
+export interface FetchTopJokesOptions {
+  limit?: number;
+  minFunnyRate?: number;
+}
+
+export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise<Joke[]> {
+  const { limit = 10, minFunnyRate = 4 } = options;
+  
+  // Query jokes ordered by funnyRate descending
+  const q = query(
+    collection(db, JOKES_COLLECTION),
+    where('funnyRate', '>=', minFunnyRate),
+    orderBy('funnyRate', 'desc'),
+    limit(limit)
+  );
+
+  const snapshot = await getDocs(q);
+  
+  const jokes = snapshot.docs.map(
+    (docSnapshot) =>
+      ({
+        id: docSnapshot.id,
+        ...docSnapshot.data(),
+        dateAdded: (docSnapshot.data().dateAdded as Timestamp).toDate(),
+      } as Joke)
+  );
+
+  return jokes;
+}
