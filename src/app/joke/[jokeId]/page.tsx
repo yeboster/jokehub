@@ -1,24 +1,20 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { Loader2, ArrowLeft, ShieldAlert, CalendarDays, Send, Edit3, UserCircle, BookOpen, ExternalLink, Lightbulb } from 'lucide-react';
+import { ArrowLeft, ShieldAlert } from 'lucide-react';
 
 import type { Joke, UserRating } from '@/lib/types';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import StarRating from '@/components/StarRating';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
+import JokeHeader from '@/components/joke/JokeHeader';
+import ExplanationCard from '@/components/joke/ExplanationCard';
+import RatingForm from '@/components/joke/RatingForm';
+import CommunityRatings from '@/components/joke/CommunityRatings';
+import { Loader2 } from 'lucide-react';
 
 export default function JokeShowPage() {
   const params = useParams();
@@ -95,7 +91,7 @@ export default function JokeShowPage() {
       if (trailingChunk) {
         setExplanation(prev => prev + trailingChunk);
       }
-    
+
 
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- streaming fetch + AI errors expose heterogeneous shapes; unknown narrows too aggressively for the placeholder string.
@@ -197,7 +193,7 @@ export default function JokeShowPage() {
     try {
       await submitUserRating(joke.id, ratingInputValue, commentInputValue);
       toast({ title: 'Success', description: currentUserRating ? 'Your rating has been updated.' : 'Your rating has been submitted.' });
-      
+
       // Refetch all ratings to update community feedback section and current user rating display
       setIsLoadingAllRatings(true);
       setIsLoadingCurrentUserRating(true);
@@ -306,187 +302,41 @@ export default function JokeShowPage() {
       </div>
 
       {/* Joke Display Area */}
-      <section className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4 leading-tight">
-          {joke.text}
-        </h1>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm text-muted-foreground mb-6">
-          <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="bg-accent text-accent-foreground">{joke.category}</Badge>
-            {joke.source && (
-                <span className="flex items-center">
-                    <BookOpen className="mr-1.5 h-4 w-4 text-primary" /> 
-                    {isSourceUrl ? (
-                         <a href={joke.source} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary underline hover:text-primary/80">
-                           <span>View Source</span>
-                           <ExternalLink className="h-3.5 w-3.5" />
-                         </a>
-                    ) : (
-                         <span>Source: {joke.source}</span>
-                    )}
-                </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center"><CalendarDays className="mr-1.5 h-4 w-4 text-primary" /> {format(joke.dateAdded, 'MMM d, yyyy')}</span>
-            <span className="flex items-center">
-              <UserCircle className="mr-1.5 h-4 w-4 text-primary" /> Joke by: {isOwner ? 'You' : 'A user'} 
-            </span>
-            {isOwner && (
-              <div className="flex items-center gap-4 border-l border-border/50 pl-4 ml-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="used-status-toggle"
-                    checked={!!joke.used}
-                    onCheckedChange={handleToggleUsed}
-                    aria-label={`Mark joke as ${joke.used ? 'unused' : 'used'}`}
-                  />
-                  <Label htmlFor="used-status-toggle" className="text-xs font-normal text-muted-foreground cursor-pointer select-none">
-                    {joke.used ? "Used" : "Unused"}
-                  </Label>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => router.push(`/edit-joke/${joke.id}`)} className="text-primary hover:text-primary/80 px-2 h-auto py-1">
-                    <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-        <Separator />
-      </section>
-      
-      {/* Joke Explanation Section */}
-      <Card className="shadow-lg mb-8 bg-accent/50 border-primary/20">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="text-xl flex items-center gap-2 text-accent-foreground">
-              <Lightbulb className="h-5 w-5" /> The Comedian&apos;s Take
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => streamExplanation(joke.text, joke.id)}
-              disabled={isExplanationLoading}
-            >
-              {isExplanationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isExplanationLoading ? 'Explaining...' : 'Explain again'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isExplanationLoading ? (
-            <div className="flex items-center text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <span>Thinking...</span>
-            </div>
-          ) : (
-            <p className="text-foreground/90 whitespace-pre-wrap leading-relaxed">{explanation}</p>
-          )}
-        </CardContent>
-      </Card>
+      <JokeHeader
+        joke={joke}
+        isOwner={!!isOwner}
+        isSourceUrl={isSourceUrl}
+        onToggleUsed={handleToggleUsed}
+      />
 
+      {/* Joke Explanation Section */}
+      <ExplanationCard
+        explanation={explanation}
+        isExplanationLoading={isExplanationLoading}
+        onExplainAgain={() => streamExplanation(joke.text, joke.id)}
+      />
 
       {/* User Rating Section */}
-      <Card className="shadow-lg mb-8">
-        <CardHeader>
-          <CardTitle className="text-xl">
-            Rate this Joke
-          </CardTitle>
-          {!user && <CardDescription>Please <Link href={`/auth?redirect=/joke/${joke.id}`} className="underline text-primary hover:text-primary/80">log in or sign up</Link> to rate this joke.</CardDescription>}
-        </CardHeader>
-        {user && (
-          <CardContent>
-            {isLoadingCurrentUserRating ? (
-              <div className="flex items-center justify-center p-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Loading your rating...</span>
-              </div>
-            ) : (
-              <form onSubmit={handleRatingSubmit} className="space-y-4">
-                <div>
-                  <StarRating
-                    rating={ratingInputValue}
-                    onRatingChange={(newRate) => setRatingInputValue(newRate)}
-                    maxStars={5}
-                    size={28}
-                    disabled={isSubmittingRating}
-                    starClassName="text-primary hover:text-primary/70" // Mockup uses yellow/orange, we use primary for consistency
-                    className="mb-1"
-                  />
-                   {ratingInputValue === 0 && <p className="text-xs text-muted-foreground">Click a star to rate.</p>}
-                </div>
-                <div>
-                  <Label htmlFor="user-rating-comment" className="block text-sm font-medium text-foreground mb-1">Add a comment (optional)</Label>
-                  <Textarea
-                    id="user-rating-comment"
-                    placeholder="What did you think of this joke?"
-                    value={commentInputValue}
-                    onChange={(e) => setCommentInputValue(e.target.value)}
-                    disabled={isSubmittingRating}
-                    maxLength={1000}
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">{commentInputValue.length}/1000 characters</p>
-                </div>
-                <Button type="submit" disabled={isSubmittingRating || ratingInputValue === 0}>
-                  {isSubmittingRating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                  {isSubmittingRating ? 'Submitting...' : (currentUserRating ? 'Update Rating' : 'Submit Rating')}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        )}
-      </Card>
+      <RatingForm
+        joke={joke}
+        user={user}
+        currentUserRating={currentUserRating}
+        ratingInputValue={ratingInputValue}
+        commentInputValue={commentInputValue}
+        isSubmittingRating={isSubmittingRating}
+        isLoadingCurrentUserRating={isLoadingCurrentUserRating}
+        onRatingInputChange={setRatingInputValue}
+        onCommentInputChange={setCommentInputValue}
+        onSubmit={handleRatingSubmit}
+      />
 
       {/* Ratings & Comments Section */}
-      <Card className="shadow-lg">
-          <CardHeader>
-              <CardTitle className="text-xl">
-                  Ratings & Comments
-              </CardTitle>
-          </CardHeader>
-          <CardContent>
-              {isLoadingAllRatings ? (
-                  <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <span className="ml-2 text-muted-foreground">Loading community ratings...</span>
-                  </div>
-              ) : (
-                <>
-                  {allUserRatings.length > 0 && (
-                    <div className="mb-6 p-4 bg-muted/50 rounded-md flex items-center gap-3">
-                      <span className="font-semibold text-foreground">Average Rating:</span>
-                      <StarRating rating={averageRating.average} readOnly size={22} starClassName="text-primary" />
-                      <span className="font-bold text-foreground">{averageRating.average.toFixed(1)}</span>
-                      <span className="text-sm text-muted-foreground">(based on {averageRating.count} rating{averageRating.count === 1 ? '' : 's'})</span>
-                    </div>
-                  )}
-
-                  {otherUserRatingsToDisplay.length === 0 ? (
-                      <p className="text-muted-foreground">{allUserRatings.length > 0 ? "No other community feedback yet." : "No community feedback yet. Be the first to rate!"}</p>
-                  ) : (
-                      <div className="space-y-6">
-                          {otherUserRatingsToDisplay.map((rating, index) => (
-                              <div key={rating.id}>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <StarRating rating={rating.stars} readOnly size={20} starClassName="text-primary" />
-                                    <span className="text-sm font-medium text-foreground">
-                                      User {/* Replace with user identifier if available, e.g., rating.userDisplayName || 'A User' */}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">- {format(rating.updatedAt, 'MMM d, yyyy')}</span>
-                                  </div>
-                                  {rating.comment && (
-                                      <p className="text-sm text-foreground bg-muted/30 p-3 rounded-md whitespace-pre-wrap">{rating.comment}</p>
-                                  )}
-                                  {index < otherUserRatingsToDisplay.length - 1 && <Separator className="my-4" />}
-                              </div>
-                          ))}
-                      </div>
-                  )}
-                </>
-              )}
-          </CardContent>
-      </Card>
+      <CommunityRatings
+        allUserRatings={allUserRatings}
+        isLoadingAllRatings={isLoadingAllRatings}
+        averageRating={averageRating}
+        otherUserRatingsToDisplay={otherUserRatingsToDisplay}
+      />
 
     </div>
   );

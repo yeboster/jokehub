@@ -2,13 +2,22 @@
 "use client";
 
 import { useEffect } from 'react';
-import CSVImport from '@/components/csv-import';
+import dynamic from 'next/dynamic';
 import Header from '@/components/header';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+const CSVImport = dynamic(() => import('@/components/csv-import'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex justify-center items-center min-h-[12rem]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    ),
+});
 
 export default function ManageJokesPage() {
     const { user, loading: authLoading } = useAuth();
