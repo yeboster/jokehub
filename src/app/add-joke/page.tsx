@@ -8,7 +8,7 @@ import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, Sparkles, CheckCirc
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import type { GenerateJokeOutput, JokeVariation } from '@/ai/flows/generate-joke-flow';
-import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
+import { DEFAULT_GENERATE_MODEL, GEMINI_MODEL_LABELS, GEMINI_MODELS } from '@/ai/models';
 import Header from '@/components/header';
 import AddJokeForm, { type JokeFormValues } from '@/components/add-joke-form';
 import { Button } from '@/components/ui/button';
@@ -59,9 +59,11 @@ export default function AddJokePage() {
         setInspirationalJokes([]);
         toast({ title: 'No 5-Star Jokes Found', description: 'You haven\'t rated any jokes with 5 stars yet.', variant: 'default' });
       }
-    } catch (error: any) {
-      console.error("Error loading 5-star jokes:", error);
-      toast({ title: 'Error', description: error.message || 'Failed to load inspirational jokes.', variant: 'destructive' });
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore fetchUserFiveStarJokes errors expose `.message`; unknown narrows too aggressively for the toast description string.
+      const err = error as any;
+      console.error("Error loading 5-star jokes:", err);
+      toast({ title: 'Error', description: err.message || 'Failed to load inspirational jokes.', variant: 'destructive' });
     } finally {
       setIsLoadingInspirationalJokes(false);
     }
@@ -81,6 +83,9 @@ export default function AddJokePage() {
       // Only include already generated jokes if we are NOT clearing them on re-generation.
       // Since we are, prefilledJokes will primarily be from the inspirational set.
       const prefilledJokes = [...inspirationalJokes];
+      // The flow caps exemplarJokes at 5 — slice defensively in case the
+      // service returns more (or future changes loosen the cap).
+      const exemplarJokes = inspirationalJokes.slice(0, 5);
 
       const response = await fetch('/api/generate-joke', {
         method: 'POST',
@@ -88,6 +93,7 @@ export default function AddJokePage() {
         body: JSON.stringify({
           topicHint: trimmedTopicHint,
           prefilledJokes,
+          exemplarJokes,
           model: selectedModel,
           temperature: temperature[0],
         }),
@@ -102,9 +108,11 @@ export default function AddJokePage() {
       setAiGeneratedJokes(result.jokes);
       setInspirationalJokes([]); // Clear inspiration after use to avoid re-using them unintentionally
       toast({ title: 'Jokes Generated!', description: 'Choose your favorite from the new variations below.' });
-    } catch (error: any) {
-      console.error("Error generating joke via API:", error);
-      toast({ title: 'AI Error', description: error.message || 'Failed to generate jokes.', variant: 'destructive' });
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fetch + genkit AI errors expose heterogeneous shapes; unknown narrows too aggressively for the toast description string.
+      const err = error as any;
+      console.error("Error generating joke via API:", err);
+      toast({ title: 'AI Error', description: err.message || 'Failed to generate jokes.', variant: 'destructive' });
     } finally {
       setIsGeneratingJoke(false);
     }
@@ -223,7 +231,7 @@ export default function AddJokePage() {
                             <SelectContent>
                                 {GEMINI_MODELS.map((model) => (
                                   <SelectItem key={model} value={model}>
-                                    {model.replace('googleai/', '')}
+                                    {GEMINI_MODEL_LABELS[model]}
                                   </SelectItem>
                                 ))}
                             </SelectContent>

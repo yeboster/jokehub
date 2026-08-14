@@ -19,7 +19,7 @@ Break down the joke's structure, identify the pun or the source of the humor, an
 /**
  * Generates an explanation for a joke and returns it as a stream.
  */
-export async function explainJoke(input: ExplainJokeInput): Promise<ReadableStream<any>> {
+export async function explainJoke(input: ExplainJokeInput): Promise<ReadableStream<Uint8Array>> {
   const { stream } = ai.generateStream({
     model: EXPLAIN_MODEL,
     system: systemInstruction,
