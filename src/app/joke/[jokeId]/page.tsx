@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Loader2, ArrowLeft, ShieldAlert, CalendarDays, Tag, Star as StarIcon, Check, MessageSquare, Send, Users, Edit3, UserCircle, BookOpen, ExternalLink, Lightbulb } from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldAlert, CalendarDays, Send, Edit3, UserCircle, BookOpen, ExternalLink, Lightbulb } from 'lucide-react';
 
 import type { Joke, UserRating } from '@/lib/types';
 import { useJokes } from '@/contexts/JokeContext';
@@ -176,11 +176,8 @@ export default function JokeShowPage() {
     } else if (!jokeId && !loadingContext && !authLoading) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- setError/loading flags when the URL is missing a jokeId, so we surface a real error state instead of an infinite loading spinner.
       setError("Joke ID is missing.");
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- paired with the setError(...) above; resets the loading flags so the page can render the error.
       setIsLoading(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above; must be paired with the reset-on-missing-id block.
       setIsLoadingCurrentUserRating(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above; must be paired with the reset-on-missing-id block.
       setIsLoadingAllRatings(false);
     }
   }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, loadingContext, authLoading, streamExplanation]);
@@ -244,7 +241,7 @@ export default function JokeShowPage() {
     try {
       const url = new URL(joke.source);
       return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch (e) {
+    } catch {
       return false;
     }
   }, [joke?.source]);

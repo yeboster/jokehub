@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, Suspense, type KeyboardEvent, useRef } from 'react';
+import { useState, useMemo, useEffect, Suspense, type KeyboardEvent, useRef } from 'react';
 import type { FilterParams } from '@/contexts/JokeContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';

@@ -6,22 +6,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJokes, type FilterParams } from '@/contexts/JokeContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Loader2, PlusCircle } from 'lucide-react';
 import type { Joke } from '@/lib/types';
 import JokeListItem from '@/components/joke-list-item';
 import Logo from '@/components/logo';
 
+// Module-scope so the array identity is stable across renders; the previous
+// in-component declaration made the useEffect dep array warn about a missing
+// dep that, if added, would create a new array each render → infinite loop.
+const HARDCODED_JOKES_FALLBACK: Joke[] = [
+  { id: 'hc1', text: "Why don't scientists trust atoms? Because they make up everything!", category: "Science", dateAdded: new Date(0), used: false, funnyRate: 0, userId: 'public-fallback' },
+  { id: 'hc2', text: "Why did the scarecrow win an award? Because he was outstanding in his field!", category: "Puns", dateAdded: new Date(0), used: false, funnyRate: 0, userId: 'public-fallback' },
+  { id: 'hc3', text: "What do you call fake spaghetti? An impasta!", category: "Food", dateAdded: new Date(0), used: false, funnyRate: 0, userId: 'public-fallback' },
+];
+
 export default function LandingPage() {
   const { user, loading: authLoading } = useAuth();
   const { jokes, loadJokesWithFilters, loadingInitialJokes } = useJokes();
   const [displayedJokes, setDisplayedJokes] = useState<Joke[]>([]);
-
-  const hardcodedJokesFallback = [
-    { id: 'hc1', text: "Why don't scientists trust atoms? Because they make up everything!", category: "Science", dateAdded: new Date(), used: false, funnyRate: 0, userId: 'public-fallback' },
-    { id: 'hc2', text: "Why did the scarecrow win an award? Because he was outstanding in his field!", category: "Puns", dateAdded: new Date(), used: false, funnyRate: 0, userId: 'public-fallback' },
-    { id: 'hc3', text: "What do you call fake spaghetti? An impasta!", category: "Food", dateAdded: new Date(), used: false, funnyRate: 0, userId: 'public-fallback' },
-  ];
 
   useEffect(() => {
     const filters: FilterParams = {
@@ -39,7 +41,7 @@ export default function LandingPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- derive the 3 displayed jokes from the async-loaded jokes list.
       setDisplayedJokes(jokes.slice(0, 3));
     } else if (!loadingInitialJokes && (!jokes || jokes.length === 0)) {
-      setDisplayedJokes(hardcodedJokesFallback);
+      setDisplayedJokes(HARDCODED_JOKES_FALLBACK);
     } else {
       setDisplayedJokes([]);
     }

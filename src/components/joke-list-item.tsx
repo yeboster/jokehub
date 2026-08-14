@@ -3,7 +3,7 @@
 
 import type { FC } from 'react';
 import { format } from 'date-fns';
-import { CalendarDays, Star as StarIcon } from 'lucide-react'; // Removed UserCircle
+import { CalendarDays } from 'lucide-react'; // Removed UserCircle
 import Link from 'next/link';
 
 import type { Joke } from '@/lib/types';

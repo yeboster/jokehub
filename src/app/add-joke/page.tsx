@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, Sparkles, CheckCircle, Star } from 'lucide-react';
+import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, CheckCircle, Star } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
@@ -101,7 +101,7 @@ export default function AddJokePage() {
 
       if (!response.ok) {
         let errorData;
-        try { errorData = await response.json(); } catch (e) { /* ignore */ }
+        try { errorData = await response.json(); } catch { /* ignore */ }
         throw new Error(errorData?.error || `API request failed with status ${response.status}`);
       }
       const result: GenerateJokeOutput = await response.json();

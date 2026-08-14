@@ -13,12 +13,10 @@ import {
   getDocs,
   getDoc,
   startAfter,
-  deleteDoc,
-  type DocumentSnapshot,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Joke, Category } from '@/lib/types';
+import type { Joke } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
 import { generateKeywords } from '@/lib/text';
 import { SYSTEM_USER_ID } from '@/lib/constants';

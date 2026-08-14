@@ -3,12 +3,11 @@
 
 import type { FC, ChangeEvent } from 'react';
 import { useState, useRef } from 'react';
-import { Upload, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 import type { Joke } from '@/lib/types'; // Ensure this path and type are correct
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';

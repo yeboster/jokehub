@@ -148,7 +148,6 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (authLoading || categories === null) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset jokes + loading flag whenever auth or categories regress back to a non-ready state.
       setJokes(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above; must be paired with the setJokes(null) reset.
       setLoadingInitialJokes(true);
       return;
     }

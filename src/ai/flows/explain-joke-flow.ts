@@ -5,12 +5,10 @@
  */
 import { ai } from '@/ai/ai-instance';
 import { EXPLAIN_MODEL } from '@/ai/models';
-import {z} from 'zod';
 
-const ExplainJokeInputSchema = z.object({
-  jokeText: z.string().describe('The text of the joke to be explained.'),
-});
-export type ExplainJokeInput = z.infer<typeof ExplainJokeInputSchema>;
+export type ExplainJokeInput = {
+  jokeText: string;
+};
 
 const systemInstruction = `You are a senior comedian trying to explain the jokes to the audience. Your tone should be insightful, a bit world-weary but still passionate about the craft of comedy.
 

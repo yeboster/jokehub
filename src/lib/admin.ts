@@ -1,4 +1,4 @@
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
 
 let adminDbInstance: Firestore | null = null;

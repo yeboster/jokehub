@@ -2,14 +2,13 @@
 "use client";
 
 import type React from 'react';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { 
-  getAuth, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut as firebaseSignOut, 
-  onAuthStateChanged, 
-  type User 
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase'; // Use the initialized auth instance
 import { useToast } from '@/hooks/use-toast';
@@ -37,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
 
-  const signIn = async (email: string, pass: string): Promise<User | null> => {
+  const signIn = useCallback(async (email: string, pass: string): Promise<User | null> => {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
@@ -51,9 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const signUp = async (email: string, pass: string): Promise<User | null> => {
+  const signUp = useCallback(async (email: string, pass: string): Promise<User | null> => {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -67,9 +66,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const signOutUser = async () => {
+  const signOutUser = useCallback(async () => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
@@ -83,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const contextValue = useMemo(() => ({
     user,
@@ -91,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOutUser,
-  }), [user, loading]); // signIn, signUp, signOutUser are stable due to useCallback pattern (implicitly here for brevity)
+  }), [user, loading, signIn, signUp, signOutUser]);
 
   return (
     <AuthContext.Provider value={contextValue}>
