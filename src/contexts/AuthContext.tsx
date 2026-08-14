@@ -43,8 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       setUser(userCredential.user);
       return userCredential.user;
-    } catch (error: any) {
-      console.error("Sign in error:", error);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase auth errors expose `.code`/`.message`; unknown narrows too aggressively here.
+      const err = error as any;
+      console.error("Sign in error:", err);
       throw error; // Re-throw to be caught by the caller
     } finally {
       setLoading(false);
@@ -57,8 +59,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       setUser(userCredential.user);
       return userCredential.user;
-    } catch (error: any) {
-      console.error("Sign up error:", error);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase createUser errors expose `.code`/`.message`; unknown narrows too aggressively here.
+      const err = error as any;
+      console.error("Sign up error:", err);
       throw error; // Re-throw to be caught by the caller
     } finally {
       setLoading(false);
@@ -71,8 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await firebaseSignOut(auth);
       setUser(null);
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-    } catch (error: any) {
-      console.error("Sign out error:", error);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase signOut errors expose `.code`/`.message`; unknown narrows too aggressively here.
+      const err = error as any;
+      console.error("Sign out error:", err);
       toast({ title: 'Error', description: 'Failed to log out.', variant: 'destructive' });
     } finally {
       setLoading(false);
