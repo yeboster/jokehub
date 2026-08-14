@@ -83,9 +83,9 @@ export default function AddJokePage() {
       // Only include already generated jokes if we are NOT clearing them on re-generation.
       // Since we are, prefilledJokes will primarily be from the inspirational set.
       const prefilledJokes = [...inspirationalJokes];
-      // The flow caps exemplarJokes at 5 — slice defensively in case the
+      // The flow caps exemplarJokes at 10 — slice defensively in case the
       // service returns more (or future changes loosen the cap).
-      const exemplarJokes = inspirationalJokes.slice(0, 5);
+      const exemplarJokes = inspirationalJokes.slice(0, 10);
 
       const response = await fetch('/api/generate-joke', {
         method: 'POST',

@@ -38,11 +38,13 @@ const GenerateJokeInputSchema = z.object({
   topicHint: z.string().optional().describe('An optional topic or category hint for the joke.'),
   prefilledJokes: z.array(z.string()).optional().describe('A list of prefilled jokes to ensure the generated jokes are different.'),
   /**
-   * Up to 5 highly-rated existing jokes used as STYLE exemplars. The
+   * Up to 10 highly-rated existing jokes used as STYLE exemplars. The
    * model is instructed to match their comedic voice and craft, but not
-   * copy topics or structures.
+   * copy topics or structures. The /api/generate-joke route now defaults
+   * to fetching the top-rated jokes from Firestore so callers don't have
+   * to send them.
    */
-  exemplarJokes: z.array(z.string()).max(5).optional().describe('Up to 5 highly-rated existing jokes used as style exemplars.'),
+  exemplarJokes: z.array(z.string()).max(10).optional().describe('Up to 10 highly-rated existing jokes used as style exemplars.'),
   model: z.enum(GEMINI_MODELS).optional().describe('The model to use for generation.'),
   temperature: z.number().min(0).max(2).optional().describe('Controls the randomness of the output. Higher values (e.g., 1.5) are more creative, lower values (e.g., 0.2) are more predictable.'),
 });
