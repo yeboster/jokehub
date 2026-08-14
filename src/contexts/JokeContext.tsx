@@ -22,7 +22,6 @@ interface JokeContextProps {
   addJoke: (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => Promise<void>;
   importJokes: (importedJokesData: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => Promise<void>;
   toggleUsed: (id: string, currentUsedStatus: boolean) => Promise<void>;
-  rateJoke: (id: string, rating: number) => Promise<void>;
   updateJokeCategory: (jokeId: string, newCategoryName: string) => Promise<void>;
   getJokeById: (jokeId: string) => Promise<Joke | null>;
   updateJoke: (jokeId: string, updatedData: Partial<Omit<Joke, 'id' | 'dateAdded' | 'userId' | 'keywords'>>) => Promise<void>;
@@ -59,7 +58,8 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (authLoading) {
-      setCategories(null); 
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset categories to null while waiting for auth state, so consumers can distinguish "loading" from "loaded with []".
+      setCategories(null);
       return;
     }
     const unsubscribe = categoryService.subscribeToAllCategoriesFromCollection(
@@ -110,10 +110,12 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       lastVisibleJokeDocRef.current = lastVisible;
       setHasMoreJokes(newHasMore);
-    } catch (error: any) {
-      console.error('Error fetching jokes (JokeContext):', error);
-      toast({ title: 'Error', description: error.message || 'Could not load jokes.', variant: 'destructive' });
-      if (!isLoadMore) setJokes([]); 
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore errors surface via `.message`/`.code`; unknown narrows too aggressively for the toast branch.
+      const err = error as any;
+      console.error('Error fetching jokes (JokeContext):', err);
+      toast({ title: 'Error', description: err.message || 'Could not load jokes.', variant: 'destructive' });
+      if (!isLoadMore) setJokes([]);
       setHasMoreJokes(false);
     } finally {
       if (isLoadMore) setLoadingMoreJokes(false);
@@ -136,9 +138,11 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   useEffect(() => {
-    if (authLoading || categories === null) { 
-      setJokes(null); 
-      setLoadingInitialJokes(true); 
+    if (authLoading || categories === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset jokes + loading flag whenever auth or categories regress back to a non-ready state.
+      setJokes(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above; must be paired with the setJokes(null) reset.
+      setLoadingInitialJokes(true);
       return;
     }
 
@@ -177,13 +181,15 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await loadJokesWithFilters(activeFiltersRef.current); 
         }
         return result;
-      } catch (error: any) {
-        console.error('API call error (JokeContext):', error);
-        if (!(error.message.includes("Category name cannot be empty") || error.message.includes("permission denied"))) {
-             toast({ title: 'Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
-        }
-        throw error; 
-      }
+      } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared error handling for addJoke/importJokes/etc.; unknown narrows too aggressively given the string-membership checks below.
+            const err = error as any;
+            console.error('API call error (JokeContext):', err);
+            if (!(err.message.includes("Category name cannot be empty") || err.message.includes("permission denied"))) {
+                 toast({ title: 'Error', description: err.message || 'An unexpected error occurred.', variant: 'destructive' });
+            }
+            throw error;
+          }
     },
     [user, toast, loadJokesWithFilters] 
   );
@@ -225,19 +231,6 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [handleApiCall, user]
   );
 
-  const rateJoke = useCallback( 
-    async (id: string, rating: number) => {
-      if (!user) throw new Error("User not authenticated for rating joke.");
-      await handleApiCall(() => jokeService.rateJoke(id, rating, user.uid), 'Joke rated successfully.', false);
-      setJokes((prevJokes) =>
-        prevJokes
-          ? prevJokes.map((j) => (j.id === id ? { ...j, funnyRate: rating } : j))
-          : null
-      );
-    },
-    [handleApiCall, user]
-  );
-
   const updateJokeCategory = useCallback(
     (jokeId: string, newCategoryName: string) => {
       if (!user) throw new Error("User not authenticated for updating joke category.");
@@ -255,11 +248,13 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const joke = await jokeService.getJokeById(jokeId);
         return joke;
-      } catch (error: any) {
-        console.error('Error in getJokeById (JokeContext):', error);
-        toast({ title: 'Error Fetching Joke', description: error.message || 'Could not fetch joke details.', variant: 'destructive' });
-        return null;
-      }
+      } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore get-by-id errors expose `.message`/`.code`; unknown narrows too aggressively for the toast description string.
+            const err = error as any;
+            console.error('Error in getJokeById (JokeContext):', err);
+            toast({ title: 'Error Fetching Joke', description: err.message || 'Could not fetch joke details.', variant: 'destructive' });
+            return null;
+          }
     },
     [toast] 
   );
@@ -316,11 +311,13 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (jokeId: string): Promise<UserRating[]> => {
       try {
         return await ratingService.fetchAllRatingsForJoke(jokeId);
-      } catch (error: any) {
-        console.error('Error fetching all ratings in context:', error);
-        toast({ title: 'Error', description: 'Could not load community ratings.', variant: 'destructive' });
-        return []; 
-      }
+      } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- collection-group queries surface heterogeneous Firestore error shapes; unknown loses the log/console access pattern.
+            const err = error as any;
+            console.error('Error fetching all ratings in context:', err);
+            toast({ title: 'Error', description: 'Could not load community ratings.', variant: 'destructive' });
+            return [];
+          }
     },
     [toast]
   );
@@ -334,7 +331,6 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addJoke,
     importJokes,
     toggleUsed,
-    rateJoke,
     updateJokeCategory,
     getJokeById,
     updateJoke,

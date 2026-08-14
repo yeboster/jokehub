@@ -68,7 +68,8 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
 
     if (aiGeneratedCategory) {
       form.setValue('category', aiGeneratedCategory, { shouldValidate: true });
-      setCategorySearch(aiGeneratedCategory); 
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the category search box in sync when the AI suggests a category.
+      setCategorySearch(aiGeneratedCategory);
     } else if (aiGeneratedCategory === null) { 
         form.setValue('category', '', { shouldValidate: true });
         setCategorySearch('');

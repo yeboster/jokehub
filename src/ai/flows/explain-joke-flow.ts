@@ -1,11 +1,10 @@
-
-'use server';
 /**
  * @fileOverview AI flow for explaining a joke.
  *
  * - explainJoke - A function that generates an explanation for a given joke and returns it as a stream.
  */
 import { ai } from '@/ai/ai-instance';
+import { EXPLAIN_MODEL } from '@/ai/models';
 import {z} from 'zod';
 
 const ExplainJokeInputSchema = z.object({
@@ -20,9 +19,9 @@ Break down the joke's structure, identify the pun or the source of the humor, an
 /**
  * Generates an explanation for a joke and returns it as a stream.
  */
-export async function explainJoke(input: ExplainJokeInput): Promise<ReadableStream<any>> {
+export async function explainJoke(input: ExplainJokeInput): Promise<ReadableStream<Uint8Array>> {
   const { stream } = ai.generateStream({
-    model: 'googleai/gemini-3.1-flash-lite-preview',
+    model: EXPLAIN_MODEL,
     system: systemInstruction,
     prompt: `Explain this joke: "${input.jokeText}"`,
   });

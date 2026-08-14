@@ -55,7 +55,7 @@ export default function ManageJokesPage() {
                 <CardContent>
                     <CardDescription>
                         This page is dedicated to managing your jokes through bulk operations like CSV import. 
-                        To add individual jokes or generate them with AI, please use the "Add New Joke" button on the main "Jokes" page.
+                        To add individual jokes or generate them with AI, please use the &quot;Add New Joke&quot; button on the main &quot;Jokes&quot; page.
                     </CardDescription>
                 </CardContent>
             </Card>

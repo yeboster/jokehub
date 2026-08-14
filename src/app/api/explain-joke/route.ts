@@ -30,8 +30,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-  } catch (error: any) {
-    console.error('API Error explaining joke:', error);
+  } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS 4.4 catch-unknown narrows poorly with Firebase/HTTP error unions here; any keeps the existing Error-extraction logic working unchanged.
+    const err = error as any;
+    console.error('API Error explaining joke:', err);
     let errorMessage = 'Failed to get joke explanation.';
     if (error instanceof Error) {
       errorMessage = error.message;

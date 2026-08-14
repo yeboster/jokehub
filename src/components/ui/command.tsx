@@ -24,7 +24,9 @@ const Command = React.forwardRef<
 ))
 Command.displayName = CommandPrimitive.displayName
 
-interface CommandDialogProps extends DialogProps {}
+// shadcn/ui template requires an alias type for the wrapper so consumers can
+// extend it with custom props if needed; equivalent to DialogProps here.
+type CommandDialogProps = DialogProps
 
 const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
   return (

@@ -90,5 +90,6 @@ export default {
   		}
   	}
   },
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- tailwindcss-animate has no type exports; require() is the canonical Tailwind config pattern
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;

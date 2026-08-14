@@ -164,7 +164,7 @@ export default function EditJokePage() {
     }
   };
 
-  const isFormDisabled = authLoading || loadingJokeData || loadingCategories || isSubmitting || isDeleting || !user || !!fetchError || (joke && joke.userId !== user?.uid);
+  const isFormDisabled = authLoading || loadingJokeData || loadingCategories || isSubmitting || isDeleting || !user || !!fetchError || (joke !== null && joke.userId !== user?.uid);
 
   const categoryNames = useMemo(() => {
     if (!categories || !user) return [];

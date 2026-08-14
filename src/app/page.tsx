@@ -29,12 +29,14 @@ export default function LandingPage() {
       filterFunnyRate: -1,
       usageStatus: 'all',
       scope: 'public',
+      search: '',
     };
     loadJokesWithFilters(filters);
   }, [loadJokesWithFilters]);
 
   useEffect(() => {
     if (jokes && jokes.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- derive the 3 displayed jokes from the async-loaded jokes list.
       setDisplayedJokes(jokes.slice(0, 3));
     } else if (!loadingInitialJokes && (!jokes || jokes.length === 0)) {
       setDisplayedJokes(hardcodedJokesFallback);

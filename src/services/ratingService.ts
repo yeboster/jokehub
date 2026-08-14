@@ -41,6 +41,7 @@ export async function submitUserRating(
   const now = Timestamp.now();
   
   // Base data, ensure comment is explicitly null if not provided or empty
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepted constraint: dynamic Firestore payload built from optional comment + user fields; unknown would force per-property assertions.
   const ratingData: any = {
     jokeId,
     userId,
@@ -62,7 +63,7 @@ export async function submitUserRating(
   const allRatings = await fetchAllRatingsForJoke(jokeId);
   const ratingCount = allRatings.length;
   const averageRating = ratingCount > 0 
-    ? Math.floor(allRatings.reduce((acc, r) => acc + r.stars, 0) / ratingCount) 
+    ? Math.round((allRatings.reduce((acc, r) => acc + r.stars, 0) / ratingCount) * 10) / 10 
     : 0;
 
   const jokeDocRef = doc(db, 'jokes', jokeId);

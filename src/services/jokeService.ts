@@ -20,21 +20,12 @@ import {
 import { db } from '@/lib/firebase';
 import type { Joke, Category } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
+import { generateKeywords } from '@/lib/text';
+import { SYSTEM_USER_ID } from '@/lib/constants';
 
 const JOKES_COLLECTION = 'jokes';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 const PAGE_SIZE = 10;
-
-// Helper function to create keywords from a string
-const generateKeywords = (text: string): string[] => {
-  const words = text
-    .toLowerCase()
-    .split(/\s+/)
-    .map(word => word.replace(/[.,!?;:()"'`]/g, ''))
-    .filter(word => word.length > 2);
-  return Array.from(new Set(words)); // Return unique keywords
-};
-
 
 export interface FilterParams {
   selectedCategories: string[];
@@ -224,13 +215,14 @@ async function getJokeDoc(jokeId: string) {
   ) {
     const { ref, data } = await getJokeDoc(jokeId);
     // If a userId is passed (for caching), check if it's the server process
-    if (userId !== 'server-process') {
+    if (userId !== SYSTEM_USER_ID) {
         if (data.userId !== userId) {
             throw new Error('You can only update your own jokes.');
         }
     }
   
-    const dataToUpdate: Record<string, any> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepted constraint: build a dynamic Partial<Joke> patch keyed by string; unknown would force casts on every assignment below.
+  const dataToUpdate: Record<string, any> = {};
   
     if (updatedData.category) {
       dataToUpdate.category = await ensureCategoryExists(updatedData.category, userId);

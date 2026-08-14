@@ -10,8 +10,6 @@ import { Loader2, ArrowLeft, ShieldAlert, CalendarDays, Tag, Star as StarIcon, C
 import type { Joke, UserRating } from '@/lib/types';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
-// Header component is not used directly in this layout as per mockup.
-// import Header from '@/components/header'; 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import StarRating from '@/components/StarRating';
@@ -97,8 +95,10 @@ export default function JokeShowPage() {
       }
     
 
-    } catch (error: any) {
-      console.error("Error streaming explanation:", error);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- streaming fetch + AI errors expose heterogeneous shapes; unknown narrows too aggressively for the placeholder string.
+      const err = error as any;
+      console.error("Error streaming explanation:", err);
       setExplanation("Sorry, I couldn't come up with an explanation right now.");
     } finally {
       setIsExplanationLoading(false);
@@ -168,9 +168,13 @@ export default function JokeShowPage() {
     if (!loadingContext && !authLoading && jokeId) {
       fetchJokeAndAllRatings();
     } else if (!jokeId && !loadingContext && !authLoading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- setError/loading flags when the URL is missing a jokeId, so we surface a real error state instead of an infinite loading spinner.
       setError("Joke ID is missing.");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- paired with the setError(...) above; resets the loading flags so the page can render the error.
       setIsLoading(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above; must be paired with the reset-on-missing-id block.
       setIsLoadingCurrentUserRating(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above; must be paired with the reset-on-missing-id block.
       setIsLoadingAllRatings(false);
     }
   }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, loadingContext, authLoading, streamExplanation]);
@@ -228,6 +232,7 @@ export default function JokeShowPage() {
     };
   }, [allUserRatings]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- try/catch inside useMemo defeats compiler memoization inference; deps are correct.
   const isSourceUrl = useMemo(() => {
     if (!joke?.source) return false;
     try {
@@ -282,7 +287,7 @@ export default function JokeShowPage() {
         <Card>
           <CardHeader><CardTitle>Hmm...</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-muted-foreground mb-4">We couldn't find the joke you're looking for.</p>
+            <p className="text-muted-foreground mb-4">We couldn&apos;t find the joke you&apos;re looking for.</p>
           </CardContent>
         </Card>
       </div>
@@ -351,7 +356,7 @@ export default function JokeShowPage() {
       <Card className="shadow-lg mb-8 bg-accent/50 border-primary/20">
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2 text-accent-foreground">
-            <Lightbulb className="h-5 w-5" /> The Comedian's Take
+            <Lightbulb className="h-5 w-5" /> The Comedian&apos;s Take
           </CardTitle>
         </CardHeader>
         <CardContent>

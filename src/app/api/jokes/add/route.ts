@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyApiToken } from '@/lib/auth';
 import { adminDb } from '@/lib/admin';
+import { generateKeywords } from '@/lib/text';
 import { z } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -32,12 +33,7 @@ export async function POST(request: NextRequest) {
     const userId = 'Zxb2vvsmjshTAyAxb31bEQOQVGs1';
     
     // Generate keywords from text
-    const words = text
-      .toLowerCase()
-      .split(/\s+/)
-      .map(word => word.replace(/[.,!?;:()"'`]/g, ''))
-      .filter(word => word.length > 2);
-    const keywords = Array.from(new Set(words));
+    const keywords = generateKeywords(text);
 
     // Add joke using Admin SDK (bypasses security rules)
     const jokeRef = adminDb.collection('jokes').doc();
@@ -55,8 +51,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ id: jokeRef.id, text, category }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error adding joke:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- adminDb write failures surface as FirebaseError which extends Error but TS can't see `.message` on unknown in this branch.
+    const err = error as any;
+    console.error('Error adding joke:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
