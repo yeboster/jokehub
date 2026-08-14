@@ -62,18 +62,25 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCategories(null);
       return;
     }
-    const unsubscribe = categoryService.subscribeToAllCategoriesFromCollection(
+    if (!user) {
+      // No authenticated user -> no user-scoped categories to subscribe to.
+      // Explicit empty state when signed out; distinct from "still loading".
+      setCategories([]);
+      return;
+    }
+    const unsubscribe = categoryService.subscribeToUserCategories(
+      user.uid,
       (newCategories) => {
         setCategories(newCategories);
       },
       (error) => {
         console.error('Error in category subscription (JokeContext):', error);
-        toast({ title: 'Error fetching system categories', description: error.message, variant: 'destructive' });
-        setCategories([]); 
+        toast({ title: 'Error fetching user categories', description: error.message, variant: 'destructive' });
+        setCategories([]);
       }
     );
     return () => unsubscribe();
-  }, [authLoading, toast]);
+  }, [authLoading, user, toast]);
 
   const fetchJokesInternal = useCallback(async (filters: FilterParams, isLoadMore: boolean) => {
     if (filters.scope === 'user' && !user) {
