@@ -1,11 +1,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { explainJoke } from '@/ai/flows/explain-joke-flow';
+import { adminDb } from '@/lib/admin';
 import { z } from 'zod';
 
 // Zod schema for input validation
 const ExplainJokeInputSchema = z.object({
-  jokeId: z.string().optional(), // Keep jokeId optional for now
+  jokeId: z.string().optional(),
   jokeText: z.string().describe('The text of the joke to be explained.'),
 });
 
@@ -18,14 +19,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid input', details: parsedInput.error.format() }, { status: 400 });
     }
 
-    // Call the streaming function
-    const stream = await explainJoke(parsedInput.data);
+    const { jokeId, jokeText } = parsedInput.data;
+    const sourceStream = await explainJoke({ jokeText });
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+    let fullExplanation = '';
 
-    // Return the stream directly to the client
+    // Preserve live streaming while retaining the complete response for persistence.
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const reader = sourceStream.getReader();
+        let streamClosed = false;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            fullExplanation += chunk;
+            controller.enqueue(encoder.encode(chunk));
+          }
+
+          const trailingChunk = decoder.decode();
+          if (trailingChunk) {
+            fullExplanation += trailingChunk;
+            controller.enqueue(encoder.encode(trailingChunk));
+          }
+
+          if (jokeId) {
+            try {
+              await adminDb.collection('jokes').doc(jokeId).update({
+                explanation: fullExplanation,
+              });
+            } catch (error) {
+              console.warn('Failed to persist AI joke explanation:', error);
+            }
+          }
+
+          controller.close();
+          streamClosed = true;
+        } catch (error) {
+          if (!streamClosed) {
+            controller.error(error);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      },
+    });
+
     return new NextResponse(stream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
-        // This header is often required for Vercel to prevent buffering
         'X-Content-Type-Options': 'nosniff',
       },
     });

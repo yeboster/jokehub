@@ -82,7 +82,6 @@ export default function JokeShowPage() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let finalExplanation = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -90,8 +89,11 @@ export default function JokeShowPage() {
           break;
         }
         const chunk = decoder.decode(value, { stream: true });
-        finalExplanation += chunk;
         setExplanation(prev => prev + chunk);
+      }
+      const trailingChunk = decoder.decode();
+      if (trailingChunk) {
+        setExplanation(prev => prev + trailingChunk);
       }
     
 
@@ -124,7 +126,11 @@ export default function JokeShowPage() {
         const fetchedJoke = await getJokeById(jokeId);
         if (fetchedJoke) {
           setJoke(fetchedJoke);
-          streamExplanation(fetchedJoke.text, fetchedJoke.id);
+          setExplanation(fetchedJoke.explanation ?? '');
+          setIsExplanationLoading(false);
+          if (!fetchedJoke.explanation) {
+            streamExplanation(fetchedJoke.text, fetchedJoke.id);
+          }
 
           // Fetch all ratings for this joke
           const allRatings = await fetchAllRatingsForJoke(jokeId);
@@ -355,9 +361,20 @@ export default function JokeShowPage() {
       {/* Joke Explanation Section */}
       <Card className="shadow-lg mb-8 bg-accent/50 border-primary/20">
         <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2 text-accent-foreground">
-            <Lightbulb className="h-5 w-5" /> The Comedian&apos;s Take
-          </CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-xl flex items-center gap-2 text-accent-foreground">
+              <Lightbulb className="h-5 w-5" /> The Comedian&apos;s Take
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => streamExplanation(joke.text, joke.id)}
+              disabled={isExplanationLoading}
+            >
+              {isExplanationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isExplanationLoading ? 'Explaining...' : 'Explain again'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isExplanationLoading ? (
