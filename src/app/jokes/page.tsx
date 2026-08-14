@@ -90,6 +90,7 @@ function JokesPageComponent() {
       search: querySearch,
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync of filter state from the URL query string on mount/navigation.
     setActiveFilters(prevFilters => {
       if (JSON.stringify(prevFilters) === JSON.stringify(filtersFromUrl)) {
         return prevFilters;
@@ -161,6 +162,7 @@ function JokesPageComponent() {
   };
 
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- early-return guard inside useMemo is intentional; compiler inference is too conservative here.
   const modalCategoryNames = useMemo(() => {
     if (!allCategoriesFromContext || allCategoriesFromContext.length === 0) {
         return [];
@@ -456,7 +458,7 @@ function JokesPageComponent() {
 
         <div className="flex flex-wrap items-center gap-2 flex-grow min-h-[36px]">
           {activeFilters.search && (
-            <Badge variant="secondary" className="py-1 px-2">Search: "{activeFilters.search}"</Badge>
+            <Badge variant="secondary" className="py-1 px-2">Search: &quot;{activeFilters.search}&quot;</Badge>
           )}
           {activeFilters.scope === 'user' && user && (
             <Badge variant="secondary" className="py-1 px-2 bg-primary/10 text-primary border-primary/30">Showing: My Jokes</Badge>

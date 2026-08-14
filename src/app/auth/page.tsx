@@ -47,6 +47,7 @@ function AuthPageComponent() {
         await signUp(email, password);
       }
       toast({ title: isLogin ? 'Login Successful' : 'Signup Successful', description: 'Redirecting...' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase auth errors expose a dynamic `code` field not present on Error.
     } catch (error: any) {
       console.error("Auth error:", error);
       let errorMessage = error.message || (isLogin ? 'Failed to login.' : 'Failed to sign up.');

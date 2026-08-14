@@ -160,6 +160,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           });
         }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PapaParse error objects have a dynamic shape.
       } catch (error: any) {
         toast({
           title: 'Import Error',
@@ -198,7 +199,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
       <CardHeader>
         <CardTitle>Import Jokes from CSV</CardTitle>
         <CardDescription>
-          Upload a CSV file with "text", "category" columns. Optionally include "funnyrate" (0-5) and "source".
+          Upload a CSV file with &quot;text&quot;, &quot;category&quot; columns. Optionally include &quot;funnyrate&quot; (0-5) and &quot;source&quot;.
           Headers are case-insensitive.
         </CardDescription>
       </CardHeader>
