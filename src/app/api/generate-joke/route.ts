@@ -1,13 +1,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateJoke, type GenerateJokeInput, type GenerateJokeOutput } from '@/ai/flows/generate-joke-flow';
+import { GEMINI_MODELS } from '@/ai/models';
 import { z } from 'zod';
 
 // Define the expected input schema for the API request body
 const ApiInputSchema = z.object({
   topicHint: z.string().optional(),
   prefilledJokes: z.array(z.string()).optional(),
-  model: z.enum(['googleai/gemini-3.1-flash-lite-preview', 'googleai/gemini-3.1-pro-preview', 'googleai/gemini-3-flash-preview']).optional(),
+  model: z.enum(GEMINI_MODELS).optional(),
   temperature: z.number().min(0).max(2).optional(),
 });
 

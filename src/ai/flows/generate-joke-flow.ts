@@ -1,5 +1,3 @@
-
-'use server';
 /**
  * @fileOverview AI flow for generating jokes.
  *
@@ -10,12 +8,13 @@
 
 import { ai } from '@/ai/ai-instance';
 import { jokeGenerationPrompt, systemInstruction } from '@/ai/prompts/generate-joke-prompt';
+import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
 import { z } from 'genkit';
 
 const GenerateJokeInputSchema = z.object({
   topicHint: z.string().optional().describe('An optional topic or category hint for the joke.'),
   prefilledJokes: z.array(z.string()).optional().describe('A list of prefilled jokes to ensure the generated jokes are different.'),
-  model: z.enum(['googleai/gemini-3.1-flash-lite-preview', 'googleai/gemini-3.1-pro-preview', 'googleai/gemini-3-flash-preview']).optional().describe('The model to use for generation.'),
+  model: z.enum(GEMINI_MODELS).optional().describe('The model to use for generation.'),
   temperature: z.number().min(0).max(2).optional().describe('Controls the randomness of the output. Higher values (e.g., 1.5) are more creative, lower values (e.g., 0.2) are more predictable.'),
 });
 
@@ -48,14 +47,13 @@ const generateJokeFlow = ai.defineFlow(
 
     const res = await ai.generate({
       prompt,
-      model: input.model || 'googleai/gemini-3-flash', // Default to flash if not provided
+      model: input.model || DEFAULT_GENERATE_MODEL,
       system: systemInstruction,
       output: { schema: GenerateJokeOutputSchema },
       config: {
         temperature: input.temperature,
       }
     });
-    console.error(res)
     const output = res.output;
     if (!output || typeof output !== 'object') {
       throw new Error('AI failed to generate a joke. The output was empty.');

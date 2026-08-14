@@ -8,6 +8,7 @@ import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, Sparkles, CheckCirc
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import type { GenerateJokeOutput, JokeVariation } from '@/ai/flows/generate-joke-flow';
+import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
 import Header from '@/components/header';
 import AddJokeForm, { type JokeFormValues } from '@/components/add-joke-form';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ export default function AddJokePage() {
   const [aiTopicHint, setAiTopicHint] = useState<string>('');
   const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
   const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
-  const [selectedModel, setSelectedModel] = useState('googleai/gemini-3.1-flash-lite-preview');
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GENERATE_MODEL);
   const [temperature, setTemperature] = useState([0.8]);
   const [inspirationalJokes, setInspirationalJokes] = useState<string[]>([]);
   const [isLoadingInspirationalJokes, setIsLoadingInspirationalJokes] = useState(false);
@@ -220,9 +221,11 @@ export default function AddJokePage() {
                                 <SelectValue placeholder="Select a model" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="googleai/gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Preview)</SelectItem>
-                                <SelectItem value="googleai/gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</SelectItem>
-                                <SelectItem value="googleai/gemini-3-flash-preview">Gemini 3 Flash (Preview)</SelectItem>
+                                {GEMINI_MODELS.map((model) => (
+                                  <SelectItem key={model} value={model}>
+                                    {model.replace('googleai/', '')}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                             </Select>
                         </div>
