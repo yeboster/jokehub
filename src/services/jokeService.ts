@@ -31,6 +31,8 @@ export interface FilterParams {
   usageStatus: 'all' | 'used' | 'unused';
   scope: 'public' | 'user';
   search: string;
+  /** Max jokes to fetch per page. Defaults to PAGE_SIZE. */
+  limit?: number;
 }
 
 function buildJokesQuery(
@@ -72,7 +74,7 @@ function buildJokesQuery(
     queryConstraints.push(startAfter(lastVisibleJokeDoc));
   }
 
-  queryConstraints.push(limit(PAGE_SIZE));
+  queryConstraints.push(limit(filters.limit ?? PAGE_SIZE));
 
   return query(collection(db, JOKES_COLLECTION), ...queryConstraints);
 }
@@ -98,7 +100,7 @@ export async function fetchJokes(
   );
 
   const lastVisible = snapshot.docs[snapshot.docs.length - 1] ?? null;
-  const hasMore = snapshot.docs.length === PAGE_SIZE;
+  const hasMore = snapshot.docs.length === (filters.limit ?? PAGE_SIZE);
 
   return { jokes, lastVisible, hasMore };
 }

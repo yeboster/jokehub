@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "migrations": "tsx ./migrations"
+    "migrations": "tsx ./migrations",
+    "firestore:deploy": "firebase deploy --only firestore"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.41.0",

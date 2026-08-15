@@ -32,13 +32,14 @@ export default function LandingPage() {
       usageStatus: 'all',
       scope: 'public',
       search: '',
+      limit: 3,
     };
     loadJokesWithFilters(filters);
   }, [loadJokesWithFilters]);
 
   useEffect(() => {
     if (jokes && jokes.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- derive the 3 displayed jokes from the async-loaded jokes list.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- derive the displayed jokes from the async-loaded (already limit:3) jokes list.
       setDisplayedJokes(jokes.slice(0, 3));
     } else if (!loadingInitialJokes && (!jokes || jokes.length === 0)) {
       setDisplayedJokes(HARDCODED_JOKES_FALLBACK);

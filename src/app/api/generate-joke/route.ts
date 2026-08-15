@@ -33,8 +33,27 @@ const ApiInputSchema = z.object({
  * by dateAdded desc (covers missing index or unrated-only corpora). Any
  * error is swallowed so generation never fails because of the exemplar
  * fetch.
+ *
+ * Caching: results are memoised at module scope for 60s keyed by the
+ * requested limit. This cache is per-process (per serverless instance),
+ * which is acceptable here: exemplars drift slowly, we already swallow
+ * fetch errors, and a cold start simply refetches. Do NOT introduce
+ * stale-while-revalidate logic without also invalidating on joke
+ * create/update/delete.
  */
+type ExemplarCacheEntry = { data: string[]; expiresAt: number };
+const EXEMPLAR_CACHE_TTL_MS = 60_000;
+// Module-scope cache. Survives across requests on the same serverless
+// instance; rebuilt on cold start or after TTL expiry.
+const exemplarCache: Map<number, ExemplarCacheEntry> = new Map();
+
 async function fetchTopExemplars(limitCount: number): Promise<string[]> {
+  const now = Date.now();
+  const cached = exemplarCache.get(limitCount);
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+
   try {
     let snap;
     try {
@@ -63,6 +82,7 @@ async function fetchTopExemplars(limitCount: number): Promise<string[]> {
         texts.push(candidate);
       }
     }
+    exemplarCache.set(limitCount, { data: texts, expiresAt: now + EXEMPLAR_CACHE_TTL_MS });
     return texts;
   } catch (err) {
     // Last-ditch: never let exemplar fetch kill generation. Could be no
