@@ -28,10 +28,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { text, category, source } = parsedInput.data;
-    
-    // Use Marco's user ID for jokes added via API
-    const userId = 'Zxb2vvsmjshTAyAxb31bEQOQVGs1';
-    
+
+    const userId = process.env.JOKEHUB_JARVIS_USER_ID;
+    if (!userId) {
+      console.error('JOKEHUB_JARVIS_USER_ID env var is not set');
+      return NextResponse.json({ error: 'Server misconfiguration: JOKEHUB_JARVIS_USER_ID is not set' }, { status: 500 });
+    }
+
     // Generate keywords from text
     const keywords = generateKeywords(text);
 
@@ -45,6 +48,7 @@ export async function POST(request: NextRequest) {
       funnyRate: 0,
       averageRating: 0,
       ratingCount: 0,
+      ratingSum: 0,
       dateAdded: FieldValue.serverTimestamp(),
       used: false,
       keywords,
