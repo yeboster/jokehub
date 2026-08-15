@@ -2,11 +2,10 @@ import {
   collection,
   query,
   where,
-  limit,
+  orderBy,
   getDocs,
   getDoc,
   Timestamp,
-  orderBy,
   doc,
   runTransaction,
   type DocumentData,
@@ -19,33 +18,19 @@ const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 /**
  * Design note — atomic rating aggregation:
  *
- * Firestore client SDK `runTransaction` does NOT support queries (no
- * `getDocs` of a Query inside the transaction body). It only supports
- * `getDoc` on a single DocumentReference.
+ * The joke doc carries running totals (`ratingSum`, `ratingCount`) so a
+ * rating submit only needs 2 reads — the joke doc and the user's rating doc
+ * (a deterministic id, so no query is needed to find it) — instead of
+ * reading every rating doc for the joke.
  *
- * Therefore we pre-fetch the supporting data BEFORE the transaction:
- *   1) the user's existing rating for this joke (so we know its document id
- *      and current stars — needed to invert its contribution to the sum)
- *   2) the full set of ratings for this joke (so we can compute count + sum
- *      once and reuse them after the upsert)
- *
- * Then inside the transaction we:
- *   1) re-read the joke doc (for optimistic-concurrency freshness, so we
- *      don't blindly clobber a value another writer just wrote)
- *   2) write the user's rating doc with a deterministic id
- *      (`${jokeId}_${userId}`) via `setDoc(..., { merge: true })`. The
- *      deterministic id means we can safely `setDoc` inside a transaction
- *      (transactions forbid `addDoc` because they need a known doc ref),
- *      and it also guarantees one rating per (joke, user) at the data
- *      layer — fixing the latent bug where the old code could leave
- *      multiple rating docs per user.
- *   3) recompute averageRating as
- *        newSum = preFetchSum - (existingUserStars ?? 0) + newStars
- *        newCount = preFetchCount                // upsert only
- *        avg = newSum / newCount
- *      and write both `averageRating` (rounded to 1 decimal, matching the
- *      original Math.round(avg*10)/10 behavior) and `ratingCount` on the
- *      joke doc. Writes come AFTER all reads, as required.
+ * Inside the transaction we:
+ *   1) read the joke doc and the user's rating doc (`${jokeId}_${userId}`).
+ *   2) compute the delta: an existing rating shifts the sum by
+ *      (newStars - oldStars) with count unchanged (upsert); a new rating
+ *      adds newStars to the sum and increments count.
+ *   3) write the rating doc (deterministic id, so `transaction.set(...,
+ *      { merge: true })` is safe — transactions forbid `addDoc`) and update
+ *      the joke doc's `ratingSum`, `ratingCount`, and `averageRating`.
  *
  * All transaction reads precede all writes.
  */
@@ -62,90 +47,65 @@ export async function submitUserRating(
     throw new Error('Comment cannot exceed 1000 characters.');
   }
 
-  const ratingsCollectionRef = collection(db, JOKE_RATINGS_COLLECTION);
-
-  // --- Pre-transaction reads (client SDK transactions forbid getDocs of queries) ---
-  // Existing rating doc for this user, if any.
-  const existingUserRatingQuery = query(
-    ratingsCollectionRef,
-    where('jokeId', '==', jokeId),
-    where('userId', '==', userId),
-    limit(1)
-  );
-  const existingUserRatingSnap = await getDocs(existingUserRatingQuery);
-
-  // Full ratings snapshot for this joke — used for sum + count.
-  const allRatingsQuery = query(
-    ratingsCollectionRef,
-    where('jokeId', '==', jokeId)
-  );
-  const allRatingsSnap = await getDocs(allRatingsQuery);
-
-  const preFetchCount = allRatingsSnap.size;
-  let preFetchSum = 0;
-  allRatingsSnap.forEach((d) => {
-    const data = d.data() as { stars?: number };
-    if (typeof data.stars === 'number') preFetchSum += data.stars;
-  });
-
-  // The existing rating doc id (if any) and its prior stars — so we can
-  // invert its contribution before adding the new stars.
-  let existingRatingDocId: string | null = null;
-  let existingStars = 0;
-  if (!existingUserRatingSnap.empty) {
-    const docSnap = existingUserRatingSnap.docs[0];
-    existingRatingDocId = docSnap.id;
-    const data = docSnap.data() as { stars?: number };
-    existingStars = typeof data.stars === 'number' ? data.stars : 0;
-  }
-
   const now = Timestamp.now();
   const ratingDocId = `${jokeId}_${userId}`;
   const ratingDocRef = doc(db, JOKE_RATINGS_COLLECTION, ratingDocId);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepted constraint: dynamic Firestore payload built from optional comment + user fields; unknown would force per-property assertions.
-  const ratingData: any = {
-    jokeId,
-    userId,
-    stars,
-    updatedAt: now,
-    comment: comment && comment.trim() !== '' ? comment.trim() : null,
-  };
-  // Preserve createdAt for updates; set it for first-time writes.
-  if (existingRatingDocId === null) {
-    ratingData.createdAt = now;
-  }
-
   const jokeDocRef = doc(db, 'jokes', jokeId);
 
   await runTransaction(db, async (transaction) => {
     // --- Reads first (transaction rule) ---
-    const jokeDoc = await transaction.get(jokeDocRef);
+    const jokeSnap = await transaction.get(jokeDocRef);
+    const existingRatingSnap = await transaction.get(ratingDocRef);
 
-    // Compute new aggregate from pre-fetched values + the user's new stars.
-    // Upsert of a single user's rating does not change ratingCount.
-    const newSum = preFetchSum - existingStars + stars;
-    const newCount = preFetchCount;
-    const averageRating = newCount > 0
-      ? Math.round((newSum / newCount) * 10) / 10
-      : 0;
+    if (!jokeSnap.exists()) {
+      throw new Error(`Joke ${jokeId} not found.`);
+    }
+
+    const jokeData = jokeSnap.data() as {
+      averageRating?: number;
+      ratingCount?: number;
+      ratingSum?: number;
+    };
+    const existingStars = existingRatingSnap.exists()
+      ? (existingRatingSnap.data() as { stars?: number }).stars
+      : undefined;
+
+    const currentCount = jokeData.ratingCount ?? 0;
+    // Legacy jokes have averageRating/ratingCount but no ratingSum yet —
+    // derive it once from the stored average so old totals aren't lost.
+    const currentSum = jokeData.ratingSum ?? Math.round((jokeData.averageRating ?? 0) * currentCount);
+
+    let newSum: number;
+    let newCount: number;
+    if (typeof existingStars === 'number') {
+      newSum = currentSum - existingStars + stars;
+      newCount = currentCount;
+    } else {
+      newSum = currentSum + stars;
+      newCount = currentCount + 1;
+    }
+    const averageRating = newCount > 0 ? Math.round((newSum / newCount) * 10) / 10 : 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepted constraint: dynamic Firestore payload built from optional comment + user fields; unknown would force per-property assertions.
+    const ratingData: any = {
+      jokeId,
+      userId,
+      stars,
+      updatedAt: now,
+      comment: comment && comment.trim() !== '' ? comment.trim() : null,
+    };
+    // Preserve createdAt for updates; set it for first-time writes.
+    if (!existingRatingSnap.exists()) {
+      ratingData.createdAt = now;
+    }
 
     // --- Writes after reads ---
     transaction.set(ratingDocRef, ratingData, { merge: true });
-
     transaction.update(jokeDocRef, {
-      averageRating,
+      ratingSum: newSum,
       ratingCount: newCount,
+      averageRating,
     });
-
-    // Touch joke doc to ensure it exists before writing to it; if the joke
-    // is missing we still attempt the update (server will surface the error
-    // via the transaction's retry/commit semantics). Reading it here also
-    // establishes it as part of the transaction's read set for OCC.
-    if (!jokeDoc.exists) {
-      // No-op placeholder; transaction.update will fail at commit with a
-      // clear "No document to update" error, which surfaces to the caller.
-    }
   });
 }
 

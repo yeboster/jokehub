@@ -10,6 +10,7 @@ export interface Joke {
   userId: string; // Added to associate joke with a user
   averageRating?: number;
   ratingCount?: number;
+  ratingSum?: number;
   explanation?: string;
   keywords?: string[];
 }

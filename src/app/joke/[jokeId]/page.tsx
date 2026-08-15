@@ -194,6 +194,13 @@ export default function JokeShowPage() {
       await submitUserRating(joke.id, ratingInputValue, commentInputValue);
       toast({ title: 'Success', description: currentUserRating ? 'Your rating has been updated.' : 'Your rating has been submitted.' });
 
+      // Refetch the joke doc so the displayed averageRating/ratingCount reflect
+      // the transaction's write (the page holds a one-time snapshot, not a live subscription).
+      const updatedJoke = await getJokeById(joke.id);
+      if (updatedJoke) {
+        setJoke(updatedJoke);
+      }
+
       // Refetch all ratings to update community feedback section and current user rating display
       setIsLoadingAllRatings(true);
       setIsLoadingCurrentUserRating(true);
@@ -222,14 +229,10 @@ export default function JokeShowPage() {
     return allUserRatings.filter(rating => rating.userId !== user?.uid);
   }, [allUserRatings, user, isLoadingAllRatings]);
 
-  const averageRating = useMemo(() => {
-    if (!allUserRatings || allUserRatings.length === 0) return { average: 0, count: 0 };
-    const sum = allUserRatings.reduce((acc, rating) => acc + rating.stars, 0);
-    return {
-      average: parseFloat((sum / allUserRatings.length).toFixed(1)),
-      count: allUserRatings.length,
-    };
-  }, [allUserRatings]);
+  const averageRating = useMemo(
+    () => ({ average: joke?.averageRating ?? 0, count: joke?.ratingCount ?? 0 }),
+    [joke?.averageRating, joke?.ratingCount]
+  );
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- try/catch inside useMemo defeats compiler memoization inference; deps are correct.
   const isSourceUrl = useMemo(() => {
