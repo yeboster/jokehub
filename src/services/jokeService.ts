@@ -20,6 +20,7 @@ import type { Joke } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
 import { generateKeywords } from '@/lib/text';
 import { SYSTEM_USER_ID } from '@/lib/constants';
+import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
 
 const JOKES_COLLECTION = 'jokes';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
@@ -266,20 +267,43 @@ async function getJokeDoc(jokeId: string) {
   }
 
   export async function fetchUserFiveStarJokes(userId: string): Promise<string[]> {
-    const ratingsQuery = query(
-      collection(db, JOKE_RATINGS_COLLECTION),
-      where('userId', '==', userId),
-      where('stars', '==', 5),
-      orderBy('updatedAt', 'desc'),
-      limit(10) // Limit to the last 10 5-star jokes for performance
-    );
-  
-    const ratingsSnapshot = await getDocs(ratingsQuery);
-    if (ratingsSnapshot.empty) {
+    const ratingsCollectionRef = collection(db, JOKE_RATINGS_COLLECTION);
+    let ratingDocs;
+    try {
+      const ratingsQuery = query(
+        ratingsCollectionRef,
+        where('userId', '==', userId),
+        where('stars', '==', 5),
+        orderBy('updatedAt', 'desc'),
+        limit(10) // Limit to the last 10 5-star jokes for performance
+      );
+      const ratingsSnapshot = await getDocs(ratingsQuery);
+      ratingDocs = ratingsSnapshot.docs;
+    } catch (error) {
+      if (!isMissingIndexError(error)) {
+        throw error;
+      }
+      warnMissingIndex('fetchUserFiveStarJokes', error);
+      // Composite index (userId + stars + orderBy updatedAt) missing/building —
+      // drop the orderBy (equality-only filters need no composite index) and
+      // sort client-side instead.
+      const fallbackQuery = query(
+        ratingsCollectionRef,
+        where('userId', '==', userId),
+        where('stars', '==', 5)
+      );
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      ratingDocs = fallbackSnapshot.docs
+        .slice()
+        .sort((a, b) => (b.data().updatedAt as Timestamp).toMillis() - (a.data().updatedAt as Timestamp).toMillis())
+        .slice(0, 10);
+    }
+
+    if (ratingDocs.length === 0) {
       return [];
     }
-  
-    const jokeIds = ratingsSnapshot.docs.map(doc => doc.data().jokeId);
+
+    const jokeIds = ratingDocs.map(doc => doc.data().jokeId);
     
     // Firestore 'in' queries are limited to 30 items, but we're only fetching 10.
     const jokesQuery = query(collection(db, 'jokes'), where('__name__', 'in', jokeIds));

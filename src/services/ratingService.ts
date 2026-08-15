@@ -9,9 +9,11 @@ import {
   doc,
   runTransaction,
   type DocumentData,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { UserRating } from '@/lib/types';
+import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
 
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 
@@ -139,25 +141,45 @@ export async function getUserRatingForJoke(
  * @param jokeId - The ID of the joke.
  * @returns A promise that resolves to an array of UserRating objects.
  */
+function mapRatingDocs(docs: QueryDocumentSnapshot[]): UserRating[] {
+  return docs.map((d) => {
+    const data = d.data() as DocumentData;
+    return {
+      id: d.id,
+      ...data,
+      createdAt: (data.createdAt as Timestamp).toDate(),
+      updatedAt: (data.updatedAt as Timestamp).toDate(),
+    } as UserRating;
+  });
+}
+
 export async function fetchAllRatingsForJoke(jokeId: string): Promise<UserRating[]> {
   const ratingsCollectionRef = collection(db, JOKE_RATINGS_COLLECTION);
-  const q = query(
-    ratingsCollectionRef,
-    where('jokeId', '==', jokeId),
-    orderBy('updatedAt', 'desc') // Order by most recently updated
-  );
 
   try {
+    const q = query(
+      ratingsCollectionRef,
+      where('jokeId', '==', jokeId),
+      orderBy('updatedAt', 'desc') // Order by most recently updated
+    );
     const querySnapshot = await getDocs(q);
-    const ratings = querySnapshot.docs.map((d) => {
-      const data = d.data() as DocumentData;
-      return {
-        id: d.id,
-        ...data,
-        createdAt: (data.createdAt as Timestamp).toDate(),
-        updatedAt: (data.updatedAt as Timestamp).toDate(),
-      } as UserRating;
-    });
+    return mapRatingDocs(querySnapshot.docs);
+  } catch (error) {
+    if (!isMissingIndexError(error)) {
+      console.error("Error fetching all ratings for joke:", error);
+      throw new Error(`Failed to fetch ratings for joke ${jokeId}.`);
+    }
+    warnMissingIndex('fetchAllRatingsForJoke', error);
+  }
+
+  // Composite index (jokeId + orderBy updatedAt) missing/building — drop the
+  // orderBy (single equality filter needs no composite index) and sort
+  // client-side instead.
+  try {
+    const fallbackQuery = query(ratingsCollectionRef, where('jokeId', '==', jokeId));
+    const fallbackSnapshot = await getDocs(fallbackQuery);
+    const ratings = mapRatingDocs(fallbackSnapshot.docs);
+    ratings.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     return ratings;
   } catch (error) {
     console.error("Error fetching all ratings for joke:", error);
