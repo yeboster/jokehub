@@ -30,5 +30,15 @@
 ## WORKING
 *   Implementing a context persistence mechanism for the AI assistant (creating summary files).
 
+## DONE (2026-08-15, improvement round 2)
+*   Security: hardcoded Firebase UID removed from `/api/jokes/add` → `JOKEHUB_JARVIS_USER_ID` env var (must be set in Vercel env + local `.env.production.local`).
+*   Perf: delta-based rating aggregation (`ratingSum`/`ratingCount` on joke doc, 2 reads per submit, was N+1); average rating single-sourced from joke doc; exemplar fetch cached 60s; home page fetches `limit: 3`.
+*   Hygiene: dead `my-jokes` route + 12 orphaned components deleted; Vitest setup with 21 unit tests (`npm test`).
+*   Infra: `firestore.rules` + `firestore.indexes.json` + `firebase.json` at root; `npm run firestore:deploy` (rules NOT yet deployed); composite-index queries fall back to client-side sort when the index is missing.
+
 ## NEXT
+*   Deploy Firestore rules/indexes (`npm run firestore:deploy`).
+*   Set `JOKEHUB_JARVIS_USER_ID` in Vercel env.
+
+## NEXT (older)
 *   (To be defined by the user for Joke Hub application features).
