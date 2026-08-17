@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast'; // Ensure this path is correct
 import { useAuth } from '@/contexts/AuthContext'; // Ensure this path is correct
 import { cn } from '@/lib/utils';
+import { parseCSVLine } from '@/lib/csv';
 
 interface CSVImportProps {
   // Defines the expected structure of jokes after parsing from CSV, before adding to DB
@@ -91,33 +92,6 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         if (lines.length <= 1) { // Must have headers and at least one data row
           throw new Error('CSV file needs a header row and at least one data row.');
         }
-
-        // More robust CSV line parser that handles commas within quotes and escaped quotes ("")
-        const parseCSVLine = (line: string): string[] => {
-          const values: string[] = [];
-          let currentValue = '';
-          let inQuotes = false;
-
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-              // If already in quotes and next char is also a quote, it's an escaped quote
-              if (inQuotes && line[i + 1] === '"') {
-                currentValue += '"';
-                i++; // Skip the next quote
-              } else {
-                inQuotes = !inQuotes; // Toggle inQuotes state
-              }
-            } else if (char === ',' && !inQuotes) {
-              values.push(currentValue); // Push the accumulated value
-              currentValue = ''; // Reset for the next value
-            } else {
-              currentValue += char; // Accumulate character to current value
-            }
-          }
-          values.push(currentValue); // Push the last value
-          return values;
-        };
 
         // Parse header row and normalize to lowercase
         const headerCells = parseCSVLine(lines[0].line);

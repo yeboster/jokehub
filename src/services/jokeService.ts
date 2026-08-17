@@ -45,7 +45,8 @@ export interface FilterParams {
   limit?: number;
 }
 
-function buildJokesQuery(
+/** Exported for tests; callers outside this module go through `fetchJokes`. */
+export function buildJokesQuery(
   filters: FilterParams,
   userId?: string,
   lastVisibleJokeDoc?: QueryDocumentSnapshot | null,
