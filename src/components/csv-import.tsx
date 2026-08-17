@@ -10,6 +10,7 @@ import type { Joke } from '@/lib/types'; // Ensure this path and type are correc
 
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast'; // Ensure this path is correct
 import { useAuth } from '@/contexts/AuthContext'; // Ensure this path is correct
@@ -205,12 +206,12 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
       <CardContent>
         {/* Display message if user is not logged in */}
         {!user && (
-          <div className="mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200 text-yellow-700 flex items-center">
-            <ShieldAlert className="mr-2 h-5 w-5 flex-shrink-0" />
-            <div>
-              Please <Link href="/auth?redirect=/manage" className="font-semibold underline hover:text-yellow-800">log in or sign up</Link> to import jokes.
-            </div>
-          </div>
+          <Alert className="mb-4 border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              Please <Link href="/auth?redirect=/manage" className="font-semibold underline hover:text-primary/80">log in or sign up</Link> to import jokes.
+            </AlertDescription>
+          </Alert>
         )}
         <div className="grid max-w-sm items-center gap-1.5 mx-auto">
           <Label htmlFor="csv-file" className="text-center">Select CSV File</Label>

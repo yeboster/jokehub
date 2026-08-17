@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import Link from 'next/link';
@@ -97,12 +98,12 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
       </CardHeader>
       <CardContent className="p-0 pt-1.5"> 
         {!user && (
-          <div className="mb-3 p-2.5 rounded-md bg-yellow-50 border border-yellow-200 text-yellow-700 flex items-center text-sm">
-            <ShieldAlert className="mr-2 h-4 w-4 flex-shrink-0" />
-            <div>
-              Please <Link href="/auth?redirect=/jokes" className="font-semibold underline hover:text-yellow-800">log in or sign up</Link> to add jokes.
-            </div>
-          </div>
+          <Alert className="mb-3 border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              Please <Link href="/auth?redirect=/jokes" className="font-semibold underline hover:text-primary/80">log in or sign up</Link> to add jokes.
+            </AlertDescription>
+          </Alert>
         )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2.5"> 

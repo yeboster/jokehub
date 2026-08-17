@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%; /* White */
@@ -24,7 +20,7 @@ body {
     --secondary-foreground: 0 0% 20%; /* Dark Gray (for text on secondary) */
 
     --muted: 0 0% 96.1%; /* Light Gray */
-    --muted-foreground: 0 0% 45.1%; /* Medium Gray (for less important text like subtitles) */
+    --muted-foreground: 0 0% 40%; /* Medium Gray #666666 - for less important text like subtitles */
 
     --accent: 270 80% 95%; /* Very Light Pastel Purple (e.g., #F3E8FD, for Home nav bg, secondary button bgs) */
     --accent-foreground: 270 60% 50%; /* Vibrant Purple (for text on accent bg, matching primary) */

@@ -16,10 +16,19 @@
 *   TypeScript
 
 **Styling Guidelines**:
-*   Primary color: Dark gray (#333333)
-*   Secondary color: Medium gray (#666666)
-*   Accent: Purple (#800080)
+
+All colors are HSL triples defined as CSS custom properties in `src/app/globals.css` (`:root` for light, `.dark` for dark) and consumed exclusively through Tailwind theme tokens (`bg-primary`, `text-muted-foreground`, …). Never hardcode a palette color (e.g. `bg-yellow-50`) — it will not adapt to dark mode.
+
+*   **Primary — vibrant purple** `270 60% 50%` (≈`#6A0DAD`), `270 60% 65%` in dark. The brand color: primary buttons, links, focus rings, filled stars.
+*   **Accent — pastel purple** `270 80% 95%` light / `270 50% 25%` dark, with `--accent-foreground` at the primary purple. Used for subtle tinted backgrounds (active nav item, file-input button). It is a *background* token — it has near-zero contrast on white as a text/fill color.
+*   **Text scale — neutral grays**: `--foreground` `0 0% 20%` (#333333) for body text, `--muted-foreground` `0 0% 40%` (#666666) for subtitles and secondary text.
+*   **Surfaces**: `--background`/`--card` white (`0 0% 100%`) light, near-black (`0 0% 10%`) dark; `--border`/`--input` `0 0% 89.8%` light, `0 0% 25%` dark.
+*   **Destructive** `0 84.2% 60.2%` for errors and delete actions.
+*   **Typography**: Geist Sans / Geist Mono, loaded in `src/app/layout.tsx` via `next/font/google` and exposed as `--font-geist-sans` / `--font-geist-mono`; `tailwind.config.ts` maps them onto `fontFamily.sans`/`mono`, so Tailwind's preflight applies Geist Sans globally.
+*   **Inline notices** follow the tinted-token idiom `bg-<token>/10 border-<token>/30 text-<token>` (e.g. `bg-destructive/10 border-destructive/30 text-destructive`), rendered via the `<Alert>` component.
 *   Clean, organized, modern layout.
+
+> Historical note: the original guideline specified dark gray `#333333` primary, medium gray `#666666` secondary, and purple `#800080` accent. The implementation deliberately promoted purple to *primary* and demoted the grays to the text scale; the description above reflects the shipped design and supersedes the original.
 
 ## 2. Key Features Implemented & Major Developments
 
