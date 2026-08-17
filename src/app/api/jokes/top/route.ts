@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchTopJokes } from '@/services/jokeService';
+import { fetchTopJokes } from '@/services/server/topJokes';
 import { verifyApiToken } from '@/lib/auth';
+
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 50;
+const DEFAULT_MIN_RATING = 4;
+
+/** Parses a query param, falling back to `fallback` when absent or non-numeric, then clamps it. */
+function clampParam(raw: string | null, fallback: number, min: number, max: number, parse: (value: string) => number) {
+  const parsed = raw === null ? Number.NaN : parse(raw);
+  return Math.min(Math.max(Number.isFinite(parsed) ? parsed : fallback, min), max);
+}
 
 // GET /api/jokes/top?limit=10&minRating=4
 export async function GET(request: NextRequest) {
@@ -12,9 +22,14 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const minRating = parseFloat(searchParams.get('minRating') || '4');
-    
+    // Clamped so `?limit=abc` can't reach Firestore's `limit()` as NaN (a 500)
+    // and `?limit=100000` can't be honored in full.
+    const limit = clampParam(searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT, (value) =>
+      Number.parseInt(value, 10)
+    );
+    // parseFloat, not parseInt: average ratings are fractional (e.g. 4.5).
+    const minRating = clampParam(searchParams.get('minRating'), DEFAULT_MIN_RATING, 0, 5, Number.parseFloat);
+
     const jokes = await fetchTopJokes({ limit, minRating });
     
     return NextResponse.json({ 

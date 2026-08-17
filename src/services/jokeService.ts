@@ -21,6 +21,7 @@ import { ensureCategoryExists } from './categoryService';
 import { generateKeywords } from '@/lib/text';
 import { SYSTEM_USER_ID } from '@/lib/constants';
 import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
+import { toDate } from '@/lib/firestoreTimestamps';
 
 const JOKES_COLLECTION = 'jokes';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
@@ -126,7 +127,7 @@ export async function fetchJokes(
       ({
         id: docSnapshot.id,
         ...docSnapshot.data(),
-        dateAdded: (docSnapshot.data().dateAdded as Timestamp).toDate(),
+        dateAdded: toDate(docSnapshot.data().dateAdded),
       } as Joke)
   );
 
@@ -198,7 +199,9 @@ async function getJokeDoc(jokeId: string) {
     if (!docSnap.exists()) {
       throw new Error('Joke not found.');
     }
-    return { ref: jokeDocRef, data: docSnap.data() };
+    // The snapshot is returned alongside the data so callers that need the
+    // document id (e.g. `getJokeById`) don't have to re-read the doc.
+    return { ref: jokeDocRef, data: docSnap.data(), snapshot: docSnap };
   }
   
   export async function toggleJokeUsed(jokeId: string, userId: string) {
@@ -228,13 +231,9 @@ async function getJokeDoc(jokeId: string) {
   
   export async function getJokeById(jokeId: string): Promise<Joke | null> {
     try {
-        const { ref } = await getJokeDoc(jokeId);
-        const docSnap = await getDoc(ref);
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            return { id: docSnap.id, ...data, dateAdded: (data.dateAdded as Timestamp).toDate() } as Joke;
-        }
-        return null;
+        // `getJokeDoc` has already read the document and thrown if it's missing.
+        const { data, snapshot } = await getJokeDoc(jokeId);
+        return { id: snapshot.id, ...data, dateAdded: toDate(data.dateAdded) } as Joke;
     } catch (error) {
         // If getJokeDoc throws 'Joke not found', we can catch it and return null.
         if (error instanceof Error && error.message === 'Joke not found.') {
@@ -267,6 +266,12 @@ async function getJokeDoc(jokeId: string) {
     if (updatedData.text !== undefined) {
         dataToUpdate.text = updatedData.text;
         dataToUpdate.keywords = generateKeywords(updatedData.text);
+        if (updatedData.text !== data.text) {
+          // The stored explanation describes the old text, so it's stale. Clear
+          // it so the detail page offers to explain the new text instead. An
+          // explicit `updatedData.explanation` below still wins.
+          dataToUpdate.explanation = '';
+        }
     }
     if (updatedData.source !== undefined) dataToUpdate.source = updatedData.source;
     if (updatedData.funnyRate !== undefined) dataToUpdate.funnyRate = updatedData.funnyRate;
@@ -349,35 +354,3 @@ async function getJokeDoc(jokeId: string) {
   
     return jokesSnapshot.docs.map(doc => doc.data().text);
   }
-
-    
-export interface FetchTopJokesOptions {
-  limit?: number;
-  minRating?: number;
-}
-
-export async function fetchTopJokes(options: FetchTopJokesOptions = {}): Promise<Joke[]> {
-  const { limit: pageLimit = 10, minRating = 4 } = options;
-  
-  if (!db) {
-    throw new Error('Firestore not initialized');
-  }
-  
-  // Query jokes with where clause on averageRating and orderBy
-  const q = query(
-    collection(db, JOKES_COLLECTION),
-    where('averageRating', '>=', minRating),
-    orderBy('averageRating', 'desc'),
-    limit(pageLimit)
-  );
-
-  const snapshot = await getDocs(q);
-  
-  const jokes = snapshot.docs.map((docSnapshot) => ({
-    id: docSnapshot.id,
-    ...docSnapshot.data(),
-    dateAdded: (docSnapshot.data().dateAdded as Timestamp).toDate(),
-  } as Joke));
-
-  return jokes;
-}

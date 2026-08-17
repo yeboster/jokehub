@@ -14,6 +14,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { UserRating } from '@/lib/types';
 import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
+import { toDate } from '@/lib/firestoreTimestamps';
 
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 
@@ -147,8 +148,8 @@ function mapRatingDocs(docs: QueryDocumentSnapshot[]): UserRating[] {
     return {
       id: d.id,
       ...data,
-      createdAt: (data.createdAt as Timestamp).toDate(),
-      updatedAt: (data.updatedAt as Timestamp).toDate(),
+      createdAt: toDate(data.createdAt),
+      updatedAt: toDate(data.updatedAt),
     } as UserRating;
   });
 }
