@@ -22,14 +22,12 @@ interface JokeContextProps {
   addJoke: (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => Promise<void>;
   importJokes: (importedJokesData: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => Promise<void>;
   toggleUsed: (id: string, currentUsedStatus: boolean) => Promise<void>;
-  updateJokeCategory: (jokeId: string, newCategoryName: string) => Promise<void>;
   getJokeById: (jokeId: string) => Promise<Joke | null>;
   updateJoke: (jokeId: string, updatedData: Partial<Omit<Joke, 'id' | 'dateAdded' | 'userId' | 'keywords'>>) => Promise<void>;
   deleteJoke: (jokeId: string) => Promise<void>;
   loadJokesWithFilters: (filters: FilterParams) => Promise<void>;
   loadMoreFilteredJokes: () => Promise<void>;
   submitUserRating: (jokeId: string, stars: number, comment?: string) => Promise<void>;
-  getUserRatingForJoke: (jokeId: string) => Promise<UserRating | null>;
   fetchAllRatingsForJoke: (jokeId: string) => Promise<UserRating[]>;
 }
 
@@ -237,18 +235,6 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [handleApiCall, user]
   );
 
-  const updateJokeCategory = useCallback(
-    (jokeId: string, newCategoryName: string) => {
-      if (!user) throw new Error("User not authenticated for updating joke category.");
-      return handleApiCall(
-        () => jokeService.updateJokeCategory(jokeId, newCategoryName, user.uid),
-        'Joke category updated.',
-        true 
-      )!;
-    },
-    [handleApiCall, user]
-  );
-
   const getJokeById = useCallback(
     async (jokeId: string): Promise<Joke | null> => {
       try {
@@ -301,18 +287,6 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [handleApiCall, user]
   );
 
-  const getUserRatingForJoke = useCallback(
-    (jokeId: string) => {
-      if (!user) return Promise.resolve(null); 
-      return ratingService.getUserRatingForJoke(jokeId, user.uid).catch(error => {
-        console.error("Error fetching user rating in context:", error);
-        toast({title: "Error", description: "Could not fetch your rating.", variant: "destructive"});
-        return null; 
-      });
-    },
-    [user, toast]
-  );
-
   const fetchAllRatingsForJoke = useCallback(
     async (jokeId: string): Promise<UserRating[]> => {
       try {
@@ -337,14 +311,12 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addJoke,
     importJokes,
     toggleUsed,
-    updateJokeCategory,
     getJokeById,
     updateJoke,
     deleteJoke,
     loadJokesWithFilters,
     loadMoreFilteredJokes,
     submitUserRating,
-    getUserRatingForJoke,
     fetchAllRatingsForJoke,
   };
 

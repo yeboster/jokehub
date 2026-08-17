@@ -10,3 +10,12 @@ import { Timestamp } from 'firebase/firestore';
 export function toDate(value: unknown): Date {
   return value instanceof Timestamp ? value.toDate() : new Date(0);
 }
+
+/**
+ * Same tolerance as {@link toDate}, for sort comparators that need epoch
+ * millis. A doc missing the field sorts as the epoch instead of throwing and
+ * rejecting the whole query.
+ */
+export function toMillis(value: unknown): number {
+  return value instanceof Timestamp ? value.toMillis() : 0;
+}

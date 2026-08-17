@@ -4,7 +4,6 @@ import {
   where,
   orderBy,
   getDocs,
-  getDoc,
   Timestamp,
   doc,
   runTransaction,
@@ -110,31 +109,6 @@ export async function submitUserRating(
       averageRating,
     });
   });
-}
-
-export async function getUserRatingForJoke(
-  jokeId: string,
-  userId: string
-): Promise<UserRating | null> {
-  const ratingDocId = `${jokeId}_${userId}`;
-  const ratingDocRef = doc(db, JOKE_RATINGS_COLLECTION, ratingDocId);
-
-  try {
-    const docSnap = await getDoc(ratingDocRef);
-    if (!docSnap.exists()) {
-      return null;
-    }
-    const docData = docSnap.data() as DocumentData;
-    return {
-      id: docSnap.id,
-      ...docData,
-      createdAt: (docData.createdAt as Timestamp).toDate(),
-      updatedAt: (docData.updatedAt as Timestamp).toDate(),
-    } as UserRating;
-  } catch (error) {
-    console.error("Error fetching user's rating for joke:", error);
-    return null;
-  }
 }
 
 /**

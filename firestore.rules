@@ -2,6 +2,55 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Bounds the rating-aggregate write any authenticated user may make to any
+    // joke (mirrors ratingService.submitUserRating's delta-based
+    // transaction.update). A single submit either adds one rating
+    // (count + 1, sum + stars where stars is 1..5) or replaces the caller's
+    // existing rating (count unchanged, sum shifts by newStars - oldStars, so
+    // -4..+4). averageRating must stay in 0..5 and agree with sum / count
+    // within the client's 1-decimal rounding.
+    //
+    // RESIDUAL RISK (accepted, see docs/audit-2026-08-17.md §1.6): these
+    // bounds are NOT cross-checked against the jokeRatings collection. A
+    // caller can still nudge a joke's aggregate by one plausible rating per
+    // write without owning a matching jokeRatings doc, and can repeat that.
+    // Eliminating it requires moving submitUserRating behind an authenticated
+    // API route backed by adminDb.runTransaction and then restricting joke
+    // updates to the owner branch — future work.
+    function isBoundedRatingUpdate(req, res) {
+      // `get(field, default)` tolerates legacy jokes written before these
+      // aggregate fields existed; the `is number` guards keep a corrupt field
+      // from turning the arithmetic below into an evaluation error.
+      let prevCountRaw = res.data.get('ratingCount', 0);
+      let prevCount = prevCountRaw is number ? prevCountRaw : 0;
+      let prevAvgRaw = res.data.get('averageRating', 0);
+      let prevAvg = prevAvgRaw is number ? prevAvgRaw : 0;
+      // Legacy jokes carry averageRating/ratingCount but no ratingSum; the
+      // client derives the same fallback (see submitUserRating).
+      let prevSumRaw = res.data.get('ratingSum', math.round(prevAvg * prevCount));
+      let prevSum = prevSumRaw is number ? prevSumRaw : 0;
+
+      let newCount = req.resource.data.ratingCount;
+      let newSum = req.resource.data.ratingSum;
+      let newAvg = req.resource.data.averageRating;
+      let isNewRating = newCount == prevCount + 1;
+      // Rounding to 1 decimal puts |avg - sum/count| at 0.05 per rating.
+      let avgTolerance = newCount * 0.06 + 0.01;
+
+      return req.resource.data.diff(res.data).affectedKeys().hasOnly(['averageRating', 'ratingCount', 'ratingSum']) &&
+        req.resource.data.userId == res.data.userId &&
+        req.resource.data.text == res.data.text &&
+        newAvg is number && newCount is number && newSum is number &&
+        (isNewRating || newCount == prevCount) &&
+        newSum >= 0 &&
+        (isNewRating
+          ? (newSum >= prevSum + 1 && newSum <= prevSum + 5)
+          : (newSum >= prevSum - 4 && newSum <= prevSum + 4)) &&
+        newAvg >= 0 && newAvg <= 5 &&
+        newAvg * newCount >= newSum - avgTolerance &&
+        newAvg * newCount <= newSum + avgTolerance;
+    }
+
     function canUpdateJoke(req, res) {
       return req.auth != null && (
         // Condition 1: The owner is updating the joke's content.
@@ -11,17 +60,9 @@ service cloud.firestore {
           req.resource.data.userId == res.data.userId &&
           req.resource.data.dateAdded == res.data.dateAdded
         ) ||
-        // Condition 2: Any authenticated user triggers an update to rating
-        // aggregate fields ONLY (mirrors ratingService.submitUserRating's
-        // delta-based transaction.update).
-        (
-          req.resource.data.diff(res.data).affectedKeys().hasOnly(['averageRating', 'ratingCount', 'ratingSum']) &&
-          req.resource.data.userId == res.data.userId &&
-          req.resource.data.text == res.data.text &&
-          req.resource.data.averageRating is number &&
-          req.resource.data.ratingCount is number &&
-          req.resource.data.ratingSum is number
-        )
+        // Condition 2: Any authenticated user triggers a bounded update to the
+        // rating aggregate fields ONLY.
+        isBoundedRatingUpdate(req, res)
         // Note: the server-side `explanation` write goes through the Admin
         // SDK, which bypasses these rules entirely — no branch needed here.
       );

@@ -19,9 +19,8 @@ import { db } from '@/lib/firebase';
 import type { Joke } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
 import { generateKeywords } from '@/lib/text';
-import { SYSTEM_USER_ID } from '@/lib/constants';
 import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
-import { toDate } from '@/lib/firestoreTimestamps';
+import { toDate, toMillis } from '@/lib/firestoreTimestamps';
 
 const JOKES_COLLECTION = 'jokes';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
@@ -212,23 +211,6 @@ async function getJokeDoc(jokeId: string) {
     await updateDoc(ref, { used: !data.used });
   }
   
-  export async function rateJoke(jokeId: string, rating: number, userId: string) {
-    const { ref, data } = await getJokeDoc(jokeId);
-    if (data.userId !== userId) {
-      throw new Error('You can only rate your own jokes.');
-    }
-    await updateDoc(ref, { funnyRate: rating });
-  }
-  
-  export async function updateJokeCategory(jokeId: string, newCategoryName: string, userId: string) {
-    const { ref, data } = await getJokeDoc(jokeId);
-    if (data.userId !== userId) {
-      throw new Error('You can only update your own jokes.');
-    }
-    const finalCategoryName = await ensureCategoryExists(newCategoryName, userId);
-    await updateDoc(ref, { category: finalCategoryName });
-  }
-  
   export async function getJokeById(jokeId: string): Promise<Joke | null> {
     try {
         // `getJokeDoc` has already read the document and thrown if it's missing.
@@ -250,13 +232,10 @@ async function getJokeDoc(jokeId: string) {
     userId: string
   ) {
     const { ref, data } = await getJokeDoc(jokeId);
-    // If a userId is passed (for caching), check if it's the server process
-    if (userId !== SYSTEM_USER_ID) {
-        if (data.userId !== userId) {
-            throw new Error('You can only update your own jokes.');
-        }
+    if (data.userId !== userId) {
+        throw new Error('You can only update your own jokes.');
     }
-  
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepted constraint: build a dynamic Partial<Joke> patch keyed by string; unknown would force casts on every assignment below.
   const dataToUpdate: Record<string, any> = {};
   
@@ -338,7 +317,7 @@ async function getJokeDoc(jokeId: string) {
       const fallbackSnapshot = await getDocs(fallbackQuery);
       ratingDocs = fallbackSnapshot.docs
         .slice()
-        .sort((a, b) => (b.data().updatedAt as Timestamp).toMillis() - (a.data().updatedAt as Timestamp).toMillis())
+        .sort((a, b) => toMillis(b.data().updatedAt) - toMillis(a.data().updatedAt))
         .slice(0, 10);
     }
 
