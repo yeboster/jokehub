@@ -107,8 +107,13 @@ service cloud.firestore {
                       && (request.resource.data.comment == resource.data.comment || request.resource.data.comment == null || (request.resource.data.comment is string && request.resource.data.comment.size() <= 1000))
                       && request.resource.data.updatedAt is timestamp;
 
-      // Authenticated users can delete THEIR OWN rating.
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Authenticated users can delete THEIR OWN rating, and the owner of the
+      // rated joke can delete any rating on it — jokeService.deleteJoke removes
+      // every rating alongside the joke, including other users' ratings.
+      allow delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/jokes/$(resource.data.jokeId)).data.userId == request.auth.uid
+      );
     }
   }
 }

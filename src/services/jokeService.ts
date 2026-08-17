@@ -25,6 +25,8 @@ import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
 const JOKES_COLLECTION = 'jokes';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 const PAGE_SIZE = 10;
+/** Firestore's hard limit on writes in a single batch. */
+const MAX_BATCH_WRITES = 500;
 
 export interface FilterParams {
   selectedCategories: string[];
@@ -39,8 +41,11 @@ export interface FilterParams {
 function buildJokesQuery(
   filters: FilterParams,
   userId?: string,
-  lastVisibleJokeDoc?: QueryDocumentSnapshot | null
+  lastVisibleJokeDoc?: QueryDocumentSnapshot | null,
+  options: { orderByDateAdded?: boolean } = {}
 ) {
+  const { orderByDateAdded = true } = options;
+
   if (filters.scope === 'user' && !userId) {
     return null;
   }
@@ -69,7 +74,9 @@ function buildJokesQuery(
     queryConstraints.push(where('used', '==', false));
   }
 
-  queryConstraints.push(orderBy('dateAdded', 'desc'));
+  if (orderByDateAdded) {
+    queryConstraints.push(orderBy('dateAdded', 'desc'));
+  }
 
   if (lastVisibleJokeDoc) {
     queryConstraints.push(startAfter(lastVisibleJokeDoc));
@@ -90,8 +97,31 @@ export async function fetchJokes(
     return { jokes: [], lastVisible: null, hasMore: false };
   }
 
-  const snapshot = await getDocs(q);
-  const jokes = snapshot.docs.map(
+  let docs: QueryDocumentSnapshot[];
+  let sortClientSide = false;
+  try {
+    docs = (await getDocs(q)).docs;
+  } catch (error) {
+    if (!isMissingIndexError(error)) {
+      throw error;
+    }
+    warnMissingIndex('fetchJokes', error);
+    // The composite index for this filter combination is missing/building —
+    // drop the orderBy (equality-only filters need no composite index) and
+    // sort client-side instead. Pagination still works: without an orderBy the
+    // query is implicitly ordered by document id, so the startAfter cursor
+    // keeps pages disjoint, but the global date ordering is only per page.
+    const fallbackQuery = buildJokesQuery(filters, userId, lastVisibleJokeDoc, {
+      orderByDateAdded: false,
+    });
+    if (!fallbackQuery) {
+      return { jokes: [], lastVisible: null, hasMore: false };
+    }
+    docs = (await getDocs(fallbackQuery)).docs;
+    sortClientSide = true;
+  }
+
+  const jokes = docs.map(
     (docSnapshot) =>
       ({
         id: docSnapshot.id,
@@ -100,8 +130,14 @@ export async function fetchJokes(
       } as Joke)
   );
 
-  const lastVisible = snapshot.docs[snapshot.docs.length - 1] ?? null;
-  const hasMore = snapshot.docs.length === (filters.limit ?? PAGE_SIZE);
+  if (sortClientSide) {
+    jokes.sort((a, b) => b.dateAdded.getTime() - a.dateAdded.getTime());
+  }
+
+  // Taken from the raw (query-ordered) docs, not the client-sorted jokes, so
+  // the cursor stays consistent with the query that produced it.
+  const lastVisible = docs[docs.length - 1] ?? null;
+  const hasMore = docs.length === (filters.limit ?? PAGE_SIZE);
 
   return { jokes, lastVisible, hasMore };
 }
@@ -250,20 +286,22 @@ async function getJokeDoc(jokeId: string) {
       throw new Error('You can only delete your own jokes.');
     }
     
-    const batch = writeBatch(db);
-
-    // 1. Delete all ratings for the joke
+    // 1. Collect all ratings for the joke, then the joke itself. The joke goes
+    // last so a failure part-way through never leaves ratings pointing at a
+    // deleted joke.
     const ratingsQuery = query(collection(db, JOKE_RATINGS_COLLECTION), where('jokeId', '==', jokeId));
     const ratingsSnapshot = await getDocs(ratingsQuery);
-    ratingsSnapshot.forEach(ratingDoc => {
-      batch.delete(ratingDoc.ref);
-    });
+    const refsToDelete = [...ratingsSnapshot.docs.map((ratingDoc) => ratingDoc.ref), ref];
 
-    // 2. Delete the joke itself
-    batch.delete(ref);
-
-    // 3. Commit the batch operation
-    await batch.commit();
+    // 2. Commit in chunks — a Firestore write batch accepts at most 500 writes,
+    // and a joke can have more than 500 ratings.
+    for (let i = 0; i < refsToDelete.length; i += MAX_BATCH_WRITES) {
+      const batch = writeBatch(db);
+      for (const docRef of refsToDelete.slice(i, i + MAX_BATCH_WRITES)) {
+        batch.delete(docRef);
+      }
+      await batch.commit();
+    }
   }
 
   export async function fetchUserFiveStarJokes(userId: string): Promise<string[]> {

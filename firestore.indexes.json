@@ -16,6 +16,55 @@
         { "fieldPath": "jokeId", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "jokes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "dateAdded", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jokes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "dateAdded", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jokes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "used", "order": "ASCENDING" },
+        { "fieldPath": "dateAdded", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jokes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "funnyRate", "order": "ASCENDING" },
+        { "fieldPath": "dateAdded", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jokes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "keywords", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "dateAdded", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jokes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "used", "order": "ASCENDING" },
+        { "fieldPath": "dateAdded", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
