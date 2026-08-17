@@ -16,23 +16,33 @@ service cloud.firestore {
     // write without owning a matching jokeRatings doc, and can repeat that.
     // Eliminating it requires moving submitUserRating behind an authenticated
     // API route backed by adminDb.runTransaction and then restricting joke
-    // updates to the owner branch — future work.
+    // updates to the owner branch — future work. Note also that the OWNER
+    // branch of canUpdateJoke (condition 1) never reaches this function, so
+    // these aggregate fields stay unbounded on one's own jokes — pre-existing
+    // behaviour, out of scope here.
+    //
+    // Firestore allows at most 10 `let` bindings per function; this one uses
+    // 8, so the guards below are inlined rather than split into *Raw pairs.
     function isBoundedRatingUpdate(req, res) {
       // `get(field, default)` tolerates legacy jokes written before these
       // aggregate fields existed; the `is number` guards keep a corrupt field
       // from turning the arithmetic below into an evaluation error.
-      let prevCountRaw = res.data.get('ratingCount', 0);
-      let prevCount = prevCountRaw is number ? prevCountRaw : 0;
-      let prevAvgRaw = res.data.get('averageRating', 0);
-      let prevAvg = prevAvgRaw is number ? prevAvgRaw : 0;
+      let prevCount = res.data.get('ratingCount', 0) is number ? res.data.get('ratingCount', 0) : 0;
+      let prevAvg = res.data.get('averageRating', 0) is number ? res.data.get('averageRating', 0) : 0;
       // Legacy jokes carry averageRating/ratingCount but no ratingSum; the
       // client derives the same fallback (see submitUserRating).
-      let prevSumRaw = res.data.get('ratingSum', math.round(prevAvg * prevCount));
-      let prevSum = prevSumRaw is number ? prevSumRaw : 0;
+      let prevSum = res.data.get('ratingSum', math.round(prevAvg * prevCount)) is number
+        ? res.data.get('ratingSum', math.round(prevAvg * prevCount))
+        : 0;
 
-      let newCount = req.resource.data.ratingCount;
-      let newSum = req.resource.data.ratingSum;
-      let newAvg = req.resource.data.averageRating;
+      // Request side uses the same `get(field, default)` form for symmetry with
+      // the resource side above. The -1 defaults sit outside every band checked
+      // below, so a write that drops one of these fields is rejected instead of
+      // being read as 0; a field present with a non-number value still fails the
+      // `is number` conjunct, which short-circuits ahead of the arithmetic.
+      let newCount = req.resource.data.get('ratingCount', -1);
+      let newSum = req.resource.data.get('ratingSum', -1);
+      let newAvg = req.resource.data.get('averageRating', -1);
       let isNewRating = newCount == prevCount + 1;
       // Rounding to 1 decimal puts |avg - sum/count| at 0.05 per rating.
       let avgTolerance = newCount * 0.06 + 0.01;
@@ -47,6 +57,9 @@ service cloud.firestore {
           ? (newSum >= prevSum + 1 && newSum <= prevSum + 5)
           : (newSum >= prevSum - 4 && newSum <= prevSum + 4)) &&
         newAvg >= 0 && newAvg <= 5 &&
+        // With newCount == 0 the two tolerance checks below hold for ANY
+        // average (newAvg * 0 == 0), so pin the average to 0 explicitly.
+        (newCount > 0 || newAvg == 0) &&
         newAvg * newCount >= newSum - avgTolerance &&
         newAvg * newCount <= newSum + avgTolerance;
     }
