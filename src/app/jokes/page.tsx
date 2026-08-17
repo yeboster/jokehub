@@ -58,6 +58,11 @@ function JokesPageComponent() {
 
   const modalSearchInputRef = useRef<HTMLInputElement>(null);
 
+  // Serialized filters last applied from the URL. The fetch effect below stays
+  // idle until `activeFilters` matches this, so a filtered deep link doesn't
+  // fire one query with the defaults and a second with the synced filters.
+  const syncedFiltersRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (authLoading) return;
 
@@ -90,6 +95,8 @@ function JokesPageComponent() {
       search: querySearch,
     };
 
+    syncedFiltersRef.current = JSON.stringify(filtersFromUrl);
+
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync of filter state from the URL query string on mount/navigation.
     setActiveFilters(prevFilters => {
       if (JSON.stringify(prevFilters) === JSON.stringify(filtersFromUrl)) {
@@ -111,8 +118,14 @@ function JokesPageComponent() {
   // Categories only feed the filter dialog, so the list no longer waits on
   // them; we do wait for auth, because the URL→filter sync above resolves
   // `scope` against `user` and we'd otherwise fetch a scope we're about to change.
+  // We also wait for that sync to land in state: the effect above runs first in
+  // the same commit, but `activeFilters` here is still the pre-sync value, so
+  // fetching now would bill a full paginated query we immediately discard.
   useEffect(() => {
     if (authLoading) {
+      return;
+    }
+    if (syncedFiltersRef.current !== JSON.stringify(activeFilters)) {
       return;
     }
     loadJokesWithFilters(activeFilters);
