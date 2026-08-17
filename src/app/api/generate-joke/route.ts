@@ -125,7 +125,8 @@ export async function POST(request: NextRequest) {
     // spends real money on every call.
     const authResult = await verifyRequestAuth(request);
     if (!authResult.success) {
-      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: 401 });
+      // 500 when we couldn't verify the credential at all (see `verifyRequestAuth`).
+      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: authResult.status ?? 401 });
     }
 
     // Trusted server-to-server callers holding the shared token are exempt;

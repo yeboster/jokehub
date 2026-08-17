@@ -9,6 +9,14 @@ import { NextRequest } from 'next/server';
  * start resets the counters. That is acceptable here — the goal is to stop
  * casual abuse of unmetered LLM billing, not to enforce a precise quota. Swap
  * the store for Redis/Firestore if a hard global limit is ever needed.
+ *
+ * FIXED-WINDOW BOUNDARY BURST: windows start at a caller's first request and
+ * expire wholesale, so a caller who spends `limit` requests at the very end of
+ * one window and `limit` more at the start of the next issues 2 × `limit`
+ * requests back to back — over any window-length span the effective ceiling is
+ * twice the nominal rate. Same trade-off as the caveat above: it bounds abuse
+ * without the cost of a sliding window or token bucket, either of which is the
+ * upgrade path if the burst ever matters.
  */
 
 interface Window {

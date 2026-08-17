@@ -16,6 +16,14 @@ const RATE_LIMIT = { limit: 20, windowMs: 5 * 60_000 };
 // Only the joke id is accepted: the text that gets explained (and persisted) is
 // always read from Firestore, so a caller can't have the model explain — and
 // then store — arbitrary text against someone else's joke.
+//
+// Deliberately no ownership gate: any signed-in user may request an explanation
+// for any joke. Jokes are already readable by all, the explained text is read
+// server-side rather than supplied by the caller, and the stored output is
+// model-generated from that text — so a non-owner can't inject content into
+// someone else's joke, only trigger a (rate-limited) explanation of it. This is
+// the fix prescribed by audit §1.3; add an owner check only if explanations
+// later become caller-influenced.
 const ExplainJokeInputSchema = z.object({
   jokeId: z.string().min(1).describe('The id of the joke to be explained.'),
 });
@@ -26,7 +34,8 @@ export async function POST(request: NextRequest) {
     // security rules, so it must authenticate for itself.
     const authResult = await verifyRequestAuth(request);
     if (!authResult.success) {
-      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: 401 });
+      // 500 when we couldn't verify the credential at all (see `verifyRequestAuth`).
+      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: authResult.status ?? 401 });
     }
 
     // Trusted server-to-server callers holding the shared token are exempt;

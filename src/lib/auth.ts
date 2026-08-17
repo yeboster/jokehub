@@ -12,8 +12,36 @@ export interface AuthResult {
   success: boolean;
   userId?: string;
   error?: string;
+  /**
+   * HTTP status the caller should respond with when `success` is false.
+   * Absent means 401 — only set explicitly when the failure is the server's
+   * fault rather than the caller's.
+   */
+  status?: number;
   /** Which credential authenticated the request (only set on success). */
   via?: 'api-token' | 'id-token';
+}
+
+/**
+ * Firebase error codes that mean "this credential is bad" as opposed to "this
+ * server cannot verify credentials right now". Anything outside the set —
+ * missing `FIREBASE_*` env vars, a failed public-key fetch, a network blip —
+ * is an infrastructure failure and must not be reported to the caller as a
+ * 401, which would send them off re-authenticating against a broken server.
+ */
+const CREDENTIAL_ERROR_CODES = new Set([
+  'auth/argument-error',
+  'auth/id-token-expired',
+  'auth/id-token-revoked',
+  'auth/invalid-id-token',
+  'auth/user-disabled',
+  'auth/user-not-found',
+]);
+
+/** True only for errors we can positively attribute to the caller's token. */
+function isCredentialError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  return typeof code === 'string' && CREDENTIAL_ERROR_CODES.has(code);
 }
 
 /** Pulls the bearer payload out of the Authorization header, or null if absent/malformed. */
@@ -86,10 +114,17 @@ export async function verifyRequestAuth(request: NextRequest): Promise<AuthResul
   }
 
   try {
+    // Note: touching `adminAuth` initialises the Admin SDK, so a missing
+    // FIREBASE_* env var surfaces here as a throw too — not as a bad token.
     const decoded = await adminAuth.verifyIdToken(token);
     return { success: true, userId: decoded.uid, via: 'id-token' };
   } catch (error) {
-    console.warn('Firebase ID token verification failed:', error instanceof Error ? error.message : error);
-    return { success: false, error: 'Invalid or expired credentials' };
+    const detail = error instanceof Error ? error.message : error;
+    if (!isCredentialError(error)) {
+      console.error('Firebase ID token verification unavailable:', detail);
+      return { success: false, status: 500, error: 'Server configuration error' };
+    }
+    console.warn('Firebase ID token verification failed:', detail);
+    return { success: false, status: 401, error: 'Invalid or expired credentials' };
   }
 }

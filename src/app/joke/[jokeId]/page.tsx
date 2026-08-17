@@ -116,6 +116,16 @@ export default function JokeShowPage() {
       }
       appendChunk(decoder.decode());
 
+      // A 200 with an empty body: the previous explanation (if any) is left
+      // untouched, so without this the click would look like it did nothing.
+      if (!receivedAnyChunk) {
+        toast({
+          title: 'Explanation Error',
+          description: 'No explanation returned — try again',
+          variant: 'destructive',
+        });
+      }
+
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- streaming fetch + AI errors expose heterogeneous shapes; unknown narrows too aggressively for the toast description string.
       const err = error as any;
