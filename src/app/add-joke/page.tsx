@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 
 export default function AddJokePage() {
   const { user, loading: authLoading } = useAuth();
-  const { addJoke, loadingInitialJokes: loadingContext } = useJokes();
+  const { addJoke, loadingCategories } = useJokes();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -169,11 +169,11 @@ export default function AddJokePage() {
      );
   }
 
-  if (loadingContext) {
+  if (loadingCategories) {
     return (
       <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Loading page data...</p>
+        <p className="mt-2 text-muted-foreground">Loading your categories...</p>
       </div>
     );
   }

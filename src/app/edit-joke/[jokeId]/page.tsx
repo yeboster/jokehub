@@ -55,7 +55,7 @@ export default function EditJokePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
-  const { getJokeById, updateJoke, deleteJoke, categories, loadingInitialJokes: loadingCategories } = useJokes();
+  const { getJokeById, updateJoke, deleteJoke, categories, loadingCategories } = useJokes();
   const [joke, setJoke] = useState<Joke | null>(null);
   const [loadingJokeData, setLoadingJokeData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -18,6 +18,20 @@ import { toDate } from '@/lib/firestoreTimestamps';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 
 /**
+ * Deterministic id of a user's rating doc for a joke — one rating per user per
+ * joke, so no query is needed to find it. Exported so callers that patch their
+ * local copy of a rating derive the id the same way the write does.
+ */
+export const ratingDocId = (jokeId: string, userId: string) => `${jokeId}_${userId}`;
+
+/** The joke's running rating totals after a submit, as written by the transaction. */
+export interface RatingAggregates {
+  averageRating: number;
+  ratingCount: number;
+  ratingSum: number;
+}
+
+/**
  * Design note — atomic rating aggregation:
  *
  * The joke doc carries running totals (`ratingSum`, `ratingCount`) so a
@@ -35,13 +49,16 @@ const JOKE_RATINGS_COLLECTION = 'jokeRatings';
  *      the joke doc's `ratingSum`, `ratingCount`, and `averageRating`.
  *
  * All transaction reads precede all writes.
+ *
+ * The new aggregates are returned so callers can apply them to whatever copy
+ * of the joke they already hold instead of re-reading the doc.
  */
 export async function submitUserRating(
   jokeId: string,
   stars: number,
   userId: string,
   comment?: string
-) {
+): Promise<RatingAggregates> {
   if (stars < 1 || stars > 5) {
     throw new Error('Rating must be between 1 and 5 stars.');
   }
@@ -50,11 +67,10 @@ export async function submitUserRating(
   }
 
   const now = Timestamp.now();
-  const ratingDocId = `${jokeId}_${userId}`;
-  const ratingDocRef = doc(db, JOKE_RATINGS_COLLECTION, ratingDocId);
+  const ratingDocRef = doc(db, JOKE_RATINGS_COLLECTION, ratingDocId(jokeId, userId));
   const jokeDocRef = doc(db, 'jokes', jokeId);
 
-  await runTransaction(db, async (transaction) => {
+  return runTransaction(db, async (transaction) => {
     // --- Reads first (transaction rule) ---
     const jokeSnap = await transaction.get(jokeDocRef);
     const existingRatingSnap = await transaction.get(ratingDocRef);
@@ -108,6 +124,8 @@ export async function submitUserRating(
       ratingCount: newCount,
       averageRating,
     });
+
+    return { averageRating, ratingCount: newCount, ratingSum: newSum };
   });
 }
 

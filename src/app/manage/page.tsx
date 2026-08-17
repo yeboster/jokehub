@@ -21,7 +21,7 @@ const CSVImport = dynamic(() => import('@/components/csv-import'), {
 
 export default function ManageJokesPage() {
     const { user, loading: authLoading } = useAuth();
-    const { importJokes, loadingInitialJokes: loadingContextData } = useJokes(); // Categories are part of context loading
+    const { importJokes, loadingCategories } = useJokes();
     const router = useRouter();
 
     useEffect(() => {
@@ -39,7 +39,9 @@ export default function ManageJokesPage() {
         );
     }
 
-    if (loadingContextData) { // Simplified loading check
+    // Imported rows create categories on the fly, so wait until the user's
+    // existing categories are known before offering the import.
+    if (loadingCategories) {
       return (
         <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />

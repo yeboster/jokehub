@@ -107,15 +107,17 @@ function JokesPageComponent() {
 
   }, [searchParams, user, authLoading]);
 
+  // This page owns its fetch — the provider no longer loads jokes on its own.
+  // Categories only feed the filter dialog, so the list no longer waits on
+  // them; we do wait for auth, because the URL→filter sync above resolves
+  // `scope` against `user` and we'd otherwise fetch a scope we're about to change.
   useEffect(() => {
-    // This effect depends on allCategoriesFromContext being loaded.
-    // Jokes should only load once categories are available (or attempted to load and are empty).
-    if (authLoading || allCategoriesFromContext === null) {
+    if (authLoading) {
       return;
     }
     loadJokesWithFilters(activeFilters);
 
-  }, [user, authLoading, activeFilters, loadJokesWithFilters, allCategoriesFromContext]);
+  }, [authLoading, activeFilters, loadJokesWithFilters]);
 
   const updateUrlWithFilters = (filters: FilterParams) => {
     const queryParams = new URLSearchParams();

@@ -11,6 +11,18 @@ import type { Joke } from '@/lib/types';
 import JokeListItem from '@/components/joke-list-item';
 import Logo from '@/components/logo';
 
+// The home page renders exactly three public jokes and owns that fetch (the
+// provider does not fetch on its own). Module scope keeps the object identity
+// stable so the effect below runs once per auth state.
+const HOME_PAGE_FILTERS: FilterParams = {
+  selectedCategories: [],
+  filterFunnyRate: -1,
+  usageStatus: 'all',
+  scope: 'public',
+  search: '',
+  limit: 3,
+};
+
 // Module-scope so the array identity is stable across renders; the previous
 // in-component declaration made the useEffect dep array warn about a missing
 // dep that, if added, would create a new array each render → infinite loop.
@@ -26,16 +38,9 @@ export default function LandingPage() {
   const [displayedJokes, setDisplayedJokes] = useState<Joke[]>([]);
 
   useEffect(() => {
-    const filters: FilterParams = {
-      selectedCategories: [],
-      filterFunnyRate: -1,
-      usageStatus: 'all',
-      scope: 'public',
-      search: '',
-      limit: 3,
-    };
-    loadJokesWithFilters(filters);
-  }, [loadJokesWithFilters]);
+    if (authLoading) return;
+    loadJokesWithFilters(HOME_PAGE_FILTERS);
+  }, [authLoading, loadJokesWithFilters]);
 
   useEffect(() => {
     if (jokes && jokes.length > 0) {

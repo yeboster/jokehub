@@ -15,10 +15,11 @@ export type FilterParams = jokeService.FilterParams;
 
 interface JokeContextProps {
   jokes: Joke[] | null;
-  categories: Category[] | null; 
+  categories: Category[] | null;
   hasMoreJokes: boolean;
   loadingInitialJokes: boolean;
   loadingMoreJokes: boolean;
+  loadingCategories: boolean;
   addJoke: (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => Promise<void>;
   importJokes: (importedJokesData: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => Promise<void>;
   toggleUsed: (id: string, currentUsedStatus: boolean) => Promise<void>;
@@ -27,7 +28,11 @@ interface JokeContextProps {
   deleteJoke: (jokeId: string) => Promise<void>;
   loadJokesWithFilters: (filters: FilterParams) => Promise<void>;
   loadMoreFilteredJokes: () => Promise<void>;
-  submitUserRating: (jokeId: string, stars: number, comment?: string) => Promise<void>;
+  submitUserRating: (
+    jokeId: string,
+    stars: number,
+    comment?: string
+  ) => Promise<ratingService.RatingAggregates | undefined>;
   fetchAllRatingsForJoke: (jokeId: string) => Promise<UserRating[]>;
 }
 
@@ -46,10 +51,24 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [loadingInitialJokes, setLoadingInitialJokes] = useState<boolean>(true);
   const [loadingMoreJokes, setLoadingMoreJokes] = useState<boolean>(false);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
   const [hasMoreJokes, setHasMoreJokes] = useState<boolean>(true);
 
   const lastVisibleJokeDocRef = useRef<QueryDocumentSnapshot | null>(null);
   const activeFiltersRef = useRef<FilterParams>(defaultFilters);
+  /**
+   * Monotonic id for joke fetches. Every `fetchJokesInternal` call claims the
+   * next id; once it resolves it applies its result only if it is still the
+   * newest request. Without this, a slow response from an old filter set can
+   * land after a newer one and overwrite it.
+   */
+  const jokeRequestIdRef = useRef(0);
+  /**
+   * Newest request id per fetch kind. The loading flags are per-kind, so each
+   * one must be cleared by the newest request of *its own* kind — otherwise a
+   * superseded fetch can leave its spinner stuck on forever.
+   */
+  const newestRequestByKindRef = useRef<{ initial: number; more: number }>({ initial: 0, more: 0 });
 
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
@@ -58,29 +77,40 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (authLoading) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset categories to null while waiting for auth state, so consumers can distinguish "loading" from "loaded with []".
       setCategories(null);
+      setLoadingCategories(true);
       return;
     }
     if (!user) {
       // No authenticated user -> no user-scoped categories to subscribe to.
       // Explicit empty state when signed out; distinct from "still loading".
       setCategories([]);
+      setLoadingCategories(false);
       return;
     }
+    setLoadingCategories(true);
     const unsubscribe = categoryService.subscribeToUserCategories(
       user.uid,
       (newCategories) => {
         setCategories(newCategories);
+        setLoadingCategories(false);
       },
       (error) => {
         console.error('Error in category subscription (JokeContext):', error);
         toast({ title: 'Error fetching user categories', description: error.message, variant: 'destructive' });
         setCategories([]);
+        setLoadingCategories(false);
       }
     );
     return () => unsubscribe();
   }, [authLoading, user, toast]);
 
   const fetchJokesInternal = useCallback(async (filters: FilterParams, isLoadMore: boolean) => {
+    const requestId = ++jokeRequestIdRef.current;
+    const kind = isLoadMore ? 'more' : 'initial';
+    newestRequestByKindRef.current[kind] = requestId;
+    const isStale = () => requestId !== jokeRequestIdRef.current;
+    const ownsLoadingFlag = () => newestRequestByKindRef.current[kind] === requestId;
+
     if (filters.scope === 'user' && !user) {
       setJokes([]);
       setHasMoreJokes(false);
@@ -92,8 +122,8 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoadingMoreJokes(true);
     } else {
       setLoadingInitialJokes(true);
-      setJokes(null); 
-      lastVisibleJokeDocRef.current = null; 
+      setJokes(null);
+      lastVisibleJokeDocRef.current = null;
     }
 
     try {
@@ -107,6 +137,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoadMore ? lastVisibleJokeDocRef.current : undefined
       );
 
+      // A newer fetch started while this one was in flight — drop the result
+      // rather than clobbering the newer filter set's jokes/cursor.
+      if (isStale()) return;
+
       if (isLoadMore) {
         setJokes((prevJokes) => (prevJokes ? [...prevJokes, ...newJokes] : newJokes));
       } else {
@@ -116,6 +150,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastVisibleJokeDocRef.current = lastVisible;
       setHasMoreJokes(newHasMore);
     } catch (error) {
+      if (isStale()) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore errors surface via `.message`/`.code`; unknown narrows too aggressively for the toast branch.
       const err = error as any;
       console.error('Error fetching jokes (JokeContext):', err);
@@ -123,8 +158,12 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isLoadMore) setJokes([]);
       setHasMoreJokes(false);
     } finally {
-      if (isLoadMore) setLoadingMoreJokes(false);
-      else setLoadingInitialJokes(false);
+      // A stale response must not clear the spinner belonging to the fetch
+      // that superseded it.
+      if (ownsLoadingFlag()) {
+        if (isLoadMore) setLoadingMoreJokes(false);
+        else setLoadingInitialJokes(false);
+      }
     }
   }, [user, toast]);
 
@@ -142,25 +181,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchJokesInternal, hasMoreJokes, loadingMoreJokes]); 
 
 
-  useEffect(() => {
-    if (authLoading || categories === null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset jokes + loading flag whenever auth or categories regress back to a non-ready state.
-      setJokes(null);
-      setLoadingInitialJokes(true);
-      return;
-    }
-
-    const currentFilters = activeFiltersRef.current;
-    let filtersToUse = currentFilters;
-
-    if (!user && currentFilters.scope === 'user') {
-      filtersToUse = { ...currentFilters, scope: 'public' as const };
-    }
-    
-    loadJokesWithFilters(filtersToUse);
-
-  }, [authLoading, user, categories, loadJokesWithFilters]); 
-
+  // Fetching is page-owned: each page calls `loadJokesWithFilters` with exactly
+  // the query it renders (see /jokes and the home page). The provider
+  // deliberately has no auto-fetch effect — it used to race every consumer's
+  // own fetch and made the detail/edit pages pay for a list they never show.
 
   const handleApiCall = useCallback(
     async <T,>(
@@ -168,7 +192,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       successMessage: string,
       shouldReloadJokesList = false 
     ): Promise<T | undefined> => {
-      if (!user && !['fetchAllRatingsForJoke', 'getJokeById'].includes(apiCall.name) ) { 
+      if (!user) {
         toast({
           title: 'Authentication Required',
           description: 'Please log in.',
@@ -186,14 +210,17 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return result;
       } catch (error) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared error handling for addJoke/importJokes/etc.; unknown narrows too aggressively given the string-membership checks below.
-            const err = error as any;
-            console.error('API call error (JokeContext):', err);
-            if (!(err.message.includes("Category name cannot be empty") || err.message.includes("permission denied"))) {
-                 toast({ title: 'Error', description: err.message || 'An unexpected error occurred.', variant: 'destructive' });
-            }
-            throw error;
-          }
+        // A non-Error throw (a string, a rejected value) must not turn into a
+        // second TypeError here and mask the original failure.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('API call error (JokeContext):', error);
+        // These two stay silent here — the callers surface them in context
+        // (form validation for the category, the rules error for permissions).
+        if (!(message.includes('Category name cannot be empty') || message.includes('permission denied'))) {
+          toast({ title: 'Error', description: message || 'An unexpected error occurred.', variant: 'destructive' });
+        }
+        throw error;
+      }
     },
     [user, toast, loadJokesWithFilters] 
   );
@@ -276,13 +303,24 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const submitUserRating = useCallback(
-    (jokeId: string, stars: number, comment?: string) => {
+    async (jokeId: string, stars: number, comment?: string) => {
       if (!user) throw new Error("User not authenticated for submitting rating.");
-      return handleApiCall(
+      // No list reload: the rating transaction returns the new aggregates, so
+      // the one joke that changed is patched in place (as `toggleUsed` does)
+      // and the caller can apply the same values to its own copy.
+      const aggregates = await handleApiCall(
         () => ratingService.submitUserRating(jokeId, stars, user.uid, comment),
         'Rating submitted successfully.',
-        true 
-      )!;
+        false
+      );
+      if (aggregates) {
+        setJokes((prevJokes) =>
+          prevJokes
+            ? prevJokes.map((j) => (j.id === jokeId ? { ...j, ...aggregates } : j))
+            : null
+        );
+      }
+      return aggregates;
     },
     [handleApiCall, user]
   );
@@ -308,6 +346,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasMoreJokes,
     loadingInitialJokes,
     loadingMoreJokes,
+    loadingCategories,
     addJoke,
     importJokes,
     toggleUsed,

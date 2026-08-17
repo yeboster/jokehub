@@ -46,7 +46,7 @@ interface AddJokeFormProps {
 const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGeneratedCategory, aiGeneratedSource, onAiJokeSubmitted }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
-  const { categories, loadingInitialJokes: loadingCategories } = useJokes();
+  const { categories, loadingCategories } = useJokes();
   const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
 

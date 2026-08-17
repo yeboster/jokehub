@@ -7,6 +7,7 @@ import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import type { Joke, UserRating } from '@/lib/types';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { ratingDocId } from '@/services/ratingService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +20,7 @@ import { Loader2 } from 'lucide-react';
 export default function JokeShowPage() {
   const params = useParams();
   const router = useRouter();
-  const { getJokeById, loadingInitialJokes: loadingContext, submitUserRating, fetchAllRatingsForJoke, toggleUsed } = useJokes();
+  const { getJokeById, submitUserRating, fetchAllRatingsForJoke, toggleUsed } = useJokes();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
@@ -203,16 +204,16 @@ export default function JokeShowPage() {
       }
     }
 
-    if (!loadingContext && !authLoading && jokeId) {
+    if (!authLoading && jokeId) {
       fetchJokeAndAllRatings();
-    } else if (!jokeId && !loadingContext && !authLoading) {
+    } else if (!jokeId && !authLoading) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- setError/loading flags when the URL is missing a jokeId, so we surface a real error state instead of an infinite loading spinner.
       setError("Joke ID is missing.");
       setIsLoading(false);
       setIsLoadingCurrentUserRating(false);
       setIsLoadingAllRatings(false);
     }
-  }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, loadingContext, authLoading]);
+  }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, authLoading]);
 
 
   const handleRatingSubmit = async (e: React.FormEvent) => {
@@ -227,30 +228,34 @@ export default function JokeShowPage() {
     }
     setIsSubmittingRating(true);
     try {
-      await submitUserRating(joke.id, ratingInputValue, commentInputValue);
+      const aggregates = await submitUserRating(joke.id, ratingInputValue, commentInputValue);
       toast({ title: 'Success', description: currentUserRating ? 'Your rating has been updated.' : 'Your rating has been submitted.' });
 
-      // Refetch the joke doc so the displayed averageRating/ratingCount reflect
-      // the transaction's write (the page holds a one-time snapshot, not a live subscription).
-      const updatedJoke = await getJokeById(joke.id);
-      if (updatedJoke) {
-        setJoke(updatedJoke);
+      // Single round trip: the transaction returns the joke's new totals and we
+      // already know what we just submitted, so both the joke and the ratings
+      // list are patched locally instead of re-read.
+      if (aggregates) {
+        setJoke(prevJoke => (prevJoke ? { ...prevJoke, ...aggregates } : prevJoke));
       }
 
-      // Refetch all ratings to update community feedback section and current user rating display
-      setIsLoadingAllRatings(true);
-      setIsLoadingCurrentUserRating(true);
-      const allRatings = await fetchAllRatingsForJoke(joke.id);
-      setAllUserRatings(allRatings);
-      setIsLoadingAllRatings(false);
-
-      const updatedUserRating = allRatings.find(rating => rating.userId === user.uid);
-      if (updatedUserRating) {
-        setCurrentUserRating(updatedUserRating);
-        setRatingInputValue(updatedUserRating.stars);
-        setCommentInputValue(updatedUserRating.comment || '');
-      }
-      setIsLoadingCurrentUserRating(false);
+      const trimmedComment = commentInputValue.trim();
+      const now = new Date();
+      const submittedRating: UserRating = {
+        id: currentUserRating?.id ?? ratingDocId(joke.id, user.uid),
+        jokeId: joke.id,
+        userId: user.uid,
+        stars: ratingInputValue,
+        comment: trimmedComment === '' ? undefined : trimmedComment,
+        createdAt: currentUserRating?.createdAt ?? now,
+        updatedAt: now,
+      };
+      setCurrentUserRating(submittedRating);
+      setCommentInputValue(submittedRating.comment ?? '');
+      // The list is ordered by `updatedAt` desc, so the just-saved rating goes first.
+      setAllUserRatings(prevRatings => [
+        submittedRating,
+        ...prevRatings.filter(rating => rating.userId !== user.uid),
+      ]);
 
     } catch (err) {
       console.error("Error submitting rating from page:", err);
@@ -282,7 +287,7 @@ export default function JokeShowPage() {
   }, [joke?.source]);
 
 
-  if (isLoading || authLoading || loadingContext) {
+  if (isLoading || authLoading) {
     return (
       <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
