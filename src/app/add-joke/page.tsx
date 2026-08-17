@@ -279,7 +279,7 @@ export default function AddJokePage() {
                                 variant="outline"
                                 className="w-full"
                             >
-                                {isLoadingInspirationalJokes ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4 text-yellow-400" />}
+                                {isLoadingInspirationalJokes ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4 text-primary" />}
                                 {isLoadingInspirationalJokes ? 'Loading Jokes...' : 'Load My 5-Star Jokes for Inspiration'}
                             </Button>
                             {inspirationalJokes.length > 0 && (

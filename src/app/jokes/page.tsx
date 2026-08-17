@@ -15,6 +15,41 @@ import JokeList from '@/components/joke-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
+/** How many placeholder cards to show while a page of jokes loads. */
+const SKELETON_CARD_COUNT = 8;
+
+/**
+ * Placeholder cards laid out in the same grid `JokeList` uses, so the results
+ * area keeps its shape while a fetch is in flight instead of collapsing.
+ */
+function JokeGridSkeleton() {
+  return (
+    <div
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-6"
+      aria-busy="true"
+      aria-label="Loading jokes"
+    >
+      {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
+        <div
+          key={index}
+          className="flex flex-col rounded-lg border border-primary/20 bg-card shadow-lg overflow-hidden animate-pulse"
+        >
+          <div className="p-5 flex-grow space-y-2">
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-11/12 rounded bg-muted" />
+            <div className="h-3 w-3/4 rounded bg-muted" />
+            <div className="h-5 w-20 rounded-md bg-muted mt-6" />
+          </div>
+          <div className="p-4 border-t border-border/50 flex items-center justify-between">
+            <div className="h-3 w-24 rounded bg-muted" />
+            <div className="h-3 w-16 rounded bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function JokesPageComponent() {
   const { user, loading: authLoading } = useAuth();
   const {
@@ -71,7 +106,14 @@ function JokesPageComponent() {
     ? 'Manage and filter your personal joke collection.'
     : 'Browse, filter, and enjoy jokes from the community. Add your own too!';
 
-  if (authLoading || (loadingInitialJokes && jokes === null)) {
+  // The chrome (header, filter bar, active-filter badges) stays mounted for
+  // every fetch — only the results grid swaps to skeletons, so applying a
+  // filter no longer blanks the page and loses scroll position. The full-page
+  // spinner is reserved for the genuine first paint: while auth resolves we
+  // don't yet know the scope, and therefore not even the page title.
+  const isReloadingResults = loadingInitialJokes;
+
+  if (authLoading) {
     return (
       <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -127,14 +169,20 @@ function JokesPageComponent() {
         </div>
       </div>
 
-      <JokeList
-        jokes={jokesToDisplay}
-        emptyMessage={emptyMessage}
-        emptyHint={emptyHint}
-      />
+      {isReloadingResults ? (
+        <JokeGridSkeleton />
+      ) : (
+        <JokeList
+          jokes={jokesToDisplay}
+          emptyMessage={emptyMessage}
+          emptyHint={emptyHint}
+        />
+      )}
 
       <div className="mt-8 text-center">
-        {hasMoreJokes ? (
+        {/* Hidden while the list reloads: "load more" pages from the *new*
+            filters and would append onto the outgoing list. */}
+        {isReloadingResults ? null : hasMoreJokes ? (
           <Button onClick={loadMoreFilteredJokes} disabled={loadingMoreJokes} variant="outline" size="lg">
             {loadingMoreJokes ? (
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -144,7 +192,7 @@ function JokesPageComponent() {
             {loadingMoreJokes ? 'Loading...' : 'Load More Jokes'}
           </Button>
         ) : (
-          jokesToDisplay.length > 0 && !loadingInitialJokes && (
+          jokesToDisplay.length > 0 && (
             <p className="text-muted-foreground">No more jokes to load for the current filters.</p>
           )
         )}

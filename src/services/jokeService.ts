@@ -227,7 +227,6 @@ export async function importJokes(
   importedJokesData: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[],
   userId: string
 ) {
-  const batch = writeBatch(db);
   const categoriesToEnsure = new Set<string>();
   importedJokesData.forEach((joke) => categoriesToEnsure.add(joke.category.trim()));
 
@@ -235,25 +234,45 @@ export async function importJokes(
     if (catName) await ensureCategoryExists(catName, userId);
   }
 
-  for (const jokeData of importedJokesData) {
-    const finalCategoryName = jokeData.category.trim();
-    if (!finalCategoryName) {
-      console.warn('Skipping joke with empty category:', jokeData.text);
-      continue;
+  const jokesToWrite = importedJokesData.filter((jokeData) => {
+    if (jokeData.category.trim()) return true;
+    console.warn('Skipping joke with empty category:', jokeData.text);
+    return false;
+  });
+
+  // Commit in chunks — a Firestore write batch accepts at most 500 writes, and
+  // an import of more than 500 rows would otherwise be rejected wholesale.
+  // Chunks commit independently, so a failure part-way through leaves the
+  // earlier chunks written; the error says how many made it so the caller can
+  // report something truthful rather than "all or nothing".
+  let written = 0;
+  for (let i = 0; i < jokesToWrite.length; i += MAX_BATCH_WRITES) {
+    const chunk = jokesToWrite.slice(i, i + MAX_BATCH_WRITES);
+    const batch = writeBatch(db);
+    for (const jokeData of chunk) {
+      const docRef = doc(collection(db, JOKES_COLLECTION));
+      batch.set(docRef, {
+        ...jokeData,
+        category: jokeData.category.trim(),
+        source: jokeData.source || '',
+        funnyRate: jokeData.funnyRate ?? 0,
+        dateAdded: Timestamp.now(),
+        used: false,
+        userId: userId,
+        keywords: generateKeywords(jokeData.text),
+      });
     }
-    const docRef = doc(collection(db, JOKES_COLLECTION));
-    batch.set(docRef, {
-      ...jokeData,
-      category: finalCategoryName,
-      source: jokeData.source || '',
-      funnyRate: jokeData.funnyRate ?? 0,
-      dateAdded: Timestamp.now(),
-      used: false,
-      userId: userId,
-      keywords: generateKeywords(jokeData.text),
-    });
+    try {
+      await batch.commit();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (written === 0) throw error;
+      throw new Error(
+        `Imported ${written} of ${jokesToWrite.length} jokes before the import failed: ${message}`
+      );
+    }
+    written += chunk.length;
   }
-  await batch.commit();
 }
 
 async function getJokeDoc(jokeId: string) {

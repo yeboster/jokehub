@@ -21,6 +21,29 @@ interface CSVImportProps {
   onImport: (jokes: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => Promise<void>;
 }
 
+/** Mirrors the `source.size() <= 100` create rule in `firestore.rules`. */
+const MAX_SOURCE_LENGTH = 100;
+/** How many individual row numbers to name before summarizing the rest. */
+const MAX_REPORTED_ROWS = 10;
+
+interface SkippedRow {
+  /** 1-based line number in the uploaded file, blank lines included. */
+  lineNumber: number;
+  reason: string;
+}
+
+/**
+ * `rows 4, 19, 27 and 3 more (missing "text" or "category")` — the row numbers
+ * as the user sees them in their file, plus every distinct reason.
+ */
+function describeSkippedRows(skipped: SkippedRow[]): string {
+  const listed = skipped.slice(0, MAX_REPORTED_ROWS).map((row) => row.lineNumber);
+  const remainder = skipped.length - listed.length;
+  const rowList = `row${skipped.length === 1 ? '' : 's'} ${listed.join(', ')}${remainder > 0 ? ` and ${remainder} more` : ''}`;
+  const reasons = Array.from(new Set(skipped.map((row) => row.reason)));
+  return `${rowList} (${reasons.join('; ')})`;
+}
+
 const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -59,8 +82,12 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
       }
 
       try {
-        // Split file content into lines and remove empty lines
-        const lines = text.split('\n').filter(line => line.trim() !== '');
+        // Drop empty lines but keep each remaining line's original position, so
+        // a skipped row is reported by the number the user sees in their editor.
+        const lines = text
+          .split('\n')
+          .map((line, index) => ({ line, lineNumber: index + 1 }))
+          .filter((entry) => entry.line.trim() !== '');
         if (lines.length <= 1) { // Must have headers and at least one data row
           throw new Error('CSV file needs a header row and at least one data row.');
         }
@@ -93,7 +120,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         };
 
         // Parse header row and normalize to lowercase
-        const headerCells = parseCSVLine(lines[0]);
+        const headerCells = parseCSVLine(lines[0].line);
         const headers = headerCells.map(h => h.trim().toLowerCase());
 
         // Find indices of required and optional columns
@@ -108,54 +135,65 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         }
 
         const importedJokes: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[] = [];
+        // Rows the import rules would reject are dropped here, one by one, and
+        // reported back — a single bad row used to fail the whole batch.
+        const skippedRows: SkippedRow[] = [];
+
         // Process data rows (starting from the second line)
-        for (let i = 1; i < lines.length; i++) {
-          const values = parseCSVLine(lines[i]);
+        for (const { line, lineNumber } of lines.slice(1)) {
+          const values = parseCSVLine(line);
+          const jokeText = values[textIndex]?.trim() ?? '';
+          const category = values[categoryIndex]?.trim() ?? '';
 
-          // Check if the row has enough columns and essential fields are not empty
-          if (values.length > Math.max(textIndex, categoryIndex) &&
-              values[textIndex]?.trim() &&
-              values[categoryIndex]?.trim()) {
+          if (!jokeText || !category) {
+            skippedRows.push({ lineNumber, reason: 'missing "text" or "category"' });
+            console.warn(`Skipping row ${lineNumber}: "${line}". Ensure 'text' and 'category' are present and valid.`);
+            continue;
+          }
 
-            let rate = 0; // Default funnyRate
-            // Process funnyRate if column exists and value is present
-            if (funnyRateIndex !== -1 && values[funnyRateIndex]?.trim()) {
-              const parsedRate = parseInt(values[funnyRateIndex].trim(), 10);
-              // Validate parsedRate: must be a number between 0 and 5
-              if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 5) {
-                rate = parsedRate;
-              } else {
-                console.warn(`Invalid funnyRate value "${values[funnyRateIndex]}" in row ${i + 1}. Using default 0.`);
-                // Optionally, you could toast a warning for invalid rates here too
-              }
-            }
-            
-            const source = sourceIndex !== -1 ? values[sourceIndex]?.trim() : undefined;
+          const source = sourceIndex !== -1 ? values[sourceIndex]?.trim() ?? '' : '';
+          if (source.length > MAX_SOURCE_LENGTH) {
+            skippedRows.push({ lineNumber, reason: `"source" longer than ${MAX_SOURCE_LENGTH} characters` });
+            console.warn(`Skipping row ${lineNumber}: source is ${source.length} characters (max ${MAX_SOURCE_LENGTH}).`);
+            continue;
+          }
 
-            importedJokes.push({
-              text: values[textIndex].trim(),
-              category: values[categoryIndex].trim(),
-              source: source,
-              funnyRate: rate,
-            });
-          } else {
-            // Log a warning for skipped rows if the line itself isn't empty (already filtered)
-            if (lines[i].trim()) {
-                console.warn(`Skipping invalid or incomplete row ${i + 1}: "${lines[i]}". Ensure 'text' and 'category' are present and valid.`);
+          let rate = 0; // Default funnyRate
+          // Process funnyRate if column exists and value is present
+          if (funnyRateIndex !== -1 && values[funnyRateIndex]?.trim()) {
+            const parsedRate = parseInt(values[funnyRateIndex].trim(), 10);
+            // Validate parsedRate: must be a number between 0 and 5
+            if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 5) {
+              rate = parsedRate;
+            } else {
+              console.warn(`Invalid funnyRate value "${values[funnyRateIndex]}" in row ${lineNumber}. Using default 0.`);
             }
           }
+
+          importedJokes.push({
+            text: jokeText,
+            category,
+            source: source || undefined,
+            funnyRate: rate,
+          });
         }
 
         if (importedJokes.length > 0) {
           await onImport(importedJokes); // Call the provided onImport function
           toast({
-            title: 'Import Successful',
-            description: `${importedJokes.length} joke(s) processed.`,
+            title: skippedRows.length > 0 ? 'Import Finished With Skipped Rows' : 'Import Successful',
+            description:
+              skippedRows.length > 0
+                ? `${importedJokes.length} imported, ${skippedRows.length} skipped — ${describeSkippedRows(skippedRows)}.`
+                : `${importedJokes.length} joke(s) imported.`,
           });
         } else {
            toast({
             title: 'Import Information',
-            description: 'No valid jokes found in the CSV file to import.',
+            description:
+              skippedRows.length > 0
+                ? `No jokes imported — all ${skippedRows.length} row(s) were skipped: ${describeSkippedRows(skippedRows)}.`
+                : 'No valid jokes found in the CSV file to import.',
             variant: 'default', // Or 'destructive' if considered an error
           });
         }

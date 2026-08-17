@@ -118,8 +118,12 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isLoadMore) {
       setLoadingMoreJokes(true);
     } else {
+      // Deliberately keeps the current `jokes` in place. Blanking them to null
+      // made `jokes === null` mean both "never loaded" and "reloading", so the
+      // pages' first-paint spinner fired on every filter change and tore down
+      // the whole page. Consumers render their loading state off
+      // `loadingInitialJokes`; `jokes === null` now means "no list yet" only.
       setLoadingInitialJokes(true);
-      setJokes(null);
       lastVisibleJokeDocRef.current = null;
     }
 

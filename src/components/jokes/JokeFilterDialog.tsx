@@ -179,84 +179,86 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
             <Label htmlFor="modal-category-filter" className="text-right pt-2">
               Categories
             </Label>
-            <Popover open={isCategoryPopoverOpen} onOpenChange={setIsCategoryPopoverOpen}>
-              <PopoverTrigger asChild className="col-span-3">
-                <Button
-                  id="modal-category-filter"
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={isCategoryPopoverOpen}
-                  className="w-full justify-between text-left font-normal h-auto min-h-10"
-                  disabled={loadingCategories || categoryNames.length === 0}
+            {/* The selected-category chips live *beside* the trigger, not
+                inside it: their remove controls used to be `role="button"`
+                spans nested in the combobox button — invalid HTML, and both
+                keyboard traversal and screen-reader behavior were ambiguous. */}
+            <div className="col-span-3 space-y-2">
+              <Popover open={isCategoryPopoverOpen} onOpenChange={setIsCategoryPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="modal-category-filter"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={isCategoryPopoverOpen}
+                    className="w-full justify-between text-left font-normal"
+                    disabled={loadingCategories || categoryNames.length === 0}
+                  >
+                    <span className={cn(draft.selectedCategories.length === 0 && 'text-muted-foreground')}>
+                      {draft.selectedCategories.length === 0
+                        ? 'Select categories...'
+                        : `${draft.selectedCategories.length} categor${draft.selectedCategories.length === 1 ? 'y' : 'ies'} selected`}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-hidden"
+                  align="start"
                 >
-                  <div className="flex flex-wrap gap-1">
-                    {draft.selectedCategories.length === 0 && (
-                      <span className="text-muted-foreground">Select categories...</span>
-                    )}
-                    {draft.selectedCategories.map((category) => (
-                      <Badge key={category} variant="secondary" className="py-0.5 px-1.5">
+                  <Command>
+                    <CommandInput
+                      placeholder="Search categories..."
+                      value={categorySearch}
+                      onValueChange={setCategorySearch}
+                      className="h-9"
+                    />
+                    <CommandList className="max-h-[204px]">
+                      <CommandEmpty>
+                        {categoryNames.length === 0 ? 'No categories available.' : 'No categories found.'}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {visibleCategories.map((categoryName) => (
+                          <CommandItem
+                            key={categoryName}
+                            value={categoryName}
+                            onSelect={() => toggleCategory(categoryName)}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                draft.selectedCategories.includes(categoryName) ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                            {categoryName}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {draft.selectedCategories.length > 0 && (
+                <ul className="flex flex-wrap gap-1 list-none p-0 m-0">
+                  {draft.selectedCategories.map((category) => (
+                    <li key={category}>
+                      <Badge variant="secondary" className="py-0.5 pl-1.5 pr-1 gap-1">
                         {category}
-                        <span
-                          role="button"
-                          tabIndex={0}
+                        <button
+                          type="button"
                           aria-label={`Remove category ${category}`}
-                          className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-1 cursor-pointer"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleCategory(category);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              toggleCategory(category);
-                            }
-                          }}
+                          className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                          onClick={() => toggleCategory(category)}
                         >
                           <XIcon className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                        </span>
+                        </button>
                       </Badge>
-                    ))}
-                  </div>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-hidden"
-                align="start"
-              >
-                <Command>
-                  <CommandInput
-                    placeholder="Search categories..."
-                    value={categorySearch}
-                    onValueChange={setCategorySearch}
-                    className="h-9"
-                  />
-                  <CommandList className="max-h-[204px]">
-                    <CommandEmpty>
-                      {categoryNames.length === 0 ? 'No categories available.' : 'No categories found.'}
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {visibleCategories.map((categoryName) => (
-                        <CommandItem
-                          key={categoryName}
-                          value={categoryName}
-                          onSelect={() => toggleCategory(categoryName)}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              draft.selectedCategories.includes(categoryName) ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
-                          {categoryName}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
