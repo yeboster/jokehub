@@ -245,7 +245,10 @@ export default function JokeShowPage() {
         jokeId: joke.id,
         userId: user.uid,
         stars: ratingInputValue,
-        comment: trimmedComment === '' ? undefined : trimmedComment,
+        // `null`, not `undefined` — the same shape the rating transaction
+        // writes for a blank comment, so the local patch and a later refetch
+        // agree.
+        comment: trimmedComment === '' ? null : trimmedComment,
         createdAt: currentUserRating?.createdAt ?? now,
         updatedAt: now,
       };

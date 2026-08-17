@@ -5,8 +5,8 @@ import type { FC } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Loader2, ShieldAlert, Check, ChevronsUpDown } from 'lucide-react';
-import { useState, useMemo, useEffect } from 'react';
+import { Plus, Loader2, ShieldAlert } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,16 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import Link from 'next/link';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import { cn } from '@/lib/utils';
+import { CategoryCombobox } from '@/components/CategoryCombobox';
 
 const jokeFormSchema = z.object({
   text: z.string().min(1, 'Joke text cannot be empty.'),
@@ -46,9 +37,7 @@ interface AddJokeFormProps {
 const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGeneratedCategory, aiGeneratedSource, onAiJokeSubmitted }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
-  const { categories, loadingCategories } = useJokes();
-  const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
+  const { loadingCategories } = useJokes();
 
   const form = useForm<JokeFormValues>({
     resolver: zodResolver(jokeFormSchema),
@@ -67,12 +56,10 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
     }
 
     if (aiGeneratedCategory) {
+      // The combobox seeds its search box from this value each time it opens.
       form.setValue('category', aiGeneratedCategory, { shouldValidate: true });
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the category search box in sync when the AI suggests a category.
-      setCategorySearch(aiGeneratedCategory);
-    } else if (aiGeneratedCategory === null) { 
+    } else if (aiGeneratedCategory === null) {
         form.setValue('category', '', { shouldValidate: true });
-        setCategorySearch('');
     }
 
     if (aiGeneratedSource) {
@@ -91,8 +78,7 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
     try {
       await onAddJoke(data);
       form.reset();
-      setCategorySearch('');
-      if (aiGeneratedText && onAiJokeSubmitted) { 
+      if (aiGeneratedText && onAiJokeSubmitted) {
         onAiJokeSubmitted();
       }
     } catch (error) {
@@ -103,29 +89,6 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
   };
 
   const isFormDisabled = !user || isSubmitting || loadingCategories;
-  const categoryNames = useMemo(() => {
-    if (!categories || !user) return [];
-    return Array.isArray(categories) ? categories.filter(cat => cat.userId === user.uid).map(cat => cat.name).sort() : [];
-  }, [categories, user]);
-
-
-  const categoryOptions = useMemo(() => {
-    let filtered = categoryNames;
-    if (categorySearch) {
-        filtered = categoryNames.filter(name =>
-            name.toLowerCase().includes(categorySearch.toLowerCase())
-        );
-    }
-
-    const options = filtered.map(name => ({ value: name, label: name }));
-    const searchTermTrimmed = categorySearch.trim();
-    const exactMatchFound = categoryNames.some(name => name.toLowerCase() === searchTermTrimmed.toLowerCase());
-
-    if (searchTermTrimmed && !exactMatchFound) {
-      options.unshift({ value: searchTermTrimmed, label: `Create "${searchTermTrimmed}"` });
-    }
-    return options;
-  }, [categoryNames, categorySearch]);
 
   return (
     <Card className="shadow-none border-0">
@@ -161,69 +124,15 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
               name="category"
               render={({ field }) => (
                  <FormItem className="flex flex-col">
-                    <FormLabel className="text-xs">Category (for your jokes)</FormLabel> 
-                     <Popover open={isCategoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
-                        <PopoverTrigger asChild>
-                         <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={isCategoryPopoverOpen}
-                              className={cn("w-full justify-between text-sm h-9", !field.value && "text-muted-foreground")} 
-                              disabled={isFormDisabled || loadingCategories}
-                            >
-                              <span className="truncate">
-                                {loadingCategories
-                                  ? "Loading categories..."
-                                  : field.value
-                                    ? categoryNames.find(
-                                        (name) => name.toLowerCase() === field.value.toLowerCase()
-                                      ) || field.value 
-                                    : "Select or type category..."}
-                              </span>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto" align="start">
-                          <Command> 
-                            <CommandInput
-                                placeholder="Search or create category..."
-                                value={categorySearch}
-                                onValueChange={setCategorySearch}
-                                className="h-9" 
-                            />
-                             <CommandList>
-                                <CommandEmpty>
-                                    {loadingCategories ? "Loading..." : categorySearch.trim() ? `No personal category found. Create "${categorySearch.trim()}"?` : 'No personal categories found.'}
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  {categoryOptions.map((option) => (
-                                    <CommandItem
-                                      key={option.value} 
-                                      value={option.label} 
-                                      onSelect={() => {
-                                        form.setValue('category', option.value, {shouldValidate: true}); 
-                                        setCategorySearch(option.value); 
-                                        setCategoryPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          field.value?.toLowerCase() === option.value.toLowerCase() 
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        )}
-                                      />
-                                      {option.label}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                             </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                    <FormLabel className="text-xs">Category (for your jokes)</FormLabel>
+                    <FormControl>
+                      <CategoryCombobox
+                        value={field.value}
+                        onChange={(category) => form.setValue('category', category, { shouldValidate: true })}
+                        disabled={isFormDisabled}
+                        className="text-sm h-9"
+                      />
+                    </FormControl>
                      <FormMessage />
                   </FormItem>
               )}

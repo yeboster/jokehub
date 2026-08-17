@@ -9,6 +9,7 @@ import { useAuth } from './AuthContext';
 import * as jokeService from '@/services/jokeService';
 import * as categoryService from '@/services/categoryService';
 import * as ratingService from '@/services/ratingService';
+import { DEFAULT_FILTERS } from '@/lib/jokeFilters';
 import type { QueryDocumentSnapshot } from 'firebase/firestore';
 
 export type FilterParams = jokeService.FilterParams;
@@ -38,14 +39,6 @@ interface JokeContextProps {
 
 const JokeContext = createContext<JokeContextProps | undefined>(undefined);
 
-const defaultFilters: FilterParams = {
-  selectedCategories: [],
-  filterFunnyRate: -1,
-  usageStatus: 'all',
-  scope: 'public',
-  search: '',
-};
-
 export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [jokes, setJokes] = useState<Joke[] | null>(null);
   const [categories, setCategories] = useState<Category[] | null>(null);
@@ -55,7 +48,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasMoreJokes, setHasMoreJokes] = useState<boolean>(true);
 
   const lastVisibleJokeDocRef = useRef<QueryDocumentSnapshot | null>(null);
-  const activeFiltersRef = useRef<FilterParams>(defaultFilters);
+  const activeFiltersRef = useRef<FilterParams>(DEFAULT_FILTERS);
   /**
    * Monotonic id for joke fetches. Every `fetchJokesInternal` call claims the
    * next id; once it resolves it applies its result only if it is still the
@@ -87,6 +80,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoadingCategories(false);
       return;
     }
+    // Drop the previous user's categories while the new subscription loads —
+    // otherwise a user switch briefly shows the old account's category list as
+    // if it were loaded.
+    setCategories(null);
     setLoadingCategories(true);
     const unsubscribe = categoryService.subscribeToUserCategories(
       user.uid,
@@ -225,10 +222,14 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [user, toast, loadJokesWithFilters] 
   );
 
+  // No list reload: the mounted page owns its list. A brand-new joke can't be
+  // spliced into a filtered, paginated list without re-running the query
+  // (nothing here knows whether it matches the active filters), and the add
+  // flow navigates to /jokes afterwards, which fetches on mount anyway.
   const addJoke = useCallback(
     (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => {
        if (!user) throw new Error("User not authenticated for adding joke.");
-       return handleApiCall(() => jokeService.addJoke(newJokeData, user.uid), 'Joke added successfully!', true)!;
+       return handleApiCall(() => jokeService.addJoke(newJokeData, user.uid), 'Joke added successfully!', false)!;
     },
     [handleApiCall, user]
   );
@@ -279,25 +280,32 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
   
   const updateJoke = useCallback(
-    (jokeId: string, updatedData: Partial<Omit<Joke, 'id' | 'dateAdded' | 'userId' | 'keywords'>>) => {
+    async (jokeId: string, updatedData: Partial<Omit<Joke, 'id' | 'dateAdded' | 'userId' | 'keywords'>>) => {
       if (!user) throw new Error("User not authenticated for updating joke.");
-      return handleApiCall(
+      await handleApiCall(
         () => jokeService.updateJoke(jokeId, updatedData, user.uid),
         'Joke updated successfully!',
-        true 
-      )!;
+        false
+      );
+      // Patch the one joke that changed instead of refetching the whole list
+      // (as `toggleUsed` does). Category casing may be normalized server-side;
+      // the next fetch reconciles that.
+      setJokes((prevJokes) =>
+        prevJokes ? prevJokes.map((j) => (j.id === jokeId ? { ...j, ...updatedData } : j)) : null
+      );
     },
     [handleApiCall, user]
   );
 
   const deleteJoke = useCallback(
-    (jokeId: string) => {
+    async (jokeId: string) => {
         if (!user) throw new Error("User not authenticated for deleting a joke.");
-        return handleApiCall(
+        await handleApiCall(
             () => jokeService.deleteJoke(jokeId, user.uid),
             'Joke deleted successfully!',
-            true 
-        )!;
+            false
+        );
+        setJokes((prevJokes) => (prevJokes ? prevJokes.filter((j) => j.id !== jokeId) : null));
     },
     [handleApiCall, user]
   );

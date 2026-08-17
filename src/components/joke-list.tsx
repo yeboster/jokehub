@@ -9,15 +9,21 @@ import { Laugh } from 'lucide-react';
 
 interface JokeListProps {
   jokes: Joke[];
+  /** Overrides the empty-state headline, e.g. to name what was searched for. */
+  emptyMessage?: string;
+  /** Overrides the empty-state hint below the headline. */
+  emptyHint?: string;
 }
 
-const JokeList: FC<JokeListProps> = ({ jokes }) => {
+const JokeList: FC<JokeListProps> = ({ jokes, emptyMessage, emptyHint }) => {
   if (jokes.length === 0) {
     return (
       <div className="text-center py-10">
         <Laugh className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-        <p className="text-muted-foreground text-lg">No jokes found.</p>
-        <p className="text-sm text-muted-foreground">Try adding some or adjusting your filters!</p>
+        <p className="text-muted-foreground text-lg">{emptyMessage ?? 'No jokes found.'}</p>
+        <p className="text-sm text-muted-foreground">
+          {emptyHint ?? 'Try adding some or adjusting your filters!'}
+        </p>
       </div>
     );
   }

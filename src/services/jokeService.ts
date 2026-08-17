@@ -18,7 +18,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { Joke } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
-import { generateKeywords } from '@/lib/text';
+import { generateKeywords, generateSearchTokens } from '@/lib/text';
 import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
 import { toDate, toMillis } from '@/lib/firestoreTimestamps';
 
@@ -56,8 +56,22 @@ function buildJokesQuery(
     queryConstraints.push(where('userId', '==', userId));
   }
 
-  if (filters.search) {
-    queryConstraints.push(where('keywords', 'array-contains', filters.search.toLowerCase()));
+  // Search strategy — first token in the query, the rest client-side:
+  //
+  // Stored `keywords` are single punctuation-stripped words, so the raw search
+  // term was unmatchable as soon as it contained a space or punctuation. We
+  // tokenize the term the same way the keywords were generated and constrain
+  // the query on the FIRST token only, then intersect the remaining tokens
+  // client-side in `fetchJokes` (AND semantics — every token must be present).
+  //
+  // `array-contains-any` over all tokens was the alternative, but it is a
+  // disjunction: combined with the `category in [...]` clause below, Firestore
+  // expands the query to tokens × categories disjuncts and rejects anything
+  // over 30. It would also read strictly more documents than the first token
+  // alone, since the client-side pass narrows OR back down to AND either way.
+  const searchTokens = generateSearchTokens(filters.search);
+  if (searchTokens.length > 0) {
+    queryConstraints.push(where('keywords', 'array-contains', searchTokens[0]));
   }
 
   if (filters.selectedCategories.length > 0) {
@@ -92,6 +106,13 @@ export async function fetchJokes(
   userId?: string,
   lastVisibleJokeDoc?: QueryDocumentSnapshot | null
 ) {
+  const searchTokens = generateSearchTokens(filters.search);
+  if (filters.search.trim() !== '' && searchTokens.length === 0) {
+    // Every word in the term was punctuation or shorter than three characters,
+    // so no stored keyword can match it. Skip the round trip.
+    return { jokes: [], lastVisible: null, hasMore: false };
+  }
+
   const q = buildJokesQuery(filters, userId, lastVisibleJokeDoc);
   if (!q) {
     return { jokes: [], lastVisible: null, hasMore: false };
@@ -121,7 +142,7 @@ export async function fetchJokes(
     sortClientSide = true;
   }
 
-  const jokes = docs.map(
+  let jokes = docs.map(
     (docSnapshot) =>
       ({
         id: docSnapshot.id,
@@ -129,6 +150,13 @@ export async function fetchJokes(
         dateAdded: toDate(docSnapshot.data().dateAdded),
       } as Joke)
   );
+
+  if (searchTokens.length > 1) {
+    // The query matched the first token; require the rest too. A page can come
+    // back partly filtered out — `hasMore` and the cursor below stay based on
+    // the raw docs, so pagination itself remains correct.
+    jokes = jokes.filter((joke) => searchTokens.every((token) => joke.keywords?.includes(token)));
+  }
 
   if (sortClientSide) {
     jokes.sort((a, b) => b.dateAdded.getTime() - a.dateAdded.getTime());

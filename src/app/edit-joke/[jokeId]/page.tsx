@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Save, ArrowLeft, ShieldAlert, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { Loader2, Save, ArrowLeft, ShieldAlert, Trash2 } from 'lucide-react';
 
 import type { Joke } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +19,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CategoryCombobox } from '@/components/CategoryCombobox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,15 +31,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import { cn } from '@/lib/utils';
 
 const editJokeFormSchema = z.object({
   text: z.string().min(1, 'Joke text cannot be empty.'),
@@ -55,14 +46,12 @@ export default function EditJokePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
-  const { getJokeById, updateJoke, deleteJoke, categories, loadingCategories } = useJokes();
+  const { getJokeById, updateJoke, deleteJoke, loadingCategories } = useJokes();
   const [joke, setJoke] = useState<Joke | null>(null);
   const [loadingJokeData, setLoadingJokeData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
 
   const jokeId = Array.isArray(params.jokeId) ? params.jokeId[0] : params.jokeId;
 
@@ -95,7 +84,6 @@ export default function EditJokePage() {
               source: fetchedJoke.source || '',
               used: fetchedJoke.used,
             });
-            setCategorySearch(fetchedJoke.category);
           }
         } else {
            setFetchError('Joke not found.');
@@ -166,29 +154,6 @@ export default function EditJokePage() {
 
   const isFormDisabled = authLoading || loadingJokeData || loadingCategories || isSubmitting || isDeleting || !user || !!fetchError || (joke !== null && joke.userId !== user?.uid);
 
-  const categoryNames = useMemo(() => {
-    if (!categories || !user) return [];
-    return Array.isArray(categories) ? categories.filter(cat => cat.userId === user.uid).map(cat => cat.name).sort() : [];
-  }, [categories, user]);
-
-
-   const categoryOptions = useMemo(() => {
-    let filtered = categoryNames;
-    if (categorySearch) {
-        filtered = categoryNames.filter(name =>
-            name.toLowerCase().includes(categorySearch.toLowerCase())
-        );
-    }
-    const options = filtered.map(name => ({ value: name, label: name }));
-    const searchTermTrimmed = categorySearch.trim();
-    const exactMatchFound = categoryNames.some(name => name.toLowerCase() === searchTermTrimmed.toLowerCase());
-
-    if (searchTermTrimmed && !exactMatchFound) {
-      options.unshift({ value: searchTermTrimmed, label: `Create "${searchTermTrimmed}"` });
-    }
-    return options;
-  }, [categoryNames, categorySearch]);
-
   if (authLoading) {
       return (
         <div className="container mx-auto p-4 md:p-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -258,37 +223,14 @@ export default function EditJokePage() {
               )} />
               <FormField control={form.control} name="category" render={({ field }) => (
                  <FormItem className="flex flex-col"> <FormLabel>Category</FormLabel>
-                     <Popover open={isCategoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
-                        <FormControl>
-                          <PopoverTrigger asChild>
-                              <Button variant="outline" role="combobox"
-                                className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
-                                disabled={isFormDisabled || loadingCategories} >
-                               <span className="truncate">
-                                {loadingCategories ? "Loading..." : field.value ? categoryNames.find(name => name.toLowerCase() === field.value.toLowerCase()) || field.value : "Select or type..."}
-                               </span> <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                          </PopoverTrigger>
-                        </FormControl>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto" align="start">
-                          <Command shouldFilter={false}>
-                            <CommandInput placeholder="Search or create..." value={categorySearch} onValueChange={setCategorySearch} />
-                             <CommandList>
-                                <CommandEmpty>{categorySearch.trim() ? `Create "${categorySearch.trim()}"?` : 'No categories.'}</CommandEmpty>
-                                <CommandGroup>
-                                  {categoryOptions.map((option) => (
-                                    <CommandItem key={option.value} value={option.label} onSelect={() => {
-                                        form.setValue('category', option.value, { shouldValidate: true });
-                                        setCategorySearch(option.value); setCategoryPopoverOpen(false); }}>
-                                      <Check className={cn("mr-2 h-4 w-4", field.value?.toLowerCase() === option.value.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                                      {option.label}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                             </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover> <FormMessage />
+                    <FormControl>
+                      <CategoryCombobox
+                        value={field.value}
+                        onChange={(category) => form.setValue('category', category, { shouldValidate: true })}
+                        disabled={isFormDisabled}
+                      />
+                    </FormControl>
+                    <FormMessage />
                   </FormItem>
               )} />
               <FormField control={form.control} name="source" render={({ field }) => (
