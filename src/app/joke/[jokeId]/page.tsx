@@ -59,49 +59,76 @@ export default function JokeShowPage() {
     }
   };
 
-  const streamExplanation = useCallback(async (jokeText: string, jokeId: string) => {
-    setExplanation('');
+  /**
+   * Streams an explanation for the current joke. Only ever invoked from an
+   * explicit user click — the API spends a Gemini call per request, so nothing
+   * here runs on page view. The route reads the joke text from Firestore
+   * itself; the client sends only the id plus the user's ID token.
+   */
+  const streamExplanation = useCallback(async (targetJokeId: string) => {
+    if (!user) {
+      toast({ title: 'Login Required', description: 'Please log in to get an AI explanation.', variant: 'destructive' });
+      return;
+    }
+
     setIsExplanationLoading(true);
+    let receivedAnyChunk = false;
 
     try {
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/explain-joke', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jokeId, jokeText }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ jokeId: targetJokeId }),
       });
 
       if (!response.ok || !response.body) {
-        throw new Error(`Failed to get explanation: ${response.statusText}`);
+        let message = `Failed to get explanation: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) message = errorData.error;
+        } catch { /* non-JSON error body — keep the status text */ }
+        throw new Error(message);
       }
-
-      setIsExplanationLoading(false);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+
+      const appendChunk = (chunk: string) => {
+        if (!chunk) return;
+        // Replace any previously displayed explanation only once the new one
+        // starts arriving, so a failed request leaves the old text intact.
+        if (receivedAnyChunk) {
+          setExplanation(prev => prev + chunk);
+        } else {
+          receivedAnyChunk = true;
+          setIsExplanationLoading(false);
+          setExplanation(chunk);
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
           break;
         }
-        const chunk = decoder.decode(value, { stream: true });
-        setExplanation(prev => prev + chunk);
+        appendChunk(decoder.decode(value, { stream: true }));
       }
-      const trailingChunk = decoder.decode();
-      if (trailingChunk) {
-        setExplanation(prev => prev + trailingChunk);
-      }
-
+      appendChunk(decoder.decode());
 
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- streaming fetch + AI errors expose heterogeneous shapes; unknown narrows too aggressively for the placeholder string.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- streaming fetch + AI errors expose heterogeneous shapes; unknown narrows too aggressively for the toast description string.
       const err = error as any;
       console.error("Error streaming explanation:", err);
-      setExplanation("Sorry, I couldn't come up with an explanation right now.");
+      toast({
+        title: 'Explanation Error',
+        description: err?.message || "Sorry, I couldn't come up with an explanation right now.",
+        variant: 'destructive',
+      });
     } finally {
       setIsExplanationLoading(false);
     }
-  }, []); // Intentionally empty dependency array to break the re-render loop
+  }, [user, toast]);
 
 
   useEffect(() => {
@@ -122,11 +149,10 @@ export default function JokeShowPage() {
         const fetchedJoke = await getJokeById(jokeId);
         if (fetchedJoke) {
           setJoke(fetchedJoke);
+          // Persisted explanations display automatically; generating a missing
+          // one requires an explicit click (see ExplanationCard).
           setExplanation(fetchedJoke.explanation ?? '');
           setIsExplanationLoading(false);
-          if (!fetchedJoke.explanation) {
-            streamExplanation(fetchedJoke.text, fetchedJoke.id);
-          }
 
           // Fetch all ratings for this joke
           const allRatings = await fetchAllRatingsForJoke(jokeId);
@@ -176,7 +202,7 @@ export default function JokeShowPage() {
       setIsLoadingCurrentUserRating(false);
       setIsLoadingAllRatings(false);
     }
-  }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, loadingContext, authLoading, streamExplanation]);
+  }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, loadingContext, authLoading]);
 
 
   const handleRatingSubmit = async (e: React.FormEvent) => {
@@ -316,7 +342,8 @@ export default function JokeShowPage() {
       <ExplanationCard
         explanation={explanation}
         isExplanationLoading={isExplanationLoading}
-        onExplainAgain={() => streamExplanation(joke.text, joke.id)}
+        canExplain={!!user}
+        onExplain={() => streamExplanation(joke.id)}
       />
 
       {/* User Rating Section */}

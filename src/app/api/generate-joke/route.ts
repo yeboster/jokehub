@@ -2,7 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateJoke, type GenerateJokeInput, type GenerateJokeOutput } from '@/ai/flows/generate-joke-flow';
 import { GEMINI_MODELS } from '@/ai/models';
 import { adminDb } from '@/lib/admin';
+import { verifyRequestAuth } from '@/lib/auth';
+import { rateLimit, rateLimitKeyFor } from '@/lib/rateLimit';
 import { z } from 'zod';
+
+/**
+ * Rate limit for joke generation. Each request costs two Gemini calls (6
+ * candidates + critic), so the window is deliberately tight. Keyed by uid for
+ * signed-in users, by IP otherwise; see the single-instance caveat in
+ * `@/lib/rateLimit`.
+ */
+const RATE_LIMIT = { limit: 10, windowMs: 5 * 60_000 };
 
 /**
  * Number of top-rated jokes the server fetches by default to use as style
@@ -111,6 +121,28 @@ function mergeOrderedUnique(primary: string[], secondary: string[], cap: number)
 
 export async function POST(request: NextRequest) {
   try {
+    // A Firebase ID token or the shared service token is required — this route
+    // spends real money on every call.
+    const authResult = await verifyRequestAuth(request);
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: 401 });
+    }
+
+    // Trusted server-to-server callers holding the shared token are exempt;
+    // browser callers are throttled per user.
+    if (authResult.via !== 'api-token') {
+      const { allowed, retryAfterSeconds } = rateLimit(
+        rateLimitKeyFor(request, 'generate-joke', authResult.userId),
+        RATE_LIMIT,
+      );
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Too many generation requests. Please try again shortly.' },
+          { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
+        );
+      }
+    }
+
     const body = await request.json();
     const parsedInput = ApiInputSchema.safeParse(body);
 

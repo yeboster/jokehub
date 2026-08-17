@@ -2,16 +2,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { explainJoke } from '@/ai/flows/explain-joke-flow';
 import { adminDb } from '@/lib/admin';
+import { verifyRequestAuth } from '@/lib/auth';
+import { rateLimit, rateLimitKeyFor } from '@/lib/rateLimit';
 import { z } from 'zod';
 
-// Zod schema for input validation
+/**
+ * Rate limit for explanations — one Gemini call per request. Keyed by uid for
+ * signed-in users, by IP otherwise; see the single-instance caveat in
+ * `@/lib/rateLimit`.
+ */
+const RATE_LIMIT = { limit: 20, windowMs: 5 * 60_000 };
+
+// Only the joke id is accepted: the text that gets explained (and persisted) is
+// always read from Firestore, so a caller can't have the model explain — and
+// then store — arbitrary text against someone else's joke.
 const ExplainJokeInputSchema = z.object({
-  jokeId: z.string().optional(),
-  jokeText: z.string().describe('The text of the joke to be explained.'),
+  jokeId: z.string().min(1).describe('The id of the joke to be explained.'),
 });
 
 export async function POST(request: NextRequest) {
   try {
+    // This route writes to `jokes/{jokeId}` through the Admin SDK, bypassing
+    // security rules, so it must authenticate for itself.
+    const authResult = await verifyRequestAuth(request);
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: 401 });
+    }
+
+    // Trusted server-to-server callers holding the shared token are exempt;
+    // browser callers are throttled per user.
+    if (authResult.via !== 'api-token') {
+      const { allowed, retryAfterSeconds } = rateLimit(
+        rateLimitKeyFor(request, 'explain-joke', authResult.userId),
+        RATE_LIMIT,
+      );
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Too many explanation requests. Please try again shortly.' },
+          { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
+        );
+      }
+    }
+
     const body = await request.json();
     const parsedInput = ExplainJokeInputSchema.safeParse(body);
 
@@ -19,8 +51,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid input', details: parsedInput.error.format() }, { status: 400 });
     }
 
-    const { jokeId, jokeText } = parsedInput.data;
-    const sourceStream = await explainJoke({ jokeText });
+    const { jokeId } = parsedInput.data;
+
+    // Existence check before anything is generated or written.
+    const jokeRef = adminDb.collection('jokes').doc(jokeId);
+    const jokeSnap = await jokeRef.get();
+    if (!jokeSnap.exists) {
+      return NextResponse.json({ error: 'Joke not found' }, { status: 404 });
+    }
+
+    const storedText = jokeSnap.get('text');
+    if (typeof storedText !== 'string' || storedText.trim().length === 0) {
+      return NextResponse.json({ error: 'Joke has no text to explain' }, { status: 422 });
+    }
+
+    const sourceStream = await explainJoke({ jokeText: storedText });
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
     let fullExplanation = '';
@@ -49,11 +94,11 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(trailingChunk));
           }
 
-          if (jokeId) {
+          if (fullExplanation.trim().length > 0) {
             try {
-              await adminDb.collection('jokes').doc(jokeId).update({
-                explanation: fullExplanation,
-              });
+              // `update` (not `set`) so a joke deleted mid-stream is not
+              // resurrected as a stub document.
+              await jokeRef.update({ explanation: fullExplanation });
             } catch (error) {
               console.warn('Failed to persist AI joke explanation:', error);
             }

@@ -87,9 +87,11 @@ export default function AddJokePage() {
       // service returns more (or future changes loosen the cap).
       const exemplarJokes = inspirationalJokes.slice(0, 10);
 
+      // The route requires a Firebase ID token (it spends Gemini calls).
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/generate-joke', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           topicHint: trimmedTopicHint,
           prefilledJokes,

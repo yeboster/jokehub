@@ -36,17 +36,54 @@ describe('verifyApiToken', () => {
     expect(result).toEqual({ success: false, error: 'Missing Authorization header' });
   });
 
-  it('fails when the token does not match', async () => {
+  it('fails when the token does not match but is the same length', async () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
-    const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer wrong-token' }));
+    const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer secret-tokeN' }));
     expect(result).toEqual({ success: false, error: 'Invalid token' });
+  });
+
+  // `timingSafeEqual` throws on length mismatch, so the compare is length-guarded.
+  it('fails without throwing when the token length differs', async () => {
+    process.env.JOKEHUB_API_TOKEN = 'secret-token';
+    const { verifyApiToken } = await import('@/lib/auth');
+    const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer wrong' }));
+    expect(result).toEqual({ success: false, error: 'Invalid token' });
+  });
+
+  it('fails when the header is not a bearer credential', async () => {
+    process.env.JOKEHUB_API_TOKEN = 'secret-token';
+    const { verifyApiToken } = await import('@/lib/auth');
+    const result = await verifyApiToken(makeRequest({ Authorization: 'secret-token' }));
+    expect(result).toEqual({ success: false, error: 'Malformed Authorization header' });
+  });
+
+  it('fails when the bearer scheme has no token', async () => {
+    process.env.JOKEHUB_API_TOKEN = 'secret-token';
+    const { verifyApiToken } = await import('@/lib/auth');
+    const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer ' }));
+    expect(result).toEqual({ success: false, error: 'Malformed Authorization header' });
+  });
+
+  it('does not treat the scheme prefix as part of the token', async () => {
+    // The old `replace('Bearer ', '')` parse accepted `Bearer Bearer <token>`.
+    process.env.JOKEHUB_API_TOKEN = 'secret-token';
+    const { verifyApiToken } = await import('@/lib/auth');
+    const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer Bearer secret-token' }));
+    expect(result).toEqual({ success: false, error: 'Malformed Authorization header' });
   });
 
   it('succeeds when the bearer token matches', async () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer secret-token' }));
-    expect(result).toEqual({ success: true, userId: 'api-user' });
+    expect(result).toEqual({ success: true, userId: 'api-user', via: 'api-token' });
+  });
+
+  it('accepts a case-insensitive scheme and extra whitespace', async () => {
+    process.env.JOKEHUB_API_TOKEN = 'secret-token';
+    const { verifyApiToken } = await import('@/lib/auth');
+    const result = await verifyApiToken(makeRequest({ Authorization: 'bearer   secret-token  ' }));
+    expect(result).toEqual({ success: true, userId: 'api-user', via: 'api-token' });
   });
 });
