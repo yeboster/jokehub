@@ -109,13 +109,14 @@ export const CategoryCombobox = React.forwardRef<HTMLButtonElement, CategoryComb
               className="h-9"
             />
             <CommandList>
-              <CommandEmpty>
-                {loadingCategories
-                  ? 'Loading...'
-                  : search.trim()
-                    ? `No personal category found. Create "${search.trim()}"?`
-                    : 'No personal categories found.'}
-              </CommandEmpty>
+              {/*
+                The only way to reach this: no categories and an empty search
+                box. A non-empty term always keeps the synthetic `Create "…"`
+                row in `options` (filtering is ours, not cmdk's), and the
+                trigger is disabled while categories load, so the popover can't
+                be open then.
+              */}
+              <CommandEmpty>No personal categories found.</CommandEmpty>
               <CommandGroup>
                 {options.map((option) => (
                   <CommandItem

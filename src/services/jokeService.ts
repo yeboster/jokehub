@@ -27,6 +27,13 @@ const JOKE_RATINGS_COLLECTION = 'jokeRatings';
 const PAGE_SIZE = 10;
 /** Firestore's hard limit on writes in a single batch. */
 const MAX_BATCH_WRITES = 500;
+/**
+ * How many pages a single `fetchJokes` call will pull through while looking for
+ * one that survives the client-side token AND (see `fetchJokes`). Bounded so a
+ * search whose first token is common but whose full term is rare can't turn one
+ * call into a scan of the whole collection.
+ */
+const MAX_SEARCH_PAGES = 5;
 
 export interface FilterParams {
   selectedCategories: string[];
@@ -62,7 +69,8 @@ function buildJokesQuery(
   // term was unmatchable as soon as it contained a space or punctuation. We
   // tokenize the term the same way the keywords were generated and constrain
   // the query on the FIRST token only, then intersect the remaining tokens
-  // client-side in `fetchJokes` (AND semantics — every token must be present).
+  // client-side in `fetchJokesPage` (AND semantics — every token must be
+  // present), which is why `fetchJokes` may need more than one page.
   //
   // `array-contains-any` over all tokens was the alternative, but it is a
   // disjunction: combined with the `category in [...]` clause below, Firestore
@@ -101,18 +109,13 @@ function buildJokesQuery(
   return query(collection(db, JOKES_COLLECTION), ...queryConstraints);
 }
 
-export async function fetchJokes(
+/** One page of the query built by `buildJokesQuery`, narrowed by the tokens the query itself couldn't express. */
+async function fetchJokesPage(
   filters: FilterParams,
+  searchTokens: string[],
   userId?: string,
   lastVisibleJokeDoc?: QueryDocumentSnapshot | null
 ) {
-  const searchTokens = generateSearchTokens(filters.search);
-  if (filters.search.trim() !== '' && searchTokens.length === 0) {
-    // Every word in the term was punctuation or shorter than three characters,
-    // so no stored keyword can match it. Skip the round trip.
-    return { jokes: [], lastVisible: null, hasMore: false };
-  }
-
   const q = buildJokesQuery(filters, userId, lastVisibleJokeDoc);
   if (!q) {
     return { jokes: [], lastVisible: null, hasMore: false };
@@ -153,8 +156,9 @@ export async function fetchJokes(
 
   if (searchTokens.length > 1) {
     // The query matched the first token; require the rest too. A page can come
-    // back partly filtered out — `hasMore` and the cursor below stay based on
-    // the raw docs, so pagination itself remains correct.
+    // back partly (or entirely) filtered out — `hasMore` and the cursor below
+    // stay based on the raw docs, so pagination itself remains correct, and
+    // `fetchJokes` pages on when this leaves nothing.
     jokes = jokes.filter((joke) => searchTokens.every((token) => joke.keywords?.includes(token)));
   }
 
@@ -168,6 +172,38 @@ export async function fetchJokes(
   const hasMore = docs.length === (filters.limit ?? PAGE_SIZE);
 
   return { jokes, lastVisible, hasMore };
+}
+
+export async function fetchJokes(
+  filters: FilterParams,
+  userId?: string,
+  lastVisibleJokeDoc?: QueryDocumentSnapshot | null
+) {
+  const searchTokens = generateSearchTokens(filters.search);
+  if (filters.search.trim() !== '' && searchTokens.length === 0) {
+    // Every word in the term was punctuation or shorter than three characters,
+    // so no stored keyword can match it. Skip the round trip.
+    return { jokes: [], lastVisible: null, hasMore: false };
+  }
+
+  // Only the first token constrains the query, so for a multi-word term the
+  // client-side AND can empty a whole page while later pages still hold
+  // matches. Page on in that case: an empty result then means "nothing left to
+  // match" rather than "nothing on this page", which is what the caller's empty
+  // state claims. Pages that yielded nothing contribute nothing, so the last
+  // page fetched is the whole answer — and its cursor/`hasMore` are the ones
+  // "load more" must continue from. A single-token (or no) search never loops:
+  // an empty page there already means the query itself was exhausted.
+  let page = await fetchJokesPage(filters, searchTokens, userId, lastVisibleJokeDoc);
+  for (
+    let extraPages = 0;
+    page.jokes.length === 0 && page.hasMore && extraPages < MAX_SEARCH_PAGES;
+    extraPages++
+  ) {
+    page = await fetchJokesPage(filters, searchTokens, userId, page.lastVisible);
+  }
+
+  return page;
 }
 
 export async function addJoke(

@@ -21,7 +21,9 @@ export const MAX_SEARCH_TOKENS = 10;
  *
  * A term that tokenizes to nothing (`"an"`, `"?"`) can never match a stored
  * keyword — callers should treat an empty result for a non-empty term as
- * "no matches" rather than "no search".
+ * "no matches" rather than "no search". Tokens beyond `MAX_SEARCH_TOKENS` are
+ * dropped entirely: they constrain neither the query nor the client-side AND,
+ * so an absurdly long term matches on its first `MAX_SEARCH_TOKENS` words.
  */
 export function generateSearchTokens(search: string): string[] {
   return generateKeywords(search).slice(0, MAX_SEARCH_TOKENS);

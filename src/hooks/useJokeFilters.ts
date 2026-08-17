@@ -32,9 +32,11 @@ export function useJokeFilters(): UseJokeFiltersResult {
   const searchParams = useSearchParams();
   const { user } = useAuth();
 
-  // Keyed on the serialized query string, not the params object: the memo must
-  // return a referentially stable object across re-renders that don't change
-  // the URL, because the page's fetch effect depends on its identity.
+  // Keyed on the serialized query string, not the params object, so re-renders
+  // that don't change the URL reuse the same object. That is an optimisation
+  // only — a `useMemo` may drop its cache at any time, so consumers must not
+  // treat this identity as a guarantee (the /jokes fetch effect compares with
+  // `filtersEqual` instead).
   const queryString = searchParams.toString();
   const isSignedIn = !!user;
 

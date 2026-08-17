@@ -1,14 +1,15 @@
 
 "use client";
 
-import { Suspense, useEffect, useMemo } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Loader2, PlusCircle, RotateCcw } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
-import { getFunnyRateLabel, hasActiveFilters } from '@/lib/jokeFilters';
+import type { FilterParams } from '@/services/jokeService';
+import { filtersEqual, getFunnyRateLabel, hasActiveFilters } from '@/lib/jokeFilters';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
 import JokeList from '@/components/joke-list';
 import { Badge } from '@/components/ui/badge';
@@ -32,12 +33,37 @@ function JokesPageComponent() {
   // because the scope resolves against `user` and we'd otherwise fetch a scope
   // we're about to change. Categories only feed the filter dialog, so the list
   // never waits on them.
+  //
+  // The guard compares by value rather than trusting the identity of `filters`
+  // or of `loadJokesWithFilters`: a `useMemo` result is a cache hint, not a
+  // stability guarantee, so identity alone could refire the effect and throw
+  // away a page the user had already loaded more of.
+  const fetchedFiltersRef = useRef<FilterParams | null>(null);
   useEffect(() => {
     if (authLoading) return;
+    if (fetchedFiltersRef.current && filtersEqual(fetchedFiltersRef.current, filters)) return;
+    fetchedFiltersRef.current = filters;
     loadJokesWithFilters(filters);
   }, [authLoading, filters, loadJokesWithFilters]);
 
   const jokesToDisplay = useMemo(() => jokes ?? [], [jokes]);
+
+  // A multi-word search is only partly expressible as a Firestore query, so the
+  // service AND-s the remaining tokens client-side and can hand back an empty
+  // page while later pages still hold matches (it pages on, but gives up after
+  // a bounded number of pages). Claiming "no jokes matched" right above an
+  // enabled "Load More" button would be a lie, so say what we actually know.
+  const searchExhausted = !hasMoreJokes;
+  const emptyMessage = filters.search
+    ? searchExhausted
+      ? `No jokes matched “${filters.search}”.`
+      : `No jokes on this page matched “${filters.search}”.`
+    : undefined;
+  const emptyHint = filters.search
+    ? searchExhausted
+      ? 'Search matches whole keywords of three or more letters. Try a single word, or clear the search.'
+      : 'There may be matches further down — load more to keep looking.'
+    : undefined;
 
   const isMyJokes = filters.scope === 'user' && !!user;
   const pageTitle = isMyJokes ? 'My Joke Collection' : 'All Jokes Feed';
@@ -103,12 +129,8 @@ function JokesPageComponent() {
 
       <JokeList
         jokes={jokesToDisplay}
-        emptyMessage={filters.search ? `No jokes matched “${filters.search}”.` : undefined}
-        emptyHint={
-          filters.search
-            ? 'Search matches whole keywords of three or more letters. Try a single word, or clear the search.'
-            : undefined
-        }
+        emptyMessage={emptyMessage}
+        emptyHint={emptyHint}
       />
 
       <div className="mt-8 text-center">
