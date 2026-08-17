@@ -4,6 +4,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes, type FilterParams } from '@/contexts/JokeContext';
+import { filtersEqual } from '@/lib/jokeFilters';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Loader2, PlusCircle } from 'lucide-react';
@@ -24,7 +25,7 @@ const HOME_PAGE_FILTERS: FilterParams = {
 
 export default function LandingPage() {
   const { user, loading: authLoading } = useAuth();
-  const { jokes, loadJokesWithFilters, loadingInitialJokes } = useJokes();
+  const { jokes, loadedFilters, loadJokesWithFilters, loadingInitialJokes } = useJokes();
 
   useEffect(() => {
     if (authLoading) return;
@@ -36,9 +37,17 @@ export default function LandingPage() {
   // the joke you're looking for". An empty feed says so instead.
   const displayedJokes = jokes ? jokes.slice(0, 3) : [];
 
-  // `jokes` survives a reload now (see JokeContext), so the loading check is
-  // the flag plus "no list yet" — never stale cards presented as fresh.
-  const isLoading = authLoading || loadingInitialJokes || jokes === null;
+  // `jokes` lives in the provider (root layout), so a client-side navigation
+  // from /jokes lands here with that page's result set already in state and no
+  // loading flag set — one full paint of somebody else's jokes before our
+  // effect runs. `loadedFilters` says which query the held list answers, so we
+  // show the spinner until it is ours.
+  const isLoading =
+    authLoading ||
+    loadingInitialJokes ||
+    jokes === null ||
+    loadedFilters === null ||
+    !filtersEqual(loadedFilters, HOME_PAGE_FILTERS);
 
   return (
     <div className="container mx-auto px-4 py-10 sm:py-16 text-center">

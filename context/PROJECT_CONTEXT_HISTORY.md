@@ -21,7 +21,7 @@ All colors are HSL triples defined as CSS custom properties in `src/app/globals.
 
 *   **Primary — vibrant purple** `270 60% 50%` (≈`#6A0DAD`), `270 60% 65%` in dark. The brand color: primary buttons, links, focus rings, filled stars.
 *   **Accent — pastel purple** `270 80% 95%` light / `270 50% 25%` dark, with `--accent-foreground` at the primary purple (`270 60% 50%` light, lightened to `270 60% 75%` in dark for contrast on the dark accent). Used for subtle tinted backgrounds (active nav item, file-input button). It is a *background* token — it has near-zero contrast on white as a text/fill color.
-*   **Text scale — neutral grays**: `--foreground` `0 0% 20%` (#333333) for body text, `--muted-foreground` `0 0% 40%` (#666666) for subtitles and secondary text.
+*   **Text scale — neutral grays**: `--foreground` `0 0% 20%` (#333333) light / `0 0% 98%` dark for body text, `--muted-foreground` `0 0% 40%` (#666666) light / `0 0% 63.9%` dark for subtitles and secondary text.
 *   **Surfaces**: `--background`/`--card` white (`0 0% 100%`) light, near-black (`0 0% 10%`) dark; `--border`/`--input` `0 0% 89.8%` light, `0 0% 25%` dark.
 *   **Destructive** `0 84.2% 60.2%` light / `0 62.8% 50.6%` dark (deepened so it doesn't glare on the near-black surface), `--destructive-foreground` `0 0% 98%` in both. Errors and delete actions.
 *   **Typography**: Geist Sans / Geist Mono, loaded in `src/app/layout.tsx` via `next/font/google` and exposed as `--font-geist-sans` / `--font-geist-mono`; `tailwind.config.ts` maps them onto `fontFamily.sans`/`mono`, so Tailwind's preflight applies Geist Sans globally.

@@ -16,6 +16,13 @@ export type FilterParams = jokeService.FilterParams;
 
 interface JokeContextProps {
   jokes: Joke[] | null;
+  /**
+   * The filter set `jokes` was fetched for, or null before any fetch has
+   * landed. The provider lives in the root layout, so `jokes` survives a
+   * client-side navigation: a page compares this against its own filters to
+   * tell "my results" from "the previous page's results, still in state".
+   */
+  loadedFilters: FilterParams | null;
   categories: Category[] | null;
   hasMoreJokes: boolean;
   loadingInitialJokes: boolean;
@@ -41,6 +48,7 @@ const JokeContext = createContext<JokeContextProps | undefined>(undefined);
 
 export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [jokes, setJokes] = useState<Joke[] | null>(null);
+  const [loadedFilters, setLoadedFilters] = useState<FilterParams | null>(null);
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [loadingInitialJokes, setLoadingInitialJokes] = useState<boolean>(true);
   const [loadingMoreJokes, setLoadingMoreJokes] = useState<boolean>(false);
@@ -110,6 +118,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (filters.scope === 'user' && !user) {
       setJokes([]);
+      if (!isLoadMore) setLoadedFilters(filters);
       setHasMoreJokes(false);
       if (isLoadMore) setLoadingMoreJokes(false); else setLoadingInitialJokes(false);
       return;
@@ -146,6 +155,9 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setJokes((prevJokes) => (prevJokes ? [...prevJokes, ...newJokes] : newJokes));
       } else {
         setJokes(newJokes);
+        // Stamped with the result, not at request time, so it always describes
+        // the list currently in `jokes` — and only the newest request gets here.
+        setLoadedFilters(filters);
       }
 
       lastVisibleJokeDocRef.current = lastVisible;
@@ -156,7 +168,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const err = error as any;
       console.error('Error fetching jokes (JokeContext):', err);
       toast({ title: 'Error', description: err.message || 'Could not load jokes.', variant: 'destructive' });
-      if (!isLoadMore) setJokes([]);
+      if (!isLoadMore) {
+        setJokes([]);
+        setLoadedFilters(filters);
+      }
       setHasMoreJokes(false);
     } finally {
       // A stale response must not clear the spinner belonging to the fetch
@@ -241,10 +256,14 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const importJokes = useCallback(
     (importedJokesData: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => {
       if (!user) throw new Error("User not authenticated for importing jokes.");
+      // No success toast and no list reload: csv-import owns the reporting
+      // (its per-row accounting toast names imported vs. skipped rows, which a
+      // bare "Processed N jokes." would pre-empt and contradict), and /manage
+      // renders no joke list to refresh.
       return handleApiCall(
         () => jokeService.importJokes(importedJokesData, user.uid),
-        `Processed ${importedJokesData.length} jokes.`,
-        true
+        '',
+        false
       )!;
     },
     [handleApiCall, user]
@@ -354,6 +373,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: JokeContextProps = {
     jokes,
+    loadedFilters,
     categories,
     hasMoreJokes,
     loadingInitialJokes,

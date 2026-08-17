@@ -24,11 +24,14 @@ const SKELETON_CARD_COUNT = 8;
  */
 function JokeGridSkeleton() {
   return (
+    // ARIA has no author-supplied name for a role-less <div> (role=generic), so
+    // the announcement rides on role="status" plus visually hidden text.
     <div
       className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-6"
+      role="status"
       aria-busy="true"
-      aria-label="Loading jokes"
     >
+      <span className="sr-only">Loading jokes…</span>
       {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
         <div
           key={index}
@@ -54,6 +57,7 @@ function JokesPageComponent() {
   const { user, loading: authLoading } = useAuth();
   const {
     jokes,
+    loadedFilters,
     loadJokesWithFilters,
     loadMoreFilteredJokes,
     hasMoreJokes,
@@ -111,7 +115,13 @@ function JokesPageComponent() {
   // filter no longer blanks the page and loses scroll position. The full-page
   // spinner is reserved for the genuine first paint: while auth resolves we
   // don't yet know the scope, and therefore not even the page title.
-  const isReloadingResults = loadingInitialJokes;
+  //
+  // The `loadedFilters` check covers the commit before the effect above runs:
+  // `jokes` lives in the provider (root layout), so a client-side navigation
+  // lands here with the home page's three jokes in state and no loading flag
+  // set. Skeletons until the held list is the one this page asked for.
+  const isReloadingResults =
+    loadingInitialJokes || loadedFilters === null || !filtersEqual(loadedFilters, filters);
 
   if (authLoading) {
     return (

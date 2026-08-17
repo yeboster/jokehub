@@ -22,7 +22,9 @@ import { CategoryCombobox } from '@/components/CategoryCombobox';
 const jokeFormSchema = z.object({
   text: z.string().min(1, 'Joke text cannot be empty.'),
   category: z.string().trim().min(1, 'Category cannot be empty. Type a new one or select from suggestions.'),
-  source: z.string().optional(),
+  // Mirrors the `source.size() <= 100` create rule in `firestore.rules` (and
+  // the CSV import's own check) — without it the write fails on the rules.
+  source: z.string().max(100, 'Source cannot exceed 100 characters.').optional(),
 });
 
 export type JokeFormValues = z.infer<typeof jokeFormSchema>; // Exporting for use in parent
