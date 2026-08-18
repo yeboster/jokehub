@@ -157,7 +157,7 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
               value={draft.scope}
               onValueChange={(scope: FilterParams['scope']) => {
                 if (scope === 'user' && !user) {
-                  toast({ title: 'Login Required', description: 'Log in to see your jokes.', variant: 'destructive' });
+                  toast({ title: 'Sign in required', description: 'Log in to filter to your own jokes.', variant: 'destructive' });
                   setDraft((prev) => ({ ...prev, scope: 'public' }));
                 } else {
                   setDraft((prev) => ({ ...prev, scope }));

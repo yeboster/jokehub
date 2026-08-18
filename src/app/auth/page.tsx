@@ -33,11 +33,14 @@ function AuthPageComponent() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-        toast({ title: 'Validation Error', description: 'Email and password are required.', variant: 'destructive'});
+        // Still unreachable — `required` on the inputs makes the browser block
+        // the submit before this runs. Task 16 replaces both with inline field
+        // messages; retitled here only so the voice rule holds everywhere.
+        toast({ title: "Couldn't submit", description: 'Email and password are required.', variant: 'destructive'});
         return;
     }
     if (password.length < 6) {
-        toast({ title: 'Validation Error', description: 'Password must be at least 6 characters long.', variant: 'destructive'});
+        toast({ title: "Couldn't submit", description: 'Password must be at least 6 characters long.', variant: 'destructive'});
         return;
     }
     setIsLoading(true);
@@ -47,7 +50,10 @@ function AuthPageComponent() {
       } else {
         await signUp(email, password);
       }
-      toast({ title: isLogin ? 'Login Successful' : 'Signup Successful', description: 'Redirecting…' });
+      toast({
+        title: isLogin ? 'Signed in' : 'Account created',
+        description: isLogin ? 'Taking you back…' : 'Welcome to Joke Hub.',
+      });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase auth errors expose a dynamic `code` field not present on Error.
     } catch (error: any) {
       console.error("Auth error:", error);
@@ -58,7 +64,7 @@ function AuthPageComponent() {
         errorMessage = 'This email is already registered. Try logging in.';
       }
       toast({
-        title: 'Authentication Error',
+        title: "Couldn't sign you in",
         description: errorMessage,
         variant: 'destructive',
       });

@@ -69,7 +69,7 @@ export default function JokeShowPage() {
    */
   const streamExplanation = useCallback(async (targetJokeId: string) => {
     if (!user) {
-      toast({ title: 'Login Required', description: 'Please log in to get an AI explanation.', variant: 'destructive' });
+      toast({ title: 'Sign in required', description: 'Log in to get an AI explanation.', variant: 'destructive' });
       return;
     }
 
@@ -122,8 +122,8 @@ export default function JokeShowPage() {
       // untouched, so without this the click would look like it did nothing.
       if (!receivedAnyChunk) {
         toast({
-          title: 'Explanation Error',
-          description: 'No explanation returned — try again',
+          title: "Couldn't explain that one",
+          description: 'No explanation came back — try again.',
           variant: 'destructive',
         });
       }
@@ -133,7 +133,7 @@ export default function JokeShowPage() {
       const err = error as any;
       console.error("Error streaming explanation:", err);
       toast({
-        title: 'Explanation Error',
+        title: "Couldn't explain that one",
         description: err?.message || "Sorry, I couldn't come up with an explanation right now.",
         variant: 'destructive',
       });
@@ -220,17 +220,19 @@ export default function JokeShowPage() {
   const handleRatingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !joke) {
-      toast({ title: 'Error', description: 'Cannot submit rating. Please log in or ensure the joke is loaded.', variant: 'destructive' });
-      return;
-    }
-    if (ratingInputValue === 0) {
-      toast({ title: 'Validation Error', description: 'Please select a star rating (1-5).', variant: 'destructive' });
+      toast({ title: "Couldn't submit", description: 'Log in and wait for the joke to load.', variant: 'destructive' });
       return;
     }
     setIsSubmittingRating(true);
     try {
       const aggregates = await submitUserRating(joke.id, ratingInputValue, commentInputValue);
-      toast({ title: 'Success', description: currentUserRating ? 'Your rating has been updated.' : 'Your rating has been submitted.' });
+      // The only toast for this action: `submitUserRating` passes `null` to
+      // `handleApiCall` precisely because the context cannot tell a new rating
+      // from an updated one and this page can.
+      toast({
+        title: currentUserRating ? 'Rating updated' : 'Rating saved',
+        description: currentUserRating ? 'Your new rating is in.' : 'Thanks for rating.',
+      });
 
       // Single round trip: the transaction returns the joke's new totals and we
       // already know what we just submitted, so both the joke and the ratings
@@ -263,7 +265,6 @@ export default function JokeShowPage() {
 
     } catch (err) {
       console.error("Error submitting rating from page:", err);
-      toast({ title: 'Rating Submission Error', description: 'Could not submit your rating.', variant: 'destructive'});
     } finally {
       setIsSubmittingRating(false);
     }

@@ -47,7 +47,7 @@ export default function AddJokePage() {
 
   const handleLoadInspirationalJokes = async () => {
     if (!user) {
-      toast({ title: 'Login Required', description: 'Please log in to load your 5-star jokes.', variant: 'destructive' });
+      toast({ title: 'Sign in required', description: 'Log in to load your 5-star jokes.', variant: 'destructive' });
       return;
     }
     setIsLoadingInspirationalJokes(true);
@@ -55,16 +55,16 @@ export default function AddJokePage() {
       const jokes = await jokeService.fetchUserFiveStarJokes(user.uid);
       if (jokes.length > 0) {
         setInspirationalJokes(jokes);
-        toast({ title: 'Inspiration Loaded!', description: `${jokes.length} of your 5-star jokes will be used for inspiration.` });
+        toast({ title: 'Inspiration loaded', description: `${jokes.length} of your 5-star jokes will guide the next batch.` });
       } else {
         setInspirationalJokes([]);
-        toast({ title: 'No 5-Star Jokes Found', description: 'You haven\'t rated any jokes with 5 stars yet.', variant: 'default' });
+        toast({ title: 'No 5-star jokes yet', description: 'Rate a few jokes five stars and try again.', variant: 'default' });
       }
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore fetchUserFiveStarJokes errors expose `.message`; unknown narrows too aggressively for the toast description string.
       const err = error as any;
       console.error("Error loading 5-star jokes:", err);
-      toast({ title: 'Error', description: err.message || 'Failed to load inspirational jokes.', variant: 'destructive' });
+      toast({ title: "Couldn't load your jokes", description: err.message || 'Failed to load inspirational jokes.', variant: 'destructive' });
     } finally {
       setIsLoadingInspirationalJokes(false);
     }
@@ -73,7 +73,7 @@ export default function AddJokePage() {
 
   const handleGenerateJoke = async () => {
     if (!user) {
-      toast({ title: 'Login Required', description: 'Please log in to generate jokes.', variant: 'destructive' });
+      toast({ title: 'Sign in required', description: 'Log in to generate jokes.', variant: 'destructive' });
       return;
     }
     setIsGeneratingJoke(true);
@@ -110,12 +110,12 @@ export default function AddJokePage() {
       const result: GenerateJokeOutput = await response.json();
       setAiGeneratedJokes(result.jokes);
       setInspirationalJokes([]); // Clear inspiration after use to avoid re-using them unintentionally
-      toast({ title: 'Jokes Generated!', description: 'Choose your favorite from the new variations below.' });
+      toast({ title: 'Three variations ready', description: 'Pick one to fill the form.' });
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fetch + genkit AI errors expose heterogeneous shapes; unknown narrows too aggressively for the toast description string.
       const err = error as any;
       console.error("Error generating joke via API:", err);
-      toast({ title: 'AI Error', description: err.message || 'Failed to generate jokes.', variant: 'destructive' });
+      toast({ title: "Couldn't generate jokes", description: err.message || 'Failed to generate jokes.', variant: 'destructive' });
     } finally {
       setIsGeneratingJoke(false);
     }
@@ -127,12 +127,11 @@ export default function AddJokePage() {
 
   const handleAddJokeAndRedirect = async (data: JokeFormValues) => {
     if (!user) {
-      toast({ title: 'Login Required', description: 'Please log in to add jokes.', variant: 'destructive' });
+      toast({ title: 'Sign in required', description: 'Log in to add jokes.', variant: 'destructive' });
       return;
     }
     try {
       await addJoke(data);
-      toast({ title: 'Success!', description: 'Your joke has been added.', variant: 'default' });
       router.push('/jokes');
     } catch (error) {
       console.error("Error submitting joke from page:", error);

@@ -75,7 +75,7 @@ export default function EditJokePage() {
         if (fetchedJoke) {
           if (fetchedJoke.userId !== user.uid) {
             setFetchError('You do not have permission to edit this joke.');
-            toast({ title: 'Access Denied', description: 'You can only edit your own jokes.', variant: 'destructive' });
+            toast({ title: 'Not your joke', description: 'You can only edit jokes you added.', variant: 'destructive' });
             setJoke(null);
           } else {
             setJoke(fetchedJoke);
@@ -88,12 +88,12 @@ export default function EditJokePage() {
           }
         } else {
            setFetchError('Joke not found.');
-           toast({ title: 'Error', description: 'Joke not found.', variant: 'destructive' });
+           toast({ title: "Couldn't load that joke", description: 'It may have been deleted.', variant: 'destructive' });
         }
       } catch (error) {
         console.error('Error fetching joke for editing:', error);
         setFetchError('Failed to load joke data.');
-        toast({ title: 'Error', description: 'Failed to load joke data.', variant: 'destructive' });
+        toast({ title: "Couldn't load that joke", description: 'Please reload and try again.', variant: 'destructive' });
       } finally {
         setLoadingJokeData(false);
       }
@@ -110,12 +110,12 @@ export default function EditJokePage() {
 
   const onSubmit: SubmitHandler<EditJokeFormValues> = async (data) => {
     if (!user || !joke || joke.userId !== user.uid) {
-        toast({ title: 'Error', description: 'Cannot update joke. Please try again.', variant: 'destructive'});
+        toast({ title: "Couldn't save", description: 'Please reload and try again.', variant: 'destructive'});
         return;
     }
 
      if (data.text === joke.text && data.category === joke.category && data.source === joke.source && data.used === joke.used) {
-         toast({ title: 'No Changes', description: 'No changes were made to the joke.' });
+         toast({ title: 'Nothing to save', description: "You haven't changed anything." });
          router.push('/jokes');
          return;
      }
@@ -123,13 +123,9 @@ export default function EditJokePage() {
     setIsSubmitting(true);
     try {
       await updateJoke(joke.id, data);
-      toast({ title: 'Success', description: 'Joke updated successfully!' });
       router.push('/jokes');
     } catch (error) {
       console.error("Failed to update joke:", error);
-       if (!(error instanceof Error && (error.message.includes("Category") || error.message.includes("permission denied")))) {
-           toast({ title: 'Update Error', description: 'Failed to update joke.', variant: 'destructive' });
-       }
     } finally {
       setIsSubmitting(false);
     }
@@ -137,17 +133,15 @@ export default function EditJokePage() {
 
   const handleDelete = async () => {
     if (!user || !joke) {
-      toast({ title: 'Error', description: 'Cannot delete joke. Please try again.', variant: 'destructive' });
+      toast({ title: "Couldn't delete", description: 'Please reload and try again.', variant: 'destructive' });
       return;
     }
     setIsDeleting(true);
     try {
       await deleteJoke(joke.id);
-      toast({ title: 'Success', description: 'Joke has been deleted.' });
       router.push('/jokes');
     } catch (error) {
        console.error("Failed to delete joke:", error);
-       toast({ title: 'Delete Error', description: 'Failed to delete joke.', variant: 'destructive' });
     } finally {
        setIsDeleting(false);
     }

@@ -56,8 +56,8 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
     // Check if user is logged in
     if (!user) {
       toast({
-        title: 'Authentication Required',
-        description: 'Please log in to import jokes.',
+        title: 'Sign in required',
+        description: 'Log in to import jokes.',
         variant: 'destructive',
       });
       if (fileInputRef.current) fileInputRef.current.value = ''; // Clear file input
@@ -74,7 +74,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
       const text = e.target?.result;
       if (typeof text !== 'string') {
         toast({
-          title: 'Error Reading File',
+          title: "Couldn't read that file",
           description: 'Could not read the file content.',
           variant: 'destructive',
         });
@@ -155,7 +155,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         if (importedJokes.length > 0) {
           await onImport(importedJokes); // Call the provided onImport function
           toast({
-            title: skippedRows.length > 0 ? 'Import Finished With Skipped Rows' : 'Import Successful',
+            title: skippedRows.length > 0 ? 'Import finished with skipped rows' : 'Import finished',
             description:
               skippedRows.length > 0
                 ? `${importedJokes.length} imported, ${skippedRows.length} skipped — ${describeSkippedRows(skippedRows)}.`
@@ -163,7 +163,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           });
         } else {
            toast({
-            title: 'Import Information',
+            title: 'Nothing imported',
             description:
               skippedRows.length > 0
                 ? `No jokes imported — all ${skippedRows.length} row(s) were skipped: ${describeSkippedRows(skippedRows)}.`
@@ -175,7 +175,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PapaParse error objects have a dynamic shape.
       } catch (error: any) {
         toast({
-          title: 'Import Error',
+          title: "Couldn't import that file",
           description: error.message || 'Failed to parse or process the CSV file.',
           variant: 'destructive',
         });
@@ -190,7 +190,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
 
     reader.onerror = () => {
       toast({
-        title: 'File Read Error',
+        title: "Couldn't read that file",
         description: 'An error occurred while reading the file.',
         variant: 'destructive',
       });

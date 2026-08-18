@@ -73,12 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await firebaseSignOut(auth);
       setUser(null);
-      toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+      toast({ title: 'Signed out', description: 'You are signed out of Joke Hub.' });
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase signOut errors expose `.code`/`.message`; unknown narrows too aggressively here.
       const err = error as any;
       console.error("Sign out error:", err);
-      toast({ title: 'Error', description: 'Failed to log out.', variant: 'destructive' });
+      toast({ title: "Couldn't sign you out", description: 'Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

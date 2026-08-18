@@ -8,6 +8,22 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
+/*
+ * Toast conventions (round 5). `TOAST_LIMIT` is 1, so a second toast fired for
+ * the same action does not stack — it evicts the first, and which message
+ * survives depends on call order. Hence:
+ *
+ *   - Errors are announced by `handleApiCall` in JokeContext, once. A caller
+ *     that wants to say more says it inline (a form error next to the field),
+ *     not in a second toast.
+ *   - Successes are announced once, by whichever layer holds the most specific
+ *     copy. A page with better copy than the context gets it by passing `null`
+ *     as the context's `success` argument.
+ *   - Titles: sentence case, <= 3 words, stating the outcome ("Joke added").
+ *     Destructive titles open with "Couldn't " ("Couldn't sign you in").
+ *     Never name the component that failed; never end with '!'.
+ *   - Descriptions: one sentence, ending in a period.
+ */
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
 
