@@ -10,13 +10,19 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import PageLoading from '@/components/PageLoading';
-import { Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 function AuthPageComponent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  // Field-level messages. The two "Validation Error" toasts these replace were
+  // unreachable: `required` and `minLength` made the browser block the submit
+  // before `handleSubmit` ever ran, so the copy written for the user was never
+  // shown to the user.
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,17 +38,17 @@ function AuthPageComponent() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-        // Still unreachable — `required` on the inputs makes the browser block
-        // the submit before this runs. Task 16 replaces both with inline field
-        // messages; retitled here only so the voice rule holds everywhere.
-        toast({ title: "Couldn't submit", description: 'Email and password are required.', variant: 'destructive'});
-        return;
+
+    const nextErrors: { email?: string; password?: string } = {};
+    if (!email.trim()) nextErrors.email = 'Enter your email address.';
+    if (!password) nextErrors.password = 'Enter your password.';
+    else if (password.length < 6) nextErrors.password = 'Passwords are at least 6 characters.';
+    if (nextErrors.email || nextErrors.password) {
+      setErrors(nextErrors);
+      return;
     }
-    if (password.length < 6) {
-        toast({ title: "Couldn't submit", description: 'Password must be at least 6 characters long.', variant: 'destructive'});
-        return;
-    }
+
+    setErrors({});
     setIsLoading(true);
     try {
       if (isLogin) {
@@ -59,15 +65,14 @@ function AuthPageComponent() {
       console.error("Auth error:", error);
       let errorMessage = error.message || (isLogin ? 'Failed to login.' : 'Failed to sign up.');
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        errorMessage = 'Invalid email or password.';
+        errorMessage = 'That email and password do not match an account.';
       } else if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered. Try logging in.';
+        errorMessage = 'That email is already registered — try logging in instead.';
       }
-      toast({
-        title: "Couldn't sign you in",
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      // Inline, not a toast: the failure belongs to this form, the form is the
+      // only thing on the page, and a toast can be missed or dismissed while
+      // the wrong password is still sitting in the field.
+      setErrors({ form: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -103,15 +108,67 @@ function AuthPageComponent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" disabled={isLoading} className="text-base"/>
+              <Input
+                id="email"
+                type="email"
+                // Without these a password manager cannot recognise the form,
+                // which is the single largest source of friction on a sign-in
+                // page nobody visits twice a week.
+                autoComplete="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrors((prev) => ({ ...prev, email: undefined, form: undefined })); }}
+                placeholder="you@example.com"
+                disabled={isLoading}
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'email-error' : undefined}
+                className="text-base"
+              />
+              {errors.email && <p id="email-error" className="text-sm font-medium text-destructive">{errors.email}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" disabled={isLoading} minLength={6} className="text-base"/>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setErrors((prev) => ({ ...prev, password: undefined, form: undefined })); }}
+                  placeholder="••••••••"
+                  disabled={isLoading}
+                  aria-invalid={!!errors.password}
+                  // Only ever points at an element that is actually rendered:
+                  // the hint exists on sign-up only, and a dangling idref is
+                  // announced as nothing at all.
+                  aria-describedby={errors.password ? 'password-error' : !isLogin ? 'password-hint' : undefined}
+                  className="text-base pr-10"
+                />
+                <button
+                  type="button"
+                  // 40px square, inside the 40px-tall field.
+                  className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.password ? (
+                <p id="password-error" className="text-sm font-medium text-destructive">{errors.password}</p>
+              ) : (
+                !isLogin && <p id="password-hint" className="text-sm text-muted-foreground">At least 6 characters.</p>
+              )}
             </div>
+            {errors.form && (
+              <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                {errors.form}
+              </p>
+            )}
             <Button type="submit" className="w-full text-base py-3" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isLogin ? 'Log In' : 'Sign Up'}
@@ -119,7 +176,7 @@ function AuthPageComponent() {
           </form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
-          <Button variant="link" onClick={() => setIsLogin(!isLogin)} disabled={isLoading} className="text-sm">
+          <Button variant="link" onClick={() => { setIsLogin(!isLogin); setErrors({}); }} disabled={isLoading} className="text-sm">
             {isLogin ? 'Don’t have an account? Sign Up' : 'Already have an account? Log In'}
           </Button>
         </CardFooter>
