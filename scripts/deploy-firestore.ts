@@ -10,13 +10,18 @@
  *   npm run firestore:push            # deploy rules + indexes
  *   npm run firestore:push -- --check # read-only: diff local vs deployed
  *
- * Requires ./firebase-admin-credentials.json (gitignored), the same file
- * migrations/index.ts reads.
+ * Credentials (checked in order, matching the repo's existing conventions):
+ *   1. FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY
+ *      env vars — the same ones src/lib/admin.ts uses on Vercel (a local
+ *      .env works too, via dotenv).
+ *   2. ./firebase-admin-credentials.json — the service-account JSON the
+ *      migrations runner reads (gitignored).
  */
 
 import fs from 'fs';
 import path from 'path';
 import { GoogleAuth } from 'google-auth-library';
+import 'dotenv/config';
 
 const CREDS_PATH = path.join(process.cwd(), 'firebase-admin-credentials.json');
 const RULES_PATH = path.join(process.cwd(), 'firestore.rules');
@@ -25,9 +30,34 @@ const DATABASE = '(default)';
 
 const CHECK_ONLY = process.argv.includes('--check');
 
-interface ServiceAccount {
-  project_id: string;
-  client_email: string;
+interface Credentials {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+}
+
+function readCredentials(): Credentials {
+  // Path 1: env vars, same shape as src/lib/admin.ts.
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  if (projectId && clientEmail && privateKey) {
+    return { projectId, clientEmail, privateKey };
+  }
+  // Path 2: service-account JSON at repo root, same file migrations use.
+  if (fs.existsSync(CREDS_PATH)) {
+    const sa = JSON.parse(fs.readFileSync(CREDS_PATH, 'utf-8'));
+    return {
+      projectId: sa.project_id,
+      clientEmail: sa.client_email,
+      privateKey: sa.private_key,
+    };
+  }
+  throw new Error(
+    'No Firebase admin credentials found. Either set FIREBASE_PROJECT_ID / ' +
+      'FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (env or .env), or drop ' +
+      'firebase-admin-credentials.json (the migrations one, gitignored) at the repo root.'
+  );
 }
 
 interface IndexField {
@@ -40,16 +70,6 @@ interface IndexSpec {
   collectionGroup: string;
   queryScope: 'COLLECTION' | 'COLLECTION_GROUP';
   fields: IndexField[];
-}
-
-function readServiceAccount(): ServiceAccount {
-  if (!fs.existsSync(CREDS_PATH)) {
-    throw new Error(
-      `Missing ${CREDS_PATH}. Drop the Firebase service-account JSON ` +
-        `(the one migrations use) at the repo root. It is gitignored.`
-    );
-  }
-  return JSON.parse(fs.readFileSync(CREDS_PATH, 'utf-8'));
 }
 
 // Loosely-typed JSON payloads from the Google REST APIs.
@@ -208,14 +228,18 @@ async function createIndex(
 // ----------------------------------------------------------------- main ----
 
 async function main() {
-  const sa = readServiceAccount();
-  const projectId = sa.project_id;
+  const creds = readCredentials();
+  const projectId = creds.projectId;
   console.log(
-    `Project: ${projectId} (via ${sa.client_email})${CHECK_ONLY ? ' [check only]' : ''}`
+    `Project: ${projectId} (via ${creds.clientEmail})${CHECK_ONLY ? ' [check only]' : ''}`
   );
 
   const auth = new GoogleAuth({
-    credentials: JSON.parse(fs.readFileSync(CREDS_PATH, 'utf-8')),
+    credentials: {
+      project_id: creds.projectId,
+      client_email: creds.clientEmail,
+      private_key: creds.privateKey,
+    },
     scopes: ['https://www.googleapis.com/auth/cloud-platform'],
   });
 
