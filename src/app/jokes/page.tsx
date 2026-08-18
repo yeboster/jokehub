@@ -141,10 +141,14 @@ function JokesPageComponent() {
     <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
       <Header title={pageTitle} description={pageDescription} centered />
 
-      <div className="mb-6 p-4 flex items-center gap-x-2 gap-y-3 border-b pb-6">
+      {/* Wraps on narrow screens: the trigger buttons, the active-filter badges
+          and the action cluster each take a full row rather than being crushed
+          into one. `p-4` was fighting `pb-6` on the same edge — the bottom
+          padding is the one that matters, since it sets the gap to the rule. */}
+      <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-3 border-b pb-6">
         <JokeFilterDialog value={filters} onApply={applyFilters} />
 
-        <div className="flex flex-wrap items-center gap-2 flex-grow min-h-[36px]">
+        <div className="flex flex-wrap items-center gap-2 flex-grow basis-full sm:basis-auto min-h-[36px]">
           {filters.search && (
             <Badge variant="secondary" className="py-1 px-2">Search: &quot;{filters.search}&quot;</Badge>
           )}
@@ -165,7 +169,7 @@ function JokesPageComponent() {
           )}
         </div>
 
-        <div className="flex items-center ml-auto">
+        <div className="flex w-full items-center justify-end sm:w-auto sm:ml-auto">
           <Button variant="default" size="sm" className="h-9" asChild>
             <Link href={user ? '/add-joke' : '/auth?redirect=/add-joke'}>
               <PlusCircle className="mr-2 h-4 w-4" />
