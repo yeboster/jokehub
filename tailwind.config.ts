@@ -86,11 +86,45 @@ export default {
   				to: {
   					height: '0'
   				}
+  			},
+  			// Cards enter from slightly below and slightly small. Kept under
+  			// 8px of travel: anything larger reads as a page transition rather
+  			// than "this item just arrived".
+  			'card-enter': {
+  				from: {
+  					opacity: '0',
+  					transform: 'translateY(8px) scale(0.98)'
+  				},
+  				to: {
+  					opacity: '1',
+  					transform: 'translateY(0) scale(1)'
+  				}
+  			},
+  			// A highlight sweeping across a skeleton bar. Travels 200% of its
+  			// own width so the gradient clears the bar at both ends.
+  			shimmer: {
+  				from: {
+  					transform: 'translateX(-100%)'
+  				},
+  				to: {
+  					transform: 'translateX(100%)'
+  				}
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			// `both` fill mode matters: staggered cards must hold the `from`
+  			// state through their delay, or every card paints at full opacity
+  			// for one frame and then snaps back to invisible.
+  			'card-enter': 'card-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both',
+  			shimmer: 'shimmer 1.6s ease-in-out infinite'
+  		},
+  		transitionTimingFunction: {
+  			// The round's two easings. `emphasized` overshoots slightly and is
+  			// for things entering; `standard` is for state changes in place.
+  			emphasized: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  			standard: 'cubic-bezier(0.4, 0, 0.2, 1)'
   		}
   	}
   },
