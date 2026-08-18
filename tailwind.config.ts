@@ -114,10 +114,18 @@ export default {
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
-  			// `both` fill mode matters: staggered cards must hold the `from`
-  			// state through their delay, or every card paints at full opacity
-  			// for one frame and then snaps back to invisible.
-  			'card-enter': 'card-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both',
+  			// The fill mode matters, and it has to be `backwards` exactly:
+  			// staggered cards must hold the `from` state through their delay, or
+  			// every card paints at full opacity for one frame and then snaps
+  			// back to invisible. `both` would do that too, but it also keeps the
+  			// `to` keyframe applied forever after the run — and animation
+  			// declarations outrank ordinary ones, so a filled
+  			// `transform: translateY(0) scale(1)` would permanently beat the
+  			// hover-lift and press transforms the card carries. `backwards`
+  			// fills the delay and then hands the element back to its own styles;
+  			// the `to` values are the element's natural state anyway, so nothing
+  			// moves at the hand-off.
+  			'card-enter': 'card-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards',
   			shimmer: 'shimmer 1.6s ease-in-out infinite'
   		},
   		transitionTimingFunction: {
