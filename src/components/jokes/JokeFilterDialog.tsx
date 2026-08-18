@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Check, ChevronsUpDown, Filter as FilterIcon, Search, User, Users, XIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, Filter as FilterIcon, User, Users, XIcon } from 'lucide-react';
 
 import type { FilterParams } from '@/services/jokeService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,7 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -42,8 +41,11 @@ interface JokeFilterDialogProps {
 }
 
 /**
- * The joke feed's search/filter controls: the two toolbar buttons plus the
- * dialog they open.
+ * The joke feed's filter controls: one toolbar button plus the dialog it
+ * opens. Search is a field on the page, not a control in here — it is the
+ * primary discovery path and was two interactions and one occluding surface
+ * deep. The single opener is a `DialogTrigger`, so Radix returns focus to the
+ * control the user actually pressed.
  *
  * All editing happens on one `draft` object that is seeded from `value` each
  * time the dialog opens — replacing the five parallel `temp*` states the page
@@ -59,20 +61,15 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
   const [draft, setDraft] = useState<FilterParams>(value);
   const [categorySearch, setCategorySearch] = useState('');
   const [isCategoryPopoverOpen, setIsCategoryPopoverOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const openDialog = (focusSearch: boolean) => {
+  const openDialog = () => {
     setDraft({ ...value, selectedCategories: [...value.selectedCategories] });
     setCategorySearch('');
     setIsOpen(true);
-    if (focusSearch) {
-      // Small delay so the input exists before we reach for it.
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) openDialog(false);
+    if (nextOpen) openDialog();
     else setIsOpen(false);
   };
 
@@ -88,10 +85,6 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
         : draft.selectedCategories.filter((category) => categoryNames.includes(category)),
     });
     setIsOpen(false);
-  };
-
-  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') handleApply();
   };
 
   const toggleCategory = (categoryName: string) => {
@@ -110,17 +103,8 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => openDialog(true)}
-        className="h-9 w-9 shrink-0"
-      >
-        <Search className="h-4 w-4" />
-        <span className="sr-only">Search</span>
-      </Button>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" onClick={() => openDialog(false)} className="h-9">
+        <Button variant="outline" size="sm" onClick={openDialog} className="h-9">
           <FilterIcon className="mr-2 h-4 w-4" />
           Filters
           {hasActiveFilters(value) && <span className="ml-2 h-2 w-2 rounded-full bg-primary" />}
@@ -128,27 +112,12 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Filter &amp; Search Jokes</DialogTitle>
+          <DialogTitle>Filter Jokes</DialogTitle>
           <DialogDescription>
-            Select preferences to refine the joke feed. Press Enter in search to apply.
+            Refine the joke feed. Search lives on the page itself.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4 pr-3">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="modal-search-input" className="text-right">
-              Search
-            </Label>
-            <Input
-              ref={searchInputRef}
-              id="modal-search-input"
-              placeholder="Search by keyword…"
-              value={draft.search}
-              onChange={(event) => setDraft((prev) => ({ ...prev, search: event.target.value }))}
-              onKeyDown={handleSearchKeyDown}
-              className="col-span-3"
-            />
-          </div>
-
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="filter-scope-select" className="text-right">
               Show Jokes

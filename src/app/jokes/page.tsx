@@ -3,7 +3,7 @@
 
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Loader2, PlusCircle, RotateCcw, X as XIcon } from 'lucide-react';
+import { ChevronDown, Loader2, PlusCircle, RotateCcw, Search, X as XIcon } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
@@ -17,6 +17,7 @@ import JokeList from '@/components/joke-list';
 import PageLoading from '@/components/PageLoading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 /** How many placeholder cards to show while a page of jokes loads. */
 const SKELETON_CARD_COUNT = 8;
@@ -126,6 +127,39 @@ function JokesPageComponent() {
           into one. `p-4` was fighting `pb-6` on the same edge — the bottom
           padding is the one that matters, since it sets the gap to the rule. */}
       <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-3 border-b pb-6">
+        {/* Search is the primary discovery path for a joke collection, so it
+            is a field on the page rather than a control inside a dialog. The
+            dialog keeps the filters that are genuinely a form. */}
+        <form
+          role="search"
+          className="flex basis-full items-center gap-2 sm:basis-auto sm:flex-1 sm:max-w-sm"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const entered = new FormData(event.currentTarget).get('search');
+            applyFilters({ ...filters, search: typeof entered === 'string' ? entered.trim() : '' });
+          }}
+        >
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              // Uncontrolled and re-keyed on the applied term. The URL is the
+              // source of truth; re-keying re-seeds the box after a chip
+              // removal or "Clear All" without an effect that would fight the
+              // user mid-keystroke.
+              key={filters.search}
+              name="search"
+              type="search"
+              defaultValue={filters.search}
+              placeholder="Search by keyword…"
+              aria-label="Search jokes by keyword"
+              className="h-9 pl-8"
+            />
+          </div>
+          <Button type="submit" variant="secondary" size="sm" className="h-9 shrink-0">
+            Search
+          </Button>
+        </form>
+
         <JokeFilterDialog value={filters} onApply={applyFilters} />
 
         {/* `min-h-[36px]` keeps the row from changing height as chips appear
