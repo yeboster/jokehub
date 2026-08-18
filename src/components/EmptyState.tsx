@@ -1,4 +1,4 @@
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -8,8 +8,9 @@ interface EmptyStateProps {
   icon: LucideIcon;
   /** The headline — one sentence, stating what is not here. */
   title: string;
-  /** Optional second line saying what to do about it. */
-  hint?: ReactNode;
+  /** Optional second line saying what to do about it. Plain text: it renders
+   *  inside a `<p>`, so element children would be invalid markup. */
+  hint?: string;
   className?: string;
   /** `sm` for empty states nested inside a card. */
   size?: 'default' | 'sm';
@@ -25,10 +26,20 @@ const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, className, s
   const isSmall = size === 'sm';
 
   return (
-    <div className={cn('text-center', isSmall ? 'py-6' : 'py-12', className)}>
+    // `role="status"` because every call site swaps this block in for content
+    // that was, or was about to be, there: an empty result set is a result and
+    // has to be announced. The role is on the wrapper so the headline and the
+    // hint are read as one message; the render is unchanged.
+    <div role="status" className={cn('text-center', isSmall ? 'py-6' : 'py-12', className)}>
       <div
         className={cn(
-          'mx-auto mb-4 flex items-center justify-center rounded-full bg-accent text-accent-foreground',
+          // The disc is a pale purple tint on a white card in light mode
+          // (`--accent` 270 80% 95% on `--card` 100%, ≈1.11:1), which is not a
+          // visible edge on its own. `ring-1 ring-border` draws that edge in
+          // both themes and keeps the accent tint the icon is coloured for.
+          // Swapping the fill to `bg-muted` would not help: 96.1% on white is
+          // ≈1.09:1, flatter still.
+          'mx-auto mb-4 flex items-center justify-center rounded-full bg-accent text-accent-foreground ring-1 ring-border',
           isSmall ? 'h-10 w-10' : 'h-14 w-14'
         )}
       >

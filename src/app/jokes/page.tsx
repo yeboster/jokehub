@@ -148,7 +148,12 @@ function JokesPageComponent() {
       <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-3 border-b pb-6">
         <JokeFilterDialog value={filters} onApply={applyFilters} />
 
-        <div className="flex flex-wrap items-center gap-2 flex-grow basis-full sm:basis-auto min-h-[36px]">
+        {/* `min-h-[36px]` keeps the row from changing height as badges appear
+            and disappear, and `basis-full` gives it its own line on a phone —
+            but with no filter active the two together painted an empty 36px
+            band above the action cluster. `empty:hidden` drops the row out of
+            the flex flow entirely in that case, so it also takes no gap. */}
+        <div className="flex flex-wrap items-center gap-2 flex-grow basis-full sm:basis-auto min-h-[36px] empty:hidden">
           {filters.search && (
             <Badge variant="secondary" className="py-1 px-2">Search: &quot;{filters.search}&quot;</Badge>
           )}
