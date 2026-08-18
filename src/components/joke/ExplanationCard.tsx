@@ -22,7 +22,7 @@ export default function ExplanationCard({
   const hasExplanation = explanation.trim().length > 0;
 
   return (
-    <Card className="shadow-lg mb-8 bg-accent/50 border-primary/20">
+    <Card className="shadow-sm mb-8 bg-accent/50 border-primary/20">
       <CardHeader>
         <div className="flex items-center justify-between gap-4">
           <CardTitle className="text-xl flex items-center gap-2 text-accent-foreground">

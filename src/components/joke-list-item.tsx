@@ -54,9 +54,12 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
         // above (320ms/emphasized → 200ms/standard). Arbitrary properties touch
         // the transition only. `standard` is Tailwind's default transition
         // easing regardless; it is written out to keep the intent greppable.
-        "shadow-lg transition-[box-shadow,border-color,transform] [transition-duration:200ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
-        "hover:shadow-xl hover:border-primary/40",
-        "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 active:shadow-md",
+        // Elevation scale (round 4): an in-flow content card rests at
+        // `shadow-sm` and lifts one step on hover. Heavy shadows are reserved
+        // for surfaces that genuinely float above the page.
+        "shadow-sm transition-[box-shadow,border-color,transform] [transition-duration:200ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
+        "hover:shadow-md hover:border-primary/40",
+        "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 active:shadow-sm",
         joke.used && isOwner ? "bg-muted/30" : "bg-card"
     )}>
       <Link href={`/joke/${joke.id}`}

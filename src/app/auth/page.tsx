@@ -85,7 +85,7 @@ function AuthPageComponent() {
 
   return (
     <div className="container mx-auto flex justify-center items-center py-12 px-4">
-      <Card className="w-full max-w-md shadow-xl">
+      <Card className="w-full max-w-md shadow-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">{isLogin ? 'Login to Joke Hub' : 'Create Your Joke Hub Account'}</CardTitle>
           <CardDescription>

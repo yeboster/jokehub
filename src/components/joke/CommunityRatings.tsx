@@ -22,7 +22,7 @@ export default function CommunityRatings({
   otherUserRatingsToDisplay,
 }: CommunityRatingsProps) {
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-sm">
         <CardHeader>
             <CardTitle className="text-xl">
                 Ratings & Comments

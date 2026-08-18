@@ -39,7 +39,7 @@ function JokeGridSkeleton() {
         // layout stay still while only the placeholders move.
         <div
           key={index}
-          className="flex flex-col rounded-lg border border-primary/20 bg-card shadow-lg overflow-hidden"
+          className="flex flex-col rounded-lg border border-primary/20 bg-card shadow-sm overflow-hidden"
         >
           <div className="p-5 flex-grow space-y-2">
             <div className="skeleton-bar h-3 w-full" />

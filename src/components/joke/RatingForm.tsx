@@ -36,7 +36,7 @@ export default function RatingForm({
   onSubmit,
 }: RatingFormProps) {
   return (
-    <Card className="shadow-lg mb-8">
+    <Card className="shadow-sm mb-8">
       <CardHeader>
         <CardTitle className="text-xl">
           Rate this Joke
