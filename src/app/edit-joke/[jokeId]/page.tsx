@@ -52,6 +52,7 @@ export default function EditJokePage() {
   const [loadingJokeData, setLoadingJokeData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const jokeId = Array.isArray(params.jokeId) ? params.jokeId[0] : params.jokeId;
@@ -148,9 +149,13 @@ export default function EditJokePage() {
     setIsDeleting(true);
     try {
       await deleteJoke(joke.id);
+      setIsDeleteOpen(false);
       router.push('/jokes');
     } catch (error) {
-       console.error("Failed to delete joke:", error);
+      // The dialog stays open on purpose: it is the surface the action was
+      // started from, so it is where the failure belongs. JokeContext has
+      // already toasted the reason; pressing the button again retries.
+      console.error('Failed to delete joke:', error);
     } finally {
        setIsDeleting(false);
     }
@@ -262,7 +267,14 @@ export default function EditJokePage() {
                 <FormMessage>{form.formState.errors.root.message}</FormMessage>
               )}
               <div className="flex flex-col sm:flex-row gap-2 justify-between items-center">
-                <AlertDialog>
+                <AlertDialog
+                  open={isDeleteOpen}
+                  // While a delete is in flight the dialog cannot be dismissed
+                  // — neither by Escape, nor by the overlay, nor by Cancel.
+                  // Closing mid-request would leave the user on a form whose
+                  // joke may or may not still exist.
+                  onOpenChange={(nextOpen) => { if (!isDeleting) setIsDeleteOpen(nextOpen); }}
+                >
                   <AlertDialogTrigger asChild>
                     <Button type="button" variant="destructive" disabled={isFormDisabled}>
                         <Trash2 className="mr-2 h-4 w-4" /> Delete Joke
@@ -270,20 +282,28 @@ export default function EditJokePage() {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure you want to delete this joke?</AlertDialogTitle>
+                      <AlertDialogTitle>Delete this joke?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete your joke and all associated ratings from our servers.
+                        This cannot be undone. The joke and every rating on it are deleted permanently.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel disabled={isDeleting}>Keep it</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={handleDelete}
+                        // `preventDefault` is what keeps the dialog open:
+                        // Radix closes on click by default, which unmounted
+                        // this button before its own pending state could ever
+                        // render, and dropped the user back on an unchanged
+                        // form when the delete failed.
+                        onClick={(event) => {
+                          event.preventDefault();
+                          handleDelete();
+                        }}
                         disabled={isDeleting}
                         className="bg-destructive hover:bg-destructive/90"
                       >
                          {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                         {isDeleting ? 'Deleting…' : 'Yes, delete joke'}
+                         {isDeleting ? 'Deleting…' : 'Delete joke'}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
