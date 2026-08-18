@@ -119,3 +119,74 @@ export function getFunnyRateLabel(rate: number): string {
   if (rate === 0) return 'Unrated';
   return `${rate} Star${rate > 1 ? 's' : ''}`;
 }
+
+/** One removable active filter, as rendered in the `/jokes` badge row. */
+export interface FilterChip {
+  /** Stable identity for React keys and for tests. */
+  key: string;
+  /** What the chip reads, e.g. `Category: Puns`. */
+  label: string;
+  /** The filter set that results from removing this one filter. */
+  next: FilterParams;
+}
+
+/**
+ * The active filters, one chip each, with the filter set that results from
+ * dropping it. The page renders these instead of the six hand-written badges
+ * it used to, so removing a single filter is one click rather than reopening
+ * the dialog and hunting for it in a popover.
+ *
+ * The order is the order they are applied in the dialog, so the row reads the
+ * same way twice running. `limit` and every untouched field ride along through
+ * the spread — a chip removes exactly one thing.
+ */
+export function activeFilterChips(filters: FilterParams): FilterChip[] {
+  const chips: FilterChip[] = [];
+
+  if (filters.search) {
+    chips.push({
+      key: 'search',
+      label: `Search: “${filters.search}”`,
+      next: { ...filters, search: DEFAULT_FILTERS.search },
+    });
+  }
+
+  // Reachable only when signed in: `useJokeFilters` downgrades `user` scope to
+  // `public` for a signed-out visitor before the page ever sees it.
+  if (filters.scope !== DEFAULT_FILTERS.scope) {
+    chips.push({
+      key: 'scope',
+      label: 'Showing: My Jokes',
+      next: { ...filters, scope: DEFAULT_FILTERS.scope },
+    });
+  }
+
+  for (const category of filters.selectedCategories) {
+    chips.push({
+      key: `category:${category}`,
+      label: `Category: ${category}`,
+      next: {
+        ...filters,
+        selectedCategories: filters.selectedCategories.filter((name) => name !== category),
+      },
+    });
+  }
+
+  if (filters.filterFunnyRate !== DEFAULT_FILTERS.filterFunnyRate) {
+    chips.push({
+      key: 'funnyRate',
+      label: `Rating: ${getFunnyRateLabel(filters.filterFunnyRate)}`,
+      next: { ...filters, filterFunnyRate: DEFAULT_FILTERS.filterFunnyRate },
+    });
+  }
+
+  if (filters.usageStatus !== DEFAULT_FILTERS.usageStatus) {
+    chips.push({
+      key: 'usageStatus',
+      label: filters.usageStatus === 'used' ? 'Status: Used' : 'Status: Unused',
+      next: { ...filters, usageStatus: DEFAULT_FILTERS.usageStatus },
+    });
+  }
+
+  return chips;
+}

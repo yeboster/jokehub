@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import type { FilterParams } from '@/services/jokeService';
 import {
+  activeFilterChips,
   DEFAULT_FILTERS,
   filtersEqual,
   filtersToSearchParams,
@@ -206,5 +207,147 @@ describe('getFunnyRateLabel', () => {
     expect(getFunnyRateLabel(1)).toBe('1 Star');
     expect(getFunnyRateLabel(2)).toBe('2 Stars');
     expect(getFunnyRateLabel(5)).toBe('5 Stars');
+  });
+});
+
+describe('activeFilterChips', () => {
+  /** The fields that differ between two filter sets — a chip must change one. */
+  function changedFields(before: FilterParams, after: FilterParams): string[] {
+    const keys: (keyof FilterParams)[] = [
+      'scope',
+      'selectedCategories',
+      'filterFunnyRate',
+      'usageStatus',
+      'search',
+      'limit',
+    ];
+    const sameCategories =
+      before.selectedCategories.length === after.selectedCategories.length &&
+      before.selectedCategories.every((name, index) => name === after.selectedCategories[index]);
+    return keys.filter((key) =>
+      key === 'selectedCategories'
+        ? !sameCategories
+        : before[key] !== after[key]
+    );
+  }
+
+  it('returns no chips for the default filters', () => {
+    expect(activeFilterChips(filters())).toEqual([]);
+  });
+
+  it('makes one chip for a search term and clears only the search', () => {
+    const input = filters({ search: 'penguin' });
+    const chips = activeFilterChips(input);
+
+    expect(chips).toHaveLength(1);
+    expect(chips[0].key).toBe('search');
+    expect(chips[0].label).toBe('Search: “penguin”');
+    expect(chips[0].next.search).toBe('');
+    expect(changedFields(input, chips[0].next)).toEqual(['search']);
+  });
+
+  it('keeps a quote character in the search term intact', () => {
+    const chips = activeFilterChips(filters({ search: 'the "best" pun' }));
+
+    expect(chips[0].label).toBe('Search: “the "best" pun”');
+  });
+
+  it('makes one chip for the user scope that returns to the public feed', () => {
+    const chips = activeFilterChips(filters({ scope: 'user' }));
+
+    expect(chips).toHaveLength(1);
+    expect(chips[0].key).toBe('scope');
+    expect(chips[0].label).toBe('Showing: My Jokes');
+    expect(chips[0].next.scope).toBe('public');
+  });
+
+  it('makes one chip per category and drops only the removed one, in order', () => {
+    const input = filters({ selectedCategories: ['Puns', 'Dad Jokes', 'Observational'] });
+    const chips = activeFilterChips(input);
+
+    expect(chips.map((chip) => chip.key)).toEqual([
+      'category:Puns',
+      'category:Dad Jokes',
+      'category:Observational',
+    ]);
+    expect(chips[1].label).toBe('Category: Dad Jokes');
+    expect(chips[1].next.selectedCategories).toEqual(['Puns', 'Observational']);
+    // The input is not mutated: the page keeps rendering the chips it built.
+    expect(input.selectedCategories).toEqual(['Puns', 'Dad Jokes', 'Observational']);
+  });
+
+  it('labels the rating chip with the shared rate label', () => {
+    expect(activeFilterChips(filters({ filterFunnyRate: 0 }))[0].label).toBe('Rating: Unrated');
+    expect(activeFilterChips(filters({ filterFunnyRate: 1 }))[0].label).toBe('Rating: 1 Star');
+    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Rating: 3 Stars');
+    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].next.filterFunnyRate).toBe(-1);
+  });
+
+  it('labels both usage statuses and resets them to "all"', () => {
+    const used = activeFilterChips(filters({ usageStatus: 'used' }));
+    const unused = activeFilterChips(filters({ usageStatus: 'unused' }));
+
+    expect(used[0].key).toBe('usageStatus');
+    expect(used[0].label).toBe('Status: Used');
+    expect(used[0].next.usageStatus).toBe('all');
+    expect(unused[0].label).toBe('Status: Unused');
+    expect(unused[0].next.usageStatus).toBe('all');
+  });
+
+  it('orders every active filter the way the dialog applies them', () => {
+    const input = filters({
+      search: 'cat',
+      scope: 'user',
+      selectedCategories: ['Puns', 'Wordplay'],
+      filterFunnyRate: 5,
+      usageStatus: 'unused',
+    });
+
+    expect(activeFilterChips(input).map((chip) => chip.key)).toEqual([
+      'search',
+      'scope',
+      'category:Puns',
+      'category:Wordplay',
+      'funnyRate',
+      'usageStatus',
+    ]);
+  });
+
+  it('changes exactly one field per chip when everything is active', () => {
+    const input = filters({
+      search: 'cat',
+      scope: 'user',
+      selectedCategories: ['Puns', 'Wordplay'],
+      filterFunnyRate: 5,
+      usageStatus: 'unused',
+    });
+
+    for (const chip of activeFilterChips(input)) {
+      expect(changedFields(input, chip.next)).toHaveLength(1);
+    }
+  });
+
+  it('carries the page limit through into every chip', () => {
+    const input = filters({ limit: 3, search: 'cat', usageStatus: 'used', filterFunnyRate: 2 });
+
+    for (const chip of activeFilterChips(input)) {
+      expect(chip.next.limit).toBe(3);
+    }
+  });
+
+  it('leaves nothing filtered when the only active filter is removed', () => {
+    const singles: Partial<FilterParams>[] = [
+      { search: 'penguin' },
+      { scope: 'user' },
+      { selectedCategories: ['Puns'] },
+      { filterFunnyRate: 4 },
+      { usageStatus: 'used' },
+    ];
+
+    for (const override of singles) {
+      const chips = activeFilterChips(filters(override));
+      expect(chips).toHaveLength(1);
+      expect(hasActiveFilters(chips[0].next)).toBe(false);
+    }
   });
 });

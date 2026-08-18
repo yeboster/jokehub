@@ -3,13 +3,13 @@
 
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Loader2, PlusCircle, RotateCcw } from 'lucide-react';
+import { ChevronDown, Loader2, PlusCircle, RotateCcw, X as XIcon } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
-import { filtersEqual, getFunnyRateLabel, hasActiveFilters } from '@/lib/jokeFilters';
+import { activeFilterChips, filtersEqual, hasActiveFilters } from '@/lib/jokeFilters';
 import Header from '@/components/header';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
 import JokeList from '@/components/joke-list';
@@ -144,31 +144,31 @@ function JokesPageComponent() {
       <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-3 border-b pb-6">
         <JokeFilterDialog value={filters} onApply={applyFilters} />
 
-        {/* `min-h-[36px]` keeps the row from changing height as badges appear
+        {/* `min-h-[36px]` keeps the row from changing height as chips appear
             and disappear, and `basis-full` gives it its own line on a phone —
             but with no filter active the two together painted an empty 36px
             band above the action cluster. `empty:hidden` drops the row out of
             the flex flow entirely in that case, so it also takes no gap. */}
-        <div className="flex flex-wrap items-center gap-2 flex-grow basis-full sm:basis-auto min-h-[36px] empty:hidden">
-          {filters.search && (
-            <Badge variant="secondary" className="py-1 px-2">Search: &quot;{filters.search}&quot;</Badge>
-          )}
-          {isMyJokes && (
-            <Badge variant="secondary" className="py-1 px-2 bg-primary/10 text-primary border-primary/30">Showing: My Jokes</Badge>
-          )}
-          {filters.selectedCategories.map((category) => (
-            <Badge key={category} variant="secondary" className="py-1 px-2">Category: {category}</Badge>
+        <ul className="flex flex-wrap items-center gap-2 flex-grow basis-full sm:basis-auto min-h-[36px] empty:hidden list-none p-0 m-0">
+          {activeFilterChips(filters).map((chip) => (
+            <li key={chip.key}>
+              <Badge variant="secondary" className="py-1 pl-2 pr-0.5 gap-1">
+                {chip.label}
+                <button
+                  type="button"
+                  aria-label={`Remove filter: ${chip.label}`}
+                  // Applying `chip.next` navigates, exactly as the dialog's
+                  // Apply does — the URL stays the single source of truth for
+                  // the feed, so a removed chip is in the back button too.
+                  onClick={() => applyFilters(chip.next)}
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                >
+                  <XIcon className="h-3 w-3" />
+                </button>
+              </Badge>
+            </li>
           ))}
-          {filters.filterFunnyRate !== -1 && (
-            <Badge variant="secondary" className="py-1 px-2">Rating: {getFunnyRateLabel(filters.filterFunnyRate)}</Badge>
-          )}
-          {filters.usageStatus === 'used' && (
-            <Badge variant="secondary" className="py-1 px-2">Status: Used</Badge>
-          )}
-          {filters.usageStatus === 'unused' && (
-            <Badge variant="secondary" className="py-1 px-2">Status: Unused</Badge>
-          )}
-        </div>
+        </ul>
 
         <div className="flex w-full items-center justify-end sm:w-auto sm:ml-auto">
           <Button variant="default" size="sm" className="h-9" asChild>
