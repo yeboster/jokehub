@@ -105,3 +105,70 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  /*
+   * One bar of a loading skeleton: a muted block with a highlight sweeping
+   * across it. The sweep is a ::after overlay rather than an opacity pulse on
+   * the parent, so the card's border and layout stay perfectly still while
+   * only the content placeholders move. Both colours are tokens, so the
+   * shimmer reads in light mode (dark sweep on light gray) and in dark mode
+   * (light sweep on dark gray) without a `dark:` variant.
+   */
+  .skeleton-bar {
+    @apply relative overflow-hidden rounded bg-muted;
+  }
+
+  .skeleton-bar::after {
+    content: '';
+    @apply absolute inset-0;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--foreground) / 0.07) 50%,
+      transparent 100%
+    );
+    /*
+     * `@apply` rather than a literal `animation: shimmer 1.6s ...`: Tailwind
+     * only emits `@keyframes shimmer` when the `animate-shimmer` utility is
+     * actually reached, and no file uses that class — the sweep lives on this
+     * pseudo-element, which cannot carry one. A raw declaration would name a
+     * keyframe that never makes it into the bundle, so nothing would move.
+     * This compiles to exactly the same declaration and pulls the keyframes
+     * in with it, keeping the timing sourced from the Task 1 token.
+     */
+    @apply animate-shimmer;
+  }
+}
+
+/*
+ * Reduced-motion policy.
+ *
+ * Deliberately NOT the usual blanket `* { animation: none !important }`: that
+ * also freezes `animate-spin`, and a motionless spinner reads as a hung
+ * request rather than as a loading one. A small continuous rotation is the one
+ * loop this app needs to keep its meaning, so it is left running. Everything
+ * this round adds — entrances, shimmer, hover lifts, press scales — is
+ * decoration and collapses to its end state instantly.
+ *
+ * The selectors are doubled (`.x.x`) purely to raise specificity above the
+ * Tailwind utility of the same name. This block is intentionally unlayered and
+ * last in the file so it also wins on source order.
+ *
+ * Per-utility opt-outs elsewhere use Tailwind's built-in `motion-safe:` /
+ * `motion-reduce:` variants, which compile to this same media query.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-card-enter.animate-card-enter,
+  .animate-shimmer.animate-shimmer,
+  .animate-pulse.animate-pulse {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .skeleton-bar::after {
+    animation: none;
+    opacity: 0;
+  }
+}
