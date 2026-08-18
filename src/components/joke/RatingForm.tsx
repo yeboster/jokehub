@@ -59,7 +59,7 @@ export default function RatingForm({
                   maxStars={5}
                   size={28}
                   disabled={isSubmittingRating}
-                  starClassName="text-primary hover:text-primary/70" // Mockup uses yellow/orange, we use primary for consistency
+                  starClassName="text-primary" // Mockup uses yellow/orange, we use primary for consistency
                   className="mb-1"
                 />
                  {ratingInputValue === 0 && <p className="text-xs text-muted-foreground">Click a star to rate.</p>}

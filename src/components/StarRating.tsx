@@ -1,6 +1,6 @@
 "use client";
 
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -55,15 +55,32 @@ const StarRating: FC<StarRatingProps> = ({
   disabled = false,
   readOnly = false,
 }) => {
+  // The value under the cursor or keyboard focus, or `null` for "no preview,
+  // show the committed rating". Held unconditionally — hooks cannot sit below
+  // the read-only early return — and simply never set in read-only mode.
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+
+  const isInteractive = !readOnly && !disabled;
+
   const handleStarClick = (index: number) => {
     if (!readOnly && onRatingChange && !disabled) {
       onRatingChange(index + 1);
     }
   };
 
-  // Fraction of each star covered by the rating.
+  const previewStar = (starValue: number | null) => {
+    if (!isInteractive) return;
+    setHoverRating(starValue);
+  };
+
+  // Interactive stars render the previewed value so you can see four stars
+  // before committing to four stars. Falls back to the committed rating the
+  // moment the pointer or focus leaves.
+  const displayedValue = isInteractive ? hoverRating ?? rating : rating;
+
+  // Fraction of each star covered by the displayed value.
   const fillPercents = Array.from({ length: maxStars }, (_, i) =>
-    Math.min(Math.max(rating - i, 0), 1) * 100
+    Math.min(Math.max(displayedValue - i, 0), 1) * 100
   );
 
   if (readOnly) {
@@ -87,7 +104,10 @@ const StarRating: FC<StarRatingProps> = ({
   }
 
   return (
-    <div className={cn('flex items-center space-x-0.5', className)}>
+    <div
+      className={cn('flex items-center space-x-0.5', className)}
+      onMouseLeave={() => previewStar(null)}
+    >
       {fillPercents.map((fillPercent, i) => (
         <Button
           key={i}
@@ -100,10 +120,17 @@ const StarRating: FC<StarRatingProps> = ({
             // silently ignore the `size` prop; `size-auto` hands sizing back to
             // the width/height attributes lucide renders.
             '[&_svg]:size-auto',
+            // The base button already transitions `transform` and dips on
+            // press; stars additionally grow a little under the cursor so the
+            // one you are aiming at is unambiguous.
+            isInteractive && 'motion-safe:hover:scale-110 motion-safe:focus-visible:scale-110',
             disabled ? 'cursor-default' : 'cursor-pointer',
             starClassName
           )}
           onClick={() => handleStarClick(i)}
+          onMouseEnter={() => previewStar(i + 1)}
+          onFocus={() => previewStar(i + 1)}
+          onBlur={() => previewStar(null)}
           disabled={disabled}
           aria-label={`Set rating to ${i + 1} stars`}
         >
