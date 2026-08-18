@@ -25,7 +25,7 @@ export default function CommunityRatings({
   return (
     <Card className="shadow-sm">
         <CardHeader>
-            <CardTitle className="text-xl">
+            <CardTitle className="text-lg">
                 Ratings & Comments
             </CardTitle>
         </CardHeader>

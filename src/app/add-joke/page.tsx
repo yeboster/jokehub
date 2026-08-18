@@ -153,7 +153,7 @@ export default function AddJokePage() {
             <Header title="Add New Joke" />
             <Card className="max-w-md mx-auto">
                 <CardHeader>
-                    <CardTitle className="text-destructive">Access Denied</CardTitle>
+                    <CardTitle className="text-lg text-destructive">Access Denied</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive flex items-center">

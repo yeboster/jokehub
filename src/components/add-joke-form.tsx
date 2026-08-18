@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
@@ -94,80 +93,78 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
   const isFormDisabled = !user || isSubmitting || loadingCategories;
 
   return (
-    <Card className="shadow-none border-0">
-      <CardHeader className="p-0 pt-1"> 
-        <CardTitle className="text-xs font-semibold">Or Add Manually</CardTitle> 
-      </CardHeader>
-      <CardContent className="p-0 pt-1.5"> 
-        {!user && (
-          <Alert className="mb-3 border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary">
-            <ShieldAlert className="h-4 w-4" />
-            <AlertDescription>
-              Please <Link href="/auth?redirect=/jokes" className="font-semibold underline hover:text-primary/80">log in or sign up</Link> to add jokes.
-            </AlertDescription>
-          </Alert>
-        )}
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2.5"> 
-            <FormField
-              control={form.control}
-              name="text"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Joke Text</FormLabel> 
+    <>
+      {!user && (
+        <Alert className="mb-3 border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertDescription>
+            Please <Link href="/auth?redirect=/jokes" className="font-semibold underline hover:text-primary/80">log in or sign up</Link> to add jokes.
+          </AlertDescription>
+        </Alert>
+      )}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="text"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Joke Text</FormLabel>
+                <FormControl>
+                  {/* No `text-sm`: `Textarea` is `text-base md:text-sm` on
+                      purpose, and anything under 16px makes iOS Safari zoom
+                      the viewport when the field takes focus. */}
+                  <Textarea placeholder="Enter the joke text..." {...field} disabled={isFormDisabled} rows={3} className="h-auto" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+               <FormItem className="flex flex-col">
+                  <FormLabel>Category (for your jokes)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter the joke text..." {...field} disabled={isFormDisabled} rows={3} className="text-sm h-auto" /> 
+                    <CategoryCombobox
+                      value={field.value}
+                      onChange={(category) => form.setValue('category', category, { shouldValidate: true })}
+                      disabled={isFormDisabled}
+                      className="h-9"
+                    />
                   </FormControl>
-                  <FormMessage />
+                   <FormMessage />
                 </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                 <FormItem className="flex flex-col">
-                    <FormLabel className="text-xs">Category (for your jokes)</FormLabel>
-                    <FormControl>
-                      <CategoryCombobox
-                        value={field.value}
-                        onChange={(category) => form.setValue('category', category, { shouldValidate: true })}
-                        disabled={isFormDisabled}
-                        className="text-sm h-9"
-                      />
-                    </FormControl>
-                     <FormMessage />
-                  </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="source"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Source (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., A friend, a book" {...field} disabled={isFormDisabled} className="text-sm h-9" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             {form.formState.errors.root && (
-                <FormMessage>{form.formState.errors.root.message}</FormMessage>
-             )}
-            <Button type="submit" className="w-full" disabled={isFormDisabled} size="sm">
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              {isSubmitting ? 'Adding...' : 'Add This Joke'}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="source"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Source (Optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., A friend, a book" {...field} disabled={isFormDisabled} className="h-9" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+           {form.formState.errors.root && (
+              <FormMessage>{form.formState.errors.root.message}</FormMessage>
+           )}
+          <Button type="submit" className="w-full" disabled={isFormDisabled} size="sm">
+            {isSubmitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            {isSubmitting ? 'Adding...' : 'Add This Joke'}
+          </Button>
+        </form>
+      </Form>
+    </>
   );
 };
 

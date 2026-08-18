@@ -175,7 +175,7 @@ export default function EditJokePage() {
             <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
                  <Header title="Edit Joke" />
                  <Card className="max-w-2xl mx-auto">
-                    <CardHeader> <CardTitle className="text-destructive">Error</CardTitle> </CardHeader>
+                    <CardHeader> <CardTitle className="text-lg text-destructive">Error</CardTitle> </CardHeader>
                     <CardContent>
                         <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive flex items-center">
                              <ShieldAlert className="mr-2 h-5 w-5 flex-shrink-0" /> <p>{fetchError}</p>
@@ -192,7 +192,7 @@ export default function EditJokePage() {
          return (
             <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
                  <Header title="Edit Joke" />
-                 <Card className="max-w-2xl mx-auto"> <CardHeader><CardTitle>Joke Not Editable</CardTitle></CardHeader>
+                 <Card className="max-w-2xl mx-auto"> <CardHeader><CardTitle className="text-lg">Joke Not Editable</CardTitle></CardHeader>
                     <CardContent>
                         <p className="text-muted-foreground mb-4">This joke cannot be edited or was not found.</p>
                         <Button variant="outline" onClick={() => router.push('/jokes')}>
@@ -210,7 +210,7 @@ export default function EditJokePage() {
       <Header title="Edit Your Joke" />
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>Update Joke Details</CardTitle>
+          <CardTitle className="text-lg">Update Joke Details</CardTitle>
           <CardDescription>Make changes to the joke text, category, or usage status.</CardDescription>
         </CardHeader>
         <CardContent>
