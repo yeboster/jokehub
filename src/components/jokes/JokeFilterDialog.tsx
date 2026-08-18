@@ -1,12 +1,10 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { Check, ChevronsUpDown, Filter as FilterIcon, User, Users, XIcon } from 'lucide-react';
+import { Check, ChevronsUpDown, Filter as FilterIcon, XIcon } from 'lucide-react';
 
 import type { FilterParams } from '@/services/jokeService';
-import { useAuth } from '@/contexts/AuthContext';
 import { useUserCategories } from '@/hooks/useUserCategories';
-import { useToast } from '@/hooks/use-toast';
 import { hasActiveFilters } from '@/lib/jokeFilters';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,8 +42,10 @@ interface JokeFilterDialogProps {
  * The joke feed's filter controls: one toolbar button plus the dialog it
  * opens. Search is a field on the page, not a control in here — it is the
  * primary discovery path and was two interactions and one occluding surface
- * deep. The single opener is a `DialogTrigger`, so Radix returns focus to the
- * control the user actually pressed.
+ * deep. Scope is a toolbar toggle for the same reason: it is the difference
+ * between "the app" and "my collection", so it belongs in view. The single
+ * opener is a `DialogTrigger`, so Radix returns focus to the control the user
+ * actually pressed.
  *
  * All editing happens on one `draft` object that is seeded from `value` each
  * time the dialog opens — replacing the five parallel `temp*` states the page
@@ -53,8 +53,6 @@ interface JokeFilterDialogProps {
  * "Apply Filters", so Cancel/dismiss simply discards the draft.
  */
 export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogProps) {
-  const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
   const { categoryNames, loadingCategories } = useUserCategories();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -118,36 +116,6 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4 pr-3">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="filter-scope-select" className="text-right">
-              Show Jokes
-            </Label>
-            <Select
-              value={draft.scope}
-              onValueChange={(scope: FilterParams['scope']) => {
-                if (scope === 'user' && !user) {
-                  toast({ title: 'Sign in required', description: 'Log in to filter to your own jokes.', variant: 'destructive' });
-                  setDraft((prev) => ({ ...prev, scope: 'public' }));
-                } else {
-                  setDraft((prev) => ({ ...prev, scope }));
-                }
-              }}
-              disabled={authLoading}
-            >
-              <SelectTrigger id="filter-scope-select" className="col-span-3 text-sm">
-                <SelectValue placeholder="Select view" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="public" className="text-sm">
-                  <div className="flex items-center gap-2"> <Users className="h-4 w-4" /> All Jokes</div>
-                </SelectItem>
-                <SelectItem value="user" disabled={!user || authLoading} className="text-sm">
-                  <div className="flex items-center gap-2"> <User className="h-4 w-4" /> My Jokes</div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="modal-category-filter" className="text-right pt-2">
               Categories

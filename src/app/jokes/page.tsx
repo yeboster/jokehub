@@ -160,6 +160,33 @@ function JokesPageComponent() {
           </Button>
         </form>
 
+        {/* Scope is the difference between "the app" and "my collection", and
+            it was a <Select> inside a dialog. Signed-out visitors get no
+            toggle: `useJokeFilters` downgrades `user` scope to `public` for
+            them, so the second option would be a button that does nothing. */}
+        {user && (
+          <div role="group" aria-label="Whose jokes to show" className="flex shrink-0 items-center rounded-md border p-0.5">
+            {([
+              { scope: 'public' as const, label: 'All jokes' },
+              { scope: 'user' as const, label: 'My jokes' },
+            ]).map(({ scope, label }) => (
+              <Button
+                key={scope}
+                type="button"
+                size="sm"
+                variant={filters.scope === scope ? 'default' : 'ghost'}
+                aria-pressed={filters.scope === scope}
+                className="h-8 px-3"
+                onClick={() => {
+                  if (filters.scope !== scope) applyFilters({ ...filters, scope });
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        )}
+
         <JokeFilterDialog value={filters} onApply={applyFilters} />
 
         {/* `min-h-[36px]` keeps the row from changing height as chips appear
