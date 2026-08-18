@@ -115,12 +115,19 @@
    * shimmer reads in light mode (dark sweep on light gray) and in dark mode
    * (light sweep on dark gray) without a `dark:` variant.
    *
-   * Never add the `animate-shimmer` utility to an element that already has
-   * `.skeleton-bar`. The sweep below is the whole feature; the utility on the
-   * element itself would translate the *bar* by ±100% of its own width — out of
-   * the card and back — on top of the pseudo-element's sweep. The reduced-motion
-   * block at the end of this file stops both paths, so the mistake is invisible
-   * with reduced motion on and obvious with it off.
+   * Never add the `animate-shimmer` utility to an element that already carries
+   * `.skeleton-bar`. Two reasons, one obvious and one not:
+   *
+   * 1. The sweep below is the whole feature. On the element itself the utility
+   *    would translate the *bar* by ±100% of its own width, out of the card and
+   *    back, on top of the pseudo-element's sweep.
+   * 2. `@apply animate-shimmer` also copies in every other rule that defines
+   *    that class — including the reduced-motion override at the end of this
+   *    file — as `.skeleton-bar.animate-shimmer::after`, carrying that rule's
+   *    `opacity: 1`. It is inert today because nothing has both classes, but it
+   *    outranks the explicit `.skeleton-bar::after { opacity: 0 }` opt-out
+   *    (0,2,1 vs 0,1,1), so adding the utility would leave a frozen highlight
+   *    band painted across every bar under `prefers-reduced-motion`.
    */
   .skeleton-bar {
     @apply relative overflow-hidden rounded bg-muted;
@@ -177,5 +184,33 @@
   .skeleton-bar::after {
     animation: none;
     opacity: 0;
+  }
+
+  /*
+   * The Radix overlay/panel transitions (dialog, popover, dropdown, select,
+   * tooltip, toast) all run through tailwindcss-animate's `animate-in` /
+   * `animate-out`. Killing those two animation names is enough: `fade-in-0`,
+   * `zoom-in-95` and the `slide-in-from-*` utilities only set custom properties
+   * that the `enter`/`exit` keyframes read, and with no animation running
+   * nothing reads them.
+   *
+   * Tripled rather than doubled, unlike the group above. These are reached
+   * through `data-[state=…]:` variants, which compile to a class plus an
+   * attribute selector — the same (0,2,0) a doubled class gives — and Tailwind
+   * emits every variant utility *after* this unlayered block, so at equal
+   * specificity Radix would win on source order. A third class settles it.
+   *
+   * Radix's Presence reads the computed `animation-name` before it waits for
+   * `animationend`: `none` unmounts immediately, so a closing dialog cannot
+   * hang on an event that will never fire.
+   *
+   * Unlike the entrance group above, this rule must NOT reset `transform`:
+   * DialogContent is centred with `translate-x-[-50%] translate-y-[-50%]`,
+   * which is a lower-specificity utility that a `transform: none` here would
+   * override, throwing every dialog into the top-left corner.
+   */
+  .animate-in.animate-in.animate-in,
+  .animate-out.animate-out.animate-out {
+    animation: none;
   }
 }
