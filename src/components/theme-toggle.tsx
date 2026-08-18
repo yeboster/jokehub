@@ -19,9 +19,16 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="px-2 text-foreground hover:bg-accent/50 hover:text-accent-foreground">
-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-primary" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-primary" />
+        {/*
+          `relative` is load-bearing: the Moon below is absolutely positioned
+          and, without a positioned ancestor here, resolves against the sticky
+          <nav>. It happens to land correctly today only because an all-`auto`
+          absolute box stays at its static position — one stray `relative`
+          upstream and the icon flies across the header.
+        */}
+        <Button variant="ghost" size="sm" className="relative px-2 text-foreground hover:bg-accent/50 hover:text-accent-foreground">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 text-primary transition-transform duration-300 ease-emphasized motion-reduce:transition-none dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 text-primary transition-transform duration-300 ease-emphasized motion-reduce:transition-none dark:rotate-0 dark:scale-100" />
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
