@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrations": "tsx ./migrations",
-    "firestore:deploy": "firebase deploy --only firestore"
+    "firestore:deploy": "firebase deploy --only firestore",
+    "firestore:push": "tsx ./scripts/deploy-firestore.ts"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.41.0",
