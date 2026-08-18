@@ -12,21 +12,34 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import StarRating from '@/components/StarRating';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { entranceDelayMs } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 interface JokeListItemProps {
   joke: Joke;
+  /**
+   * Position in the grid. Drives the staggered entrance delay; omit it (the
+   * home page's three-card teaser, a one-off render) and the card simply
+   * enters with no delay.
+   *
+   * The animation is a CSS mount animation, so it plays exactly when React
+   * inserts the node. Cards are keyed by `joke.id`, so a "Load More" append
+   * leaves existing cards untouched and only the new page animates.
+   */
+  index?: number;
 }
 
-const JokeListItem: FC<JokeListItemProps> = ({ joke }) => {
+const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
   const { user: currentUser } = useAuth();
 
   const isOwner = currentUser?.uid === joke.userId;
 
   return (
-    <Card className={cn(
-        "flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg overflow-hidden border-primary/20",
-        joke.used && isOwner ? "bg-muted/30" : "bg-card" 
+    <Card
+      style={index === undefined ? undefined : { animationDelay: `${entranceDelayMs(index)}ms` }}
+      className={cn(
+        "animate-card-enter flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg overflow-hidden border-primary/20",
+        joke.used && isOwner ? "bg-muted/30" : "bg-card"
     )}>
       <Link href={`/joke/${joke.id}`}
             className="block flex-grow flex flex-col hover:bg-accent/20 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded-t-lg">
