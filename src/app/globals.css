@@ -111,6 +111,26 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /*
+   * Type scale (round 4). One scale, applied at call sites — deliberately not
+   * component classes, so the utilities stay greppable and Tailwind can still
+   * see every variant.
+   *
+   *   Page title (h1)    text-3xl font-bold tracking-tight sm:text-4xl
+   *   Page description   text-base text-muted-foreground sm:text-lg
+   *   Section title (h2) text-2xl font-semibold tracking-tight
+   *   Card title         text-lg font-semibold
+   *   Body               text-sm leading-relaxed
+   *
+   * Elevation scale (round 4):
+   *   in-flow card       shadow-sm  (hover: shadow-md)
+   *   floating surface   shadow-lg  (dialog, popover, dropdown, toast)
+   *   focal card         shadow-md  (auth)
+   *
+   * Page container (round 4):
+   *   container mx-auto px-4 py-8 sm:px-6 md:py-12
+   */
 }
 
 @layer components {

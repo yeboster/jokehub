@@ -59,7 +59,7 @@ export default function LandingPage() {
       </header>
 
       <section className="mb-12 sm:mb-16">
-        <h2 className="text-3xl font-bold text-center text-primary mb-10">
+        <h2 className="text-2xl font-semibold tracking-tight text-primary mb-10">
           A Taste of Humor
         </h2>
         {isLoading ? (

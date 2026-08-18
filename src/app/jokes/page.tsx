@@ -10,6 +10,7 @@ import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
 import { filtersEqual, getFunnyRateLabel, hasActiveFilters } from '@/lib/jokeFilters';
+import Header from '@/components/header';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
 import JokeList from '@/components/joke-list';
 import { Badge } from '@/components/ui/badge';
@@ -138,10 +139,7 @@ function JokesPageComponent() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-primary sm:text-5xl">{pageTitle}</h1>
-        <p className="mt-3 text-lg text-muted-foreground sm:text-xl">{pageDescription}</p>
-      </header>
+      <Header title={pageTitle} description={pageDescription} centered />
 
       <div className="mb-6 p-4 flex items-center gap-x-2 gap-y-3 border-b pb-6">
         <JokeFilterDialog value={filters} onApply={applyFilters} />

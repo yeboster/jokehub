@@ -23,7 +23,9 @@ export default function JokeHeader({ joke, isOwner, isSourceUrl, onToggleUsed }:
 
   return (
     <section className="mb-8">
-      <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4 leading-tight">
+      {/* This h1 is the joke itself, which can run to several sentences —
+          smaller than a page title on purpose, with tighter leading. */}
+      <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 leading-snug">
         {joke.text}
       </h1>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm text-muted-foreground mb-6">
