@@ -8,7 +8,7 @@ export default defineConfig({
     // `// @vitest-environment node` docblock (next/server needs the real
     // Request/Response globals, which jsdom does not provide).
     environment: 'jsdom',
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
   },
   resolve: {
     alias: {
