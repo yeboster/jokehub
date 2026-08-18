@@ -28,6 +28,41 @@ All colors are HSL triples defined as CSS custom properties in `src/app/globals.
 *   **Inline notices** follow the tinted-token idiom `bg-<token>/10 border-<token>/30 text-<token>` (e.g. `bg-destructive/10 border-destructive/30 text-destructive`), rendered via the `<Alert>` component.
 *   Clean, organized, modern layout.
 
+**The four scales (design round 4, 2026-08-18)**
+
+One scale each for type, elevation, page container and motion. All four are also recorded as a comment block in `src/app/globals.css` (in the second `@layer base`, immediately after the `body` rule) — that comment is the copy to keep in sync with the code; this section is the narrative one.
+
+*   **Type scale.** Applied at call sites, deliberately not as component classes, so the utilities stay greppable and Tailwind can see every variant.
+
+    | Role | Classes |
+    |---|---|
+    | Page title (h1) | `text-3xl font-bold tracking-tight sm:text-4xl` |
+    | Page description | `text-base text-muted-foreground sm:text-lg` |
+    | Section title (h2) | `text-2xl font-semibold tracking-tight` |
+    | Card title | `text-lg font-semibold` |
+    | Body | `text-sm leading-relaxed` |
+
+    Page titles come from the shared `src/components/header.tsx` (`title`, optional `description`, optional `centered`) — use it rather than hand-rolling an `<h1>`. ShadCN's `CardTitle` defaults to `text-2xl` and is always overridden at the call site; `src/components/ui/card.tsx` is left alone. Known stragglers are listed under round 4's round-5 deferrals in `PROJECT_PROGRESS.md`.
+
+*   **Elevation scale.** Reserve heavy shadows for things that actually float.
+
+    | Surface | Class |
+    |---|---|
+    | In-flow content card (grid item, detail-page section) | `shadow-sm`, `hover:shadow-md` |
+    | Genuinely floating (dialog, popover, dropdown, toast) | `shadow-lg` |
+    | Standalone focal card (auth) | `shadow-md` |
+
+    `shadow-xl` is not in the scale. In dark mode shadows are invisible on the near-black surfaces, so separation comes from the `--card`/`--popover` lightness step (`0 0% 13%` over a `0 0% 10%` page) plus the border — never from elevation alone.
+
+*   **Page container.** `container mx-auto px-4 py-8 sm:px-6 md:py-12`, plus any existing `max-w-*` (e.g. `max-w-3xl` on the joke detail page). Loading states use the same container with `flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]` appended. `p-4 md:p-8` and `py-10 sm:py-16` are retired.
+
+*   **Motion.** Tokens live in `tailwind.config.ts`; the policy lives in `src/app/globals.css`.
+    *   Easings: `ease-emphasized` (`cubic-bezier(0.22, 1, 0.36, 1)`) for things entering, `ease-standard` (`cubic-bezier(0.4, 0, 0.2, 1)`) for state changes in place. Source them by name — or via `theme(transitionTimingFunction.standard)` in an arbitrary property — rather than repeating a curve.
+    *   Durations: 150ms for colour/state changes, 200ms for elevation and transform on a card, 300ms for the theme-toggle icon, 320ms for a card entrance.
+    *   Animations: `animate-card-enter` for mount entrances (stagger via `src/lib/motion.ts`, 40ms step, capped at 12 items) and `.skeleton-bar` for loading placeholders.
+    *   **Every animation must have a reduced-motion path.** Use `motion-safe:` for anything that moves and `motion-reduce:transition-none` for a transition that should not run; if you add a new `animate-*` utility, add it to the `@media (prefers-reduced-motion: reduce)` block at the end of `globals.css`. That block is unlayered and last in the file on purpose, and its selectors are doubled (or tripled, for Radix `data-[state]` utilities) to outrank the utilities they override. `animate-spin` is intentionally exempt: a frozen spinner reads as a hung request.
+    *   Do not add `animate-shimmer` to an element that already has `.skeleton-bar`, and do not remove `disableTransitionOnChange` from `src/app/layout.tsx` — both are commented at the code site.
+
 > Historical note: the original guideline specified dark gray `#333333` primary, medium gray `#666666` secondary, and purple `#800080` accent. The implementation deliberately promoted purple to *primary* and demoted the grays to the text scale; the description above reflects the shipped design and supersedes the original.
 
 ## 2. Key Features Implemented & Major Developments
