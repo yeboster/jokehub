@@ -73,18 +73,30 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
 
   const onSubmit: SubmitHandler<JokeFormValues> = async (data) => {
     if (!user) {
-      form.setError("root", {message: "You must be logged in to add a joke."});
+      form.setError('root', { message: 'You must be logged in to add a joke.' });
       return;
     }
     setIsSubmitting(true);
     try {
       await onAddJoke(data);
+      // Only on success. The fields are the user's work; a failed write is not
+      // a reason to throw it away.
       form.reset();
       if (aiGeneratedText && onAiJokeSubmitted) {
         onAiJokeSubmitted();
       }
     } catch (error) {
-      console.error("Failed to add joke from form:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to add joke from form:', error);
+      // `handleApiCall` suppresses exactly these two messages, on the stated
+      // assumption that the caller surfaces them in context. Nothing did, so
+      // they reached the user nowhere at all. Everything else was already
+      // announced by the context's error toast.
+      if (message.includes('Category')) {
+        form.setError('category', { message });
+      } else if (message.includes('permission denied')) {
+        form.setError('root', { message: 'You do not have permission to add this joke.' });
+      }
     } finally {
       setIsSubmitting(false);
     }

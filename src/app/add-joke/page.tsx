@@ -130,12 +130,14 @@ export default function AddJokePage() {
       toast({ title: 'Sign in required', description: 'Log in to add jokes.', variant: 'destructive' });
       return;
     }
-    try {
-      await addJoke(data);
-      router.push('/jokes');
-    } catch (error) {
-      console.error("Error submitting joke from page:", error);
-    }
+    // Deliberately NOT wrapped in try/catch. `AddJokeForm` only calls
+    // `form.reset()` when this promise resolves; swallowing the rejection here
+    // told it the save succeeded, so a failed write cleared the joke the user
+    // had just typed (or generated and then edited) and left them with a red
+    // toast and an empty form. The rejection is handled in the form's own
+    // catch, which keeps the fields and surfaces the reason next to them.
+    await addJoke(data);
+    router.push('/jokes');
   };
   
   if (authLoading) {

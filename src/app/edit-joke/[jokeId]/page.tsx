@@ -125,7 +125,16 @@ export default function EditJokePage() {
       await updateJoke(joke.id, data);
       router.push('/jokes');
     } catch (error) {
-      console.error("Failed to update joke:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to update joke:', error);
+      // Same suppression as the add form: these two never reached the user.
+      // Anything else was announced by JokeContext's error toast, and the form
+      // keeps every field either way.
+      if (message.includes('Category')) {
+        form.setError('category', { message });
+      } else if (message.includes('permission denied')) {
+        form.setError('root', { message: 'You can only edit jokes you added.' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -249,6 +258,9 @@ export default function EditJokePage() {
                   </FormItem>
                 )}
               />
+              {form.formState.errors.root && (
+                <FormMessage>{form.formState.errors.root.message}</FormMessage>
+              )}
               <div className="flex flex-col sm:flex-row gap-2 justify-between items-center">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
