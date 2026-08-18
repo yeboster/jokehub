@@ -63,7 +63,7 @@ export default function JokeHeader({ joke, isOwner, isSourceUrl, onToggleUsed }:
                   {joke.used ? "Used" : "Unused"}
                 </Label>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => router.push(`/edit-joke/${joke.id}`)} className="text-primary hover:text-primary/80 px-2 h-auto py-1">
+              <Button variant="ghost" size="sm" onClick={() => router.push(`/edit-joke/${joke.id}`)} className="text-primary hover:text-primary/80">
                   <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit
               </Button>
             </div>

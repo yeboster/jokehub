@@ -179,7 +179,7 @@ function JokesPageComponent() {
           </Button>
 
           {hasActiveFilters(filters) && (
-            <Button variant="ghost" onClick={clearFilters} className="ml-2 text-sm p-2 h-auto self-center">
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-2 h-9">
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Clear All
             </Button>
           )}

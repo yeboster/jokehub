@@ -247,15 +247,17 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
                 <ul className="flex flex-wrap gap-1 list-none p-0 m-0">
                   {draft.selectedCategories.map((category) => (
                     <li key={category}>
-                      <Badge variant="secondary" className="py-0.5 pl-1.5 pr-1 gap-1">
+                      <Badge variant="secondary" className="py-0.5 pl-2 pr-0.5 gap-1">
                         {category}
                         <button
                           type="button"
                           aria-label={`Remove category ${category}`}
-                          className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                          // 24px — the WCAG 2.5.8 floor. It was a bare 12px
+                          // icon with no padding, which on a phone is a miss.
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                           onClick={() => toggleCategory(category)}
                         >
-                          <XIcon className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                          <XIcon className="h-3 w-3" />
                         </button>
                       </Badge>
                     </li>

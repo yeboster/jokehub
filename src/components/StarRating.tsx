@@ -115,7 +115,7 @@ const StarRating: FC<StarRatingProps> = ({
           variant="ghost"
           size="icon"
           className={cn(
-            'p-0 h-auto w-auto', // remove default button padding and size constraints
+            'p-1 h-auto w-auto', // remove default button padding and size constraints
             // `buttonVariants` pins every nested svg to `size-4`, which would
             // silently ignore the `size` prop; `size-auto` hands sizing back to
             // the width/height attributes lucide renders.
