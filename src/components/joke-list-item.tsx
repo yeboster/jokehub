@@ -61,7 +61,7 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
         // for surfaces that genuinely float above the page.
         "shadow-sm transition-[box-shadow,border-color,transform] [transition-duration:200ms] [transition-timing-function:theme(transitionTimingFunction.standard)]",
         "hover:shadow-md hover:border-primary/40",
-        "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 active:shadow-sm",
+        "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.995]",
         joke.used && isOwner ? "bg-muted/30" : "bg-card"
     )}>
       <Link href={`/joke/${joke.id}`}
