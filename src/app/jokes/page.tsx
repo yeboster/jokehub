@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
+import { describeEmptyFeed } from '@/lib/feedEmptyState';
 import { activeFilterChips, filtersEqual, hasActiveFilters } from '@/lib/jokeFilters';
 import Header from '@/components/header';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
@@ -93,23 +94,6 @@ function JokesPageComponent() {
 
   const jokesToDisplay = useMemo(() => jokes ?? [], [jokes]);
 
-  // A multi-word search is only partly expressible as a Firestore query, so the
-  // service AND-s the remaining tokens client-side and can hand back an empty
-  // page while later pages still hold matches (it pages on, but gives up after
-  // a bounded number of pages). Claiming "no jokes matched" right above an
-  // enabled "Load More" button would be a lie, so say what we actually know.
-  const searchExhausted = !hasMoreJokes;
-  const emptyMessage = filters.search
-    ? searchExhausted
-      ? `No jokes matched “${filters.search}”.`
-      : `No jokes on this page matched “${filters.search}”.`
-    : undefined;
-  const emptyHint = filters.search
-    ? searchExhausted
-      ? 'Search matches whole keywords of three or more letters. Try a single word, or clear the search.'
-      : 'There may be matches further down — load more to keep looking.'
-    : undefined;
-
   const isMyJokes = filters.scope === 'user' && !!user;
   const pageTitle = isMyJokes ? 'My Joke Collection' : 'All Jokes Feed';
   const pageDescription = isMyJokes
@@ -191,8 +175,12 @@ function JokesPageComponent() {
       ) : (
         <JokeList
           jokes={jokesToDisplay}
-          emptyMessage={emptyMessage}
-          emptyHint={emptyHint}
+          emptyCopy={describeEmptyFeed({
+            search: filters.search,
+            hasMoreJokes,
+            hasActiveFilters: hasActiveFilters(filters),
+          })}
+          onClearFilters={clearFilters}
         />
       )}
 

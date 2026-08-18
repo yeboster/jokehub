@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -11,6 +11,10 @@ interface EmptyStateProps {
   /** Optional second line saying what to do about it. Plain text: it renders
    *  inside a `<p>`, so element children would be invalid markup. */
   hint?: string;
+  /** Optional single control below the hint — the way out of this state
+   *  ("Clear filters", "Try again"). One action, not a toolbar: an empty
+   *  state that needs a choice is not an empty state. */
+  action?: ReactNode;
   className?: string;
   /** `sm` for empty states nested inside a card. */
   size?: 'default' | 'sm';
@@ -18,11 +22,14 @@ interface EmptyStateProps {
 
 /**
  * Shared "nothing here" block: an icon in a tinted disc, a headline in
- * foreground weight, and a muted hint. Presentational only — it carries no
- * actions, because the three current call sites each sit somewhere that would
- * need different wiring, and a wrong action is worse than none.
+ * foreground weight, a muted hint, and optionally one action.
+ *
+ * Round 4 shipped this deliberately action-free, because a CTA would have been
+ * a behaviour change and that round forbade them. Round 5 allows them: an
+ * empty result set caused by four active filters, or by a failed fetch, needs
+ * a way out that is not "work out what you did and undo it".
  */
-const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, className, size = 'default' }) => {
+const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, className, size = 'default' }) => {
   const isSmall = size === 'sm';
 
   return (
@@ -47,6 +54,7 @@ const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, className, s
       </div>
       <p className={cn('font-medium text-foreground', isSmall ? 'text-sm' : 'text-lg')}>{title}</p>
       {hint && <p className="mt-1.5 text-sm text-muted-foreground max-w-md mx-auto">{hint}</p>}
+      {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   );
 };

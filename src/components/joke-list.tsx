@@ -7,17 +7,21 @@ import type { Joke } from '@/lib/types';
 import JokeListItem from './joke-list-item';
 import EmptyState from './EmptyState';
 import { nextStaggerBatch, type StaggerBatch } from '@/lib/motion';
-import { Laugh } from 'lucide-react';
+import { Laugh, RotateCcw } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import type { FeedEmptyCopy } from '@/lib/feedEmptyState';
 
 interface JokeListProps {
   jokes: Joke[];
-  /** Overrides the empty-state headline, e.g. to name what was searched for. */
-  emptyMessage?: string;
-  /** Overrides the empty-state hint below the headline. */
-  emptyHint?: string;
+  /** What to say when there is nothing to show; omitted for a plain list. */
+  emptyCopy?: FeedEmptyCopy;
+  /** Wired to the empty state's "Clear filters" action when `emptyCopy` asks
+   *  for one. */
+  onClearFilters?: () => void;
 }
 
-const JokeList: FC<JokeListProps> = ({ jokes, emptyMessage, emptyHint }) => {
+const JokeList: FC<JokeListProps> = ({ jokes, emptyCopy, onClearFilters }) => {
   // Where the cards mounting on this render begin. "Load More" appends, so the
   // second page starts at absolute index 10 — past the stagger cap, where every
   // card would share one delay and the whole page would land in a single frame.
@@ -35,11 +39,23 @@ const JokeList: FC<JokeListProps> = ({ jokes, emptyMessage, emptyHint }) => {
   }
 
   if (jokes.length === 0) {
+    const copy = emptyCopy ?? {
+      title: 'No jokes found.',
+      hint: 'Try adding some or adjusting your filters!',
+      offerClearFilters: false,
+    };
     return (
       <EmptyState
         icon={Laugh}
-        title={emptyMessage ?? 'No jokes found.'}
-        hint={emptyHint ?? 'Try adding some or adjusting your filters!'}
+        title={copy.title}
+        hint={copy.hint}
+        action={
+          copy.offerClearFilters && onClearFilters ? (
+            <Button variant="outline" size="sm" onClick={onClearFilters}>
+              <RotateCcw className="mr-2 h-4 w-4" /> Clear filters
+            </Button>
+          ) : undefined
+        }
       />
     );
   }
