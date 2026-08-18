@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     // Verify API token
     const authResult = await verifyApiToken(request);
     if (!authResult.success) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      // 500 when the server itself is unconfigured (see `verifyApiToken`).
+      return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: authResult.status ?? 401 });
     }
 
     const body = await request.json();

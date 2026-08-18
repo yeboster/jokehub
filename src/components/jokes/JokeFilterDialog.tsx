@@ -80,8 +80,12 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
     onApply({
       ...draft,
       // Drop categories that no longer exist (a stale deep link, or a category
-      // deleted while the dialog was open).
-      selectedCategories: draft.selectedCategories.filter((category) => categoryNames.includes(category)),
+      // deleted while the dialog was open). Skipped while the subscription is
+      // still loading: `categoryNames` is [] until the first snapshot lands, so
+      // pruning then would silently discard every selection the user can see.
+      selectedCategories: loadingCategories
+        ? draft.selectedCategories
+        : draft.selectedCategories.filter((category) => categoryNames.includes(category)),
     });
     setIsOpen(false);
   };

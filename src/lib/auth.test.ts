@@ -36,24 +36,26 @@ describe('verifyApiToken', () => {
     }
   });
 
-  it('fails with a server configuration error when JOKEHUB_API_TOKEN is unset', async () => {
+  // A server with no token configured cannot authenticate anyone; reporting
+  // 401 would tell the caller their (perfectly good) token is bad.
+  it('reports an unset JOKEHUB_API_TOKEN as a 500, not a 401', async () => {
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer anything' }));
-    expect(result).toEqual({ success: false, error: 'Server configuration error' });
+    expect(result).toEqual({ success: false, status: 500, error: 'Server configuration error' });
   });
 
   it('fails when the Authorization header is missing', async () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest());
-    expect(result).toEqual({ success: false, error: 'Missing Authorization header' });
+    expect(result).toEqual({ success: false, status: 401, error: 'Missing Authorization header' });
   });
 
   it('fails when the token does not match but is the same length', async () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer secret-tokeN' }));
-    expect(result).toEqual({ success: false, error: 'Invalid token' });
+    expect(result).toEqual({ success: false, status: 401, error: 'Invalid token' });
   });
 
   // `timingSafeEqual` throws on length mismatch, so the compare is length-guarded.
@@ -61,21 +63,21 @@ describe('verifyApiToken', () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer wrong' }));
-    expect(result).toEqual({ success: false, error: 'Invalid token' });
+    expect(result).toEqual({ success: false, status: 401, error: 'Invalid token' });
   });
 
   it('fails when the header is not a bearer credential', async () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'secret-token' }));
-    expect(result).toEqual({ success: false, error: 'Malformed Authorization header' });
+    expect(result).toEqual({ success: false, status: 401, error: 'Malformed Authorization header' });
   });
 
   it('fails when the bearer scheme has no token', async () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer ' }));
-    expect(result).toEqual({ success: false, error: 'Malformed Authorization header' });
+    expect(result).toEqual({ success: false, status: 401, error: 'Malformed Authorization header' });
   });
 
   it('does not treat the scheme prefix as part of the token', async () => {
@@ -83,7 +85,7 @@ describe('verifyApiToken', () => {
     process.env.JOKEHUB_API_TOKEN = 'secret-token';
     const { verifyApiToken } = await import('@/lib/auth');
     const result = await verifyApiToken(makeRequest({ Authorization: 'Bearer Bearer secret-token' }));
-    expect(result).toEqual({ success: false, error: 'Malformed Authorization header' });
+    expect(result).toEqual({ success: false, status: 401, error: 'Malformed Authorization header' });
   });
 
   it('succeeds when the bearer token matches', async () => {

@@ -203,11 +203,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // own fetch and made the detail/edit pages pay for a list they never show.
 
   const handleApiCall = useCallback(
-    async <T,>(
-      apiCall: () => Promise<T>,
-      successMessage: string,
-      shouldReloadJokesList = false 
-    ): Promise<T | undefined> => {
+    async <T,>(apiCall: () => Promise<T>, successMessage: string): Promise<T | undefined> => {
       if (!user) {
         toast({
           title: 'Authentication Required',
@@ -220,9 +216,6 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const result = await apiCall();
         if (successMessage) {
             toast({ title: 'Success', description: successMessage });
-        }
-        if (shouldReloadJokesList && (user || activeFiltersRef.current.scope === 'public')) { 
-          await loadJokesWithFilters(activeFiltersRef.current); 
         }
         return result;
       } catch (error) {
@@ -238,7 +231,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
     },
-    [user, toast, loadJokesWithFilters] 
+    [user, toast]
   );
 
   // No list reload: the mounted page owns its list. A brand-new joke can't be
@@ -248,7 +241,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addJoke = useCallback(
     (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => {
        if (!user) throw new Error("User not authenticated for adding joke.");
-       return handleApiCall(() => jokeService.addJoke(newJokeData, user.uid), 'Joke added successfully!', false)!;
+       return handleApiCall(() => jokeService.addJoke(newJokeData, user.uid), 'Joke added successfully!')!;
     },
     [handleApiCall, user]
   );
@@ -260,11 +253,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // (its per-row accounting toast names imported vs. skipped rows, which a
       // bare "Processed N jokes." would pre-empt and contradict), and /manage
       // renders no joke list to refresh.
-      return handleApiCall(
-        () => jokeService.importJokes(importedJokesData, user.uid),
-        '',
-        false
-      )!;
+      return handleApiCall(() => jokeService.importJokes(importedJokesData, user.uid), '')!;
     },
     [handleApiCall, user]
   );
@@ -272,11 +261,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleUsed = useCallback(
     async (id: string, currentUsedStatus: boolean) => { 
       if (!user) throw new Error("User not authenticated for toggling joke status.");
-      await handleApiCall(
-        () => jokeService.toggleJokeUsed(id, user.uid), 
-        'Joke status updated.',
-        false 
-      );
+      await handleApiCall(() => jokeService.toggleJokeUsed(id, user.uid), 'Joke status updated.');
       setJokes((prevJokes) =>
         prevJokes
           ? prevJokes.map((j) => (j.id === id ? { ...j, used: !currentUsedStatus } : j))
@@ -307,8 +292,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!user) throw new Error("User not authenticated for updating joke.");
       await handleApiCall(
         () => jokeService.updateJoke(jokeId, updatedData, user.uid),
-        'Joke updated successfully!',
-        false
+        'Joke updated successfully!'
       );
       // Patch the one joke that changed instead of refetching the whole list
       // (as `toggleUsed` does). Category casing may be normalized server-side;
@@ -323,11 +307,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteJoke = useCallback(
     async (jokeId: string) => {
         if (!user) throw new Error("User not authenticated for deleting a joke.");
-        await handleApiCall(
-            () => jokeService.deleteJoke(jokeId, user.uid),
-            'Joke deleted successfully!',
-            false
-        );
+        await handleApiCall(() => jokeService.deleteJoke(jokeId, user.uid), 'Joke deleted successfully!');
         setJokes((prevJokes) => (prevJokes ? prevJokes.filter((j) => j.id !== jokeId) : null));
     },
     [handleApiCall, user]
@@ -341,8 +321,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // and the caller can apply the same values to its own copy.
       const aggregates = await handleApiCall(
         () => ratingService.submitUserRating(jokeId, stars, user.uid, comment),
-        'Rating submitted successfully.',
-        false
+        'Rating submitted successfully.'
       );
       if (aggregates) {
         setJokes((prevJokes) =>

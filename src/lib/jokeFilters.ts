@@ -29,6 +29,10 @@ interface ReadableSearchParams {
  * user — that is auth state, not URL state (see `useJokeFilters`).
  */
 export function parseFiltersFromParams(params: ReadableSearchParams): FilterParams {
+  // Known limitation (accepted, see context/PROJECT_PROGRESS.md): categories
+  // round-trip through a single comma-separated param, so a category name that
+  // itself contains a comma parses back as two names and is then dropped as
+  // unknown. Fixing it means repeated `categories` params on both sides.
   const rawCategories = params.get('categories');
   const selectedCategories = rawCategories
     ? rawCategories
@@ -71,6 +75,7 @@ export function filtersToSearchParams(filters: FilterParams): URLSearchParams {
     params.set('scope', filters.scope);
   }
   if (filters.selectedCategories.length > 0) {
+    // See the comma limitation noted on `parseFiltersFromParams`.
     params.set('categories', filters.selectedCategories.join(','));
   }
   if (filters.filterFunnyRate !== DEFAULT_FILTERS.filterFunnyRate) {

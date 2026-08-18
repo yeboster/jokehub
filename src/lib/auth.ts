@@ -14,8 +14,8 @@ export interface AuthResult {
   error?: string;
   /**
    * HTTP status the caller should respond with when `success` is false.
-   * Absent means 401 — only set explicitly when the failure is the server's
-   * fault rather than the caller's.
+   * Absent means 401; 500 marks a failure that is the server's fault rather
+   * than the caller's, so routes must read this instead of hardcoding 401.
    */
   status?: number;
   /** Which credential authenticated the request (only set on success). */
@@ -73,22 +73,24 @@ function tokensMatch(candidate: string, expected: string): boolean {
  * machine-to-machine routes (`/api/jokes/add`, `/api/jokes/top`).
  */
 export async function verifyApiToken(request: NextRequest): Promise<AuthResult> {
+  // Not the caller's fault: an unconfigured server cannot authenticate anyone,
+  // and answering 401 would send them off re-issuing a token that was fine.
   if (!API_TOKEN) {
     console.error('JOKEHUB_API_TOKEN is not configured');
-    return { success: false, error: 'Server configuration error' };
+    return { success: false, status: 500, error: 'Server configuration error' };
   }
 
   if (!request.headers.get('Authorization')) {
-    return { success: false, error: 'Missing Authorization header' };
+    return { success: false, status: 401, error: 'Missing Authorization header' };
   }
 
   const token = extractBearerToken(request);
   if (!token) {
-    return { success: false, error: 'Malformed Authorization header' };
+    return { success: false, status: 401, error: 'Malformed Authorization header' };
   }
 
   if (!tokensMatch(token, API_TOKEN)) {
-    return { success: false, error: 'Invalid token' };
+    return { success: false, status: 401, error: 'Invalid token' };
   }
 
   return { success: true, userId: 'api-user', via: 'api-token' };
