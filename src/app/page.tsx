@@ -69,8 +69,8 @@ export default function LandingPage() {
           </div>
         ) : displayedJokes.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 md:gap-6 max-w-5xl mx-auto">
-            {displayedJokes.map((joke) => (
-              <JokeListItem key={joke.id} joke={joke} />
+            {displayedJokes.map((joke, index) => (
+              <JokeListItem key={joke.id} joke={joke} index={index} />
             ))}
           </div>
         ) : (

@@ -30,8 +30,8 @@ const JokeList: FC<JokeListProps> = ({ jokes, emptyMessage, emptyHint }) => {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-6">
-      {jokes.map((joke) => (
-        <JokeListItem key={joke.id} joke={joke} />
+      {jokes.map((joke, index) => (
+        <JokeListItem key={joke.id} joke={joke} index={index} />
       ))}
     </div>
   );
