@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import PageLoading from '@/components/PageLoading';
 import { Loader2 } from 'lucide-react';
 
 function AuthPageComponent() {
@@ -46,7 +47,7 @@ function AuthPageComponent() {
       } else {
         await signUp(email, password);
       }
-      toast({ title: isLogin ? 'Login Successful' : 'Signup Successful', description: 'Redirecting...' });
+      toast({ title: isLogin ? 'Login Successful' : 'Signup Successful', description: 'Redirecting…' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase auth errors expose a dynamic `code` field not present on Error.
     } catch (error: any) {
       console.error("Auth error:", error);
@@ -67,20 +68,11 @@ function AuthPageComponent() {
   };
 
   if (authLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoading label="Checking your sign-in…" />;
   }
 
   if (user) {
-     return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Redirecting...</p>
-      </div>
-    );
+     return <PageLoading label="Signing you in…" />;
   }
 
   return (
@@ -132,12 +124,7 @@ function AuthPageComponent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={
-      <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2 text-muted-foreground">Loading page...</p>
-      </div>
-    }>
+    <Suspense fallback={<PageLoading label="Loading the page…" />}>
       <AuthPageComponent />
     </Suspense>
   );

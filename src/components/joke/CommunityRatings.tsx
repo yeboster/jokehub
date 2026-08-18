@@ -33,7 +33,7 @@ export default function CommunityRatings({
             {isLoadingAllRatings ? (
                 <div className="flex items-center justify-center p-4">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2 text-muted-foreground">Loading community ratings...</span>
+                    <span className="ml-2 text-muted-foreground">Loading community ratings…</span>
                 </div>
             ) : (
               <>

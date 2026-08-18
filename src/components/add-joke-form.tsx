@@ -114,7 +114,7 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
                   {/* No `text-sm`: `Textarea` is `text-base md:text-sm` on
                       purpose, and anything under 16px makes iOS Safari zoom
                       the viewport when the field takes focus. */}
-                  <Textarea placeholder="Enter the joke text..." {...field} disabled={isFormDisabled} rows={3} className="h-auto" />
+                  <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={3} className="h-auto" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -160,7 +160,7 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
             ) : (
               <Plus className="mr-2 h-4 w-4" />
             )}
-            {isSubmitting ? 'Adding...' : 'Add This Joke'}
+            {isSubmitting ? 'Adding…' : 'Add This Joke'}
           </Button>
         </form>
       </Form>

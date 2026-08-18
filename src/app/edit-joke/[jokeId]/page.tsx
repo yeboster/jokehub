@@ -12,6 +12,7 @@ import type { Joke } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import Header from '@/components/header';
+import PageLoading from '@/components/PageLoading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -155,19 +156,10 @@ export default function EditJokePage() {
   const isFormDisabled = authLoading || loadingJokeData || loadingCategories || isSubmitting || isDeleting || !user || !!fetchError || (joke !== null && joke.userId !== user?.uid);
 
   if (authLoading) {
-      return (
-        <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex justify-center items-center min-h-[calc(100vh-8rem)]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2 text-muted-foreground">Verifying...</p>
-        </div>
-      );
+      return <PageLoading label="Checking your sign-in…" />;
   }
    if (loadingJokeData || loadingCategories) {
-    return (
-      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-         <p className="ml-2 text-muted-foreground">Loading data...</p>
-      </div>
-    );
+    return <PageLoading label="Loading this joke…" />;
    }
 
     if (fetchError) {
@@ -218,7 +210,7 @@ export default function EditJokePage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField control={form.control} name="text" render={({ field }) => (
                   <FormItem> <FormLabel>Joke Text</FormLabel> <FormControl>
-                      <Textarea placeholder="Enter the joke text..." {...field} disabled={isFormDisabled} rows={5} />
+                      <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={5} />
                   </FormControl> <FormMessage /> </FormItem>
               )} />
               <FormField control={form.control} name="category" render={({ field }) => (
@@ -285,7 +277,7 @@ export default function EditJokePage() {
                         className="bg-destructive hover:bg-destructive/90"
                       >
                          {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                         {isDeleting ? 'Deleting...' : 'Yes, delete joke'}
+                         {isDeleting ? 'Deleting…' : 'Yes, delete joke'}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -297,7 +289,7 @@ export default function EditJokePage() {
                     </Button>
                     <Button type="submit" disabled={isFormDisabled}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    {isSubmitting ? 'Saving...' : 'Save Changes'}
+                    {isSubmitting ? 'Saving…' : 'Save Changes'}
                     </Button>
                 </div>
               </div>

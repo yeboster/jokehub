@@ -200,7 +200,7 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
                   >
                     <span className={cn(draft.selectedCategories.length === 0 && 'text-muted-foreground')}>
                       {draft.selectedCategories.length === 0
-                        ? 'Select categories...'
+                        ? 'Select categories…'
                         : `${draft.selectedCategories.length} categor${draft.selectedCategories.length === 1 ? 'y' : 'ies'} selected`}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -212,7 +212,7 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
                 >
                   <Command>
                     <CommandInput
-                      placeholder="Search categories..."
+                      placeholder="Search categories…"
                       value={categorySearch}
                       onValueChange={setCategorySearch}
                       className="h-9"

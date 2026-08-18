@@ -7,9 +7,10 @@ import { useJokes, type FilterParams } from '@/contexts/JokeContext';
 import { filtersEqual } from '@/lib/jokeFilters';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Laugh, Loader2, PlusCircle } from 'lucide-react';
+import { ArrowRight, Laugh, PlusCircle } from 'lucide-react';
 import JokeListItem from '@/components/joke-list-item';
 import EmptyState from '@/components/EmptyState';
+import PageLoading from '@/components/PageLoading';
 import Logo from '@/components/logo';
 
 // The home page renders exactly three public jokes and owns that fetch (the
@@ -64,10 +65,7 @@ export default function LandingPage() {
           A Taste of Humor
         </h2>
         {isLoading ? (
-          <div className="flex justify-center items-center min-h-[150px]">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2 text-muted-foreground">Loading jokes...</p>
-          </div>
+          <PageLoading inline label="Loading jokes…" />
         ) : displayedJokes.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 md:gap-6 max-w-5xl mx-auto">
             {displayedJokes.map((joke, index) => (

@@ -7,16 +7,12 @@ import Header from '@/components/header';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import PageLoading from '@/components/PageLoading';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const CSVImport = dynamic(() => import('@/components/csv-import'), {
     ssr: false,
-    loading: () => (
-        <div className="flex justify-center items-center min-h-[12rem]">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-    ),
+    loading: () => <PageLoading inline label="Loading the importer…" />,
 });
 
 export default function ManageJokesPage() {
@@ -31,23 +27,13 @@ export default function ManageJokesPage() {
     }, [user, authLoading, router]);
     
     if (authLoading || (!user && !authLoading)) {
-        return (
-            <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                 <p className="mt-2 text-muted-foreground">Checking authentication...</p>
-            </div>
-        );
+        return <PageLoading label="Checking your sign-in…" />;
     }
 
     // Imported rows create categories on the fly, so wait until the user's
     // existing categories are known before offering the import.
     if (loadingCategories) {
-      return (
-        <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="mt-2 text-muted-foreground">Loading necessary data...</p>
-        </div>
-      );
+      return <PageLoading label="Loading your categories…" />;
     }
 
     return (

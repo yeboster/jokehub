@@ -16,7 +16,7 @@ import ExplanationCard from '@/components/joke/ExplanationCard';
 import RatingForm from '@/components/joke/RatingForm';
 import CommunityRatings from '@/components/joke/CommunityRatings';
 import EmptyState from '@/components/EmptyState';
-import { Loader2 } from 'lucide-react';
+import PageLoading from '@/components/PageLoading';
 
 export default function JokeShowPage() {
   const params = useParams();
@@ -292,12 +292,7 @@ export default function JokeShowPage() {
 
 
   if (isLoading || authLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Loading joke...</p>
-      </div>
-    );
+    return <PageLoading label="Loading this joke…" />;
   }
 
   if (error) {

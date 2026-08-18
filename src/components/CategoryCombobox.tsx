@@ -44,7 +44,7 @@ export interface CategoryComboboxProps extends TriggerProps {
  */
 export const CategoryCombobox = React.forwardRef<HTMLButtonElement, CategoryComboboxProps>(
   (
-    { value, onChange, disabled, className, placeholder = 'Select or type category...', ...triggerProps },
+    { value, onChange, disabled, className, placeholder = 'Select or type category…', ...triggerProps },
     ref
   ) => {
     const { categoryNames, loadingCategories } = useUserCategories();
@@ -92,7 +92,7 @@ export const CategoryCombobox = React.forwardRef<HTMLButtonElement, CategoryComb
             {...triggerProps}
           >
             <span className="truncate">
-              {loadingCategories ? 'Loading categories...' : selectedValue ? selectedLabel : placeholder}
+              {loadingCategories ? 'Loading categories…' : selectedValue ? selectedLabel : placeholder}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -103,7 +103,7 @@ export const CategoryCombobox = React.forwardRef<HTMLButtonElement, CategoryComb
         >
           <Command shouldFilter={false}>
             <CommandInput
-              placeholder="Search or create category..."
+              placeholder="Search or create category…"
               value={search}
               onValueChange={setSearch}
               className="h-9"

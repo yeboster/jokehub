@@ -13,6 +13,7 @@ import { filtersEqual, getFunnyRateLabel, hasActiveFilters } from '@/lib/jokeFil
 import Header from '@/components/header';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
 import JokeList from '@/components/joke-list';
+import PageLoading from '@/components/PageLoading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -129,12 +130,7 @@ function JokesPageComponent() {
     loadingInitialJokes || loadedFilters === null || !filtersEqual(loadedFilters, filters);
 
   if (authLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Loading jokes...</p>
-      </div>
-    );
+    return <PageLoading label="Loading jokes…" />;
   }
 
   return (
@@ -210,7 +206,7 @@ function JokesPageComponent() {
             ) : (
               <ChevronDown className="mr-2 h-5 w-5" />
             )}
-            {loadingMoreJokes ? 'Loading...' : 'Load More Jokes'}
+            {loadingMoreJokes ? 'Loading…' : 'Load More Jokes'}
           </Button>
         ) : (
           jokesToDisplay.length > 0 && (
@@ -224,12 +220,7 @@ function JokesPageComponent() {
 
 export default function JokesPage() {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Loading page...</p>
-      </div>
-    }>
+    <Suspense fallback={<PageLoading label="Loading jokes…" />}>
       <JokesPageComponent />
     </Suspense>
   );

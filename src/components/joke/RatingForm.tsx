@@ -48,7 +48,7 @@ export default function RatingForm({
           {isLoadingCurrentUserRating ? (
             <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Loading your rating...</span>
+                <span className="ml-2 text-muted-foreground">Loading your rating…</span>
             </div>
           ) : (
             <form onSubmit={onSubmit} className="space-y-4">
@@ -79,7 +79,7 @@ export default function RatingForm({
               </div>
               <Button type="submit" disabled={isSubmittingRating || ratingInputValue === 0}>
                 {isSubmittingRating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                {isSubmittingRating ? 'Submitting...' : (currentUserRating ? 'Update Rating' : 'Submit Rating')}
+                {isSubmittingRating ? 'Submitting…' : (currentUserRating ? 'Update Rating' : 'Submit Rating')}
               </Button>
             </form>
           )}

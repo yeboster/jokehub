@@ -244,7 +244,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
                 )}
              />
           </div>
-          {isLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Processing file, please wait...</p>}
+          {isLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Processing your file…</p>}
         </div>
       </CardContent>
     </Card>

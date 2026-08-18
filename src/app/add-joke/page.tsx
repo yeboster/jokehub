@@ -11,6 +11,7 @@ import type { GenerateJokeOutput, JokeVariation } from '@/ai/flows/generate-joke
 import { DEFAULT_GENERATE_MODEL, GEMINI_MODEL_LABELS, GEMINI_MODELS } from '@/ai/models';
 import Header from '@/components/header';
 import AddJokeForm, { type JokeFormValues } from '@/components/add-joke-form';
+import PageLoading from '@/components/PageLoading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -139,12 +140,7 @@ export default function AddJokePage() {
   };
   
   if (authLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Verifying authentication...</p>
-      </div>
-    );
+    return <PageLoading label="Checking your sign-in…" />;
   }
 
   if (!user) {
@@ -170,12 +166,7 @@ export default function AddJokePage() {
   }
 
   if (loadingCategories) {
-    return (
-      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Loading your categories...</p>
-      </div>
-    );
+    return <PageLoading label="Loading your categories…" />;
   }
 
   return (
@@ -280,7 +271,7 @@ export default function AddJokePage() {
                                 className="w-full"
                             >
                                 {isLoadingInspirationalJokes ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4 text-primary" />}
-                                {isLoadingInspirationalJokes ? 'Loading Jokes...' : 'Load My 5-Star Jokes for Inspiration'}
+                                {isLoadingInspirationalJokes ? 'Loading Jokes…' : 'Load My 5-Star Jokes for Inspiration'}
                             </Button>
                             {inspirationalJokes.length > 0 && (
                                 <p className="text-xs text-center text-muted-foreground">
@@ -309,7 +300,7 @@ export default function AddJokePage() {
                               className="flex flex-col items-center justify-center min-h-[200px] bg-card rounded-lg border border-dashed"
                           >
                               <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-                              <p className="text-lg font-medium text-muted-foreground">Generating witty humor...</p>
+                              <p className="text-lg font-medium text-muted-foreground">Generating witty humor…</p>
                               <p className="text-sm text-muted-foreground">This may take a moment.</p>
                           </motion.div>
                       )}

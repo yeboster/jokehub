@@ -36,7 +36,7 @@ export default function ExplanationCard({
           >
             {isExplanationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isExplanationLoading
-              ? 'Explaining...'
+              ? 'Explaining…'
               : hasExplanation
                 ? 'Explain again'
                 : 'Explain this joke'}
@@ -47,7 +47,7 @@ export default function ExplanationCard({
         {isExplanationLoading && !hasExplanation ? (
           <div className="flex items-center text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span>Thinking...</span>
+            <span>Thinking…</span>
           </div>
         ) : hasExplanation ? (
           <p className="text-foreground/90 whitespace-pre-wrap leading-relaxed">{explanation}</p>
