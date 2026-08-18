@@ -130,7 +130,7 @@ function JokesPageComponent() {
 
   if (authLoading) {
     return (
-      <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Loading jokes...</p>
       </div>
@@ -138,7 +138,7 @@ function JokesPageComponent() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
       <Header title={pageTitle} description={pageDescription} centered />
 
       <div className="mb-6 p-4 flex items-center gap-x-2 gap-y-3 border-b pb-6">
@@ -216,7 +216,7 @@ function JokesPageComponent() {
 export default function JokesPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Loading page...</p>
       </div>

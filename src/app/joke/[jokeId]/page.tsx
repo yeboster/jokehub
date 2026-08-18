@@ -292,7 +292,7 @@ export default function JokeShowPage() {
 
   if (isLoading || authLoading) {
     return (
-      <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Loading joke...</p>
       </div>
@@ -301,7 +301,7 @@ export default function JokeShowPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-4 md:p-8 max-w-3xl">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
         <div className="mb-6">
           <Button variant="outline" size="sm" onClick={() => router.push('/jokes')}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes
@@ -324,7 +324,7 @@ export default function JokeShowPage() {
 
   if (!joke) {
      return (
-      <div className="container mx-auto p-4 md:p-8 max-w-3xl">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
          <div className="mb-6">
           <Button variant="outline" size="sm" onClick={() => router.push('/jokes')}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes
@@ -341,7 +341,7 @@ export default function JokeShowPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 max-w-3xl">
+    <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
       <div className="mb-6">
           <Button variant="outline" size="sm" onClick={() => router.push('/jokes')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes

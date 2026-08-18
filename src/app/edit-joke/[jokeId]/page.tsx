@@ -156,14 +156,14 @@ export default function EditJokePage() {
 
   if (authLoading) {
       return (
-        <div className="container mx-auto p-4 md:p-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
+        <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex justify-center items-center min-h-[calc(100vh-8rem)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2 text-muted-foreground">Verifying...</p>
         </div>
       );
   }
    if (loadingJokeData || loadingCategories) {
     return (
-      <div className="container mx-auto p-4 md:p-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
          <p className="ml-2 text-muted-foreground">Loading data...</p>
       </div>
@@ -172,7 +172,7 @@ export default function EditJokePage() {
 
     if (fetchError) {
         return (
-            <div className="container mx-auto p-4 md:p-8">
+            <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
                  <Header title="Edit Joke" />
                  <Card className="max-w-2xl mx-auto">
                     <CardHeader> <CardTitle className="text-destructive">Error</CardTitle> </CardHeader>
@@ -190,7 +190,7 @@ export default function EditJokePage() {
     }
     if (!joke) {
          return (
-            <div className="container mx-auto p-4 md:p-8">
+            <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
                  <Header title="Edit Joke" />
                  <Card className="max-w-2xl mx-auto"> <CardHeader><CardTitle>Joke Not Editable</CardTitle></CardHeader>
                     <CardContent>
@@ -206,7 +206,7 @@ export default function EditJokePage() {
 
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
       <Header title="Edit Your Joke" />
       <Card className="max-w-2xl mx-auto">
         <CardHeader>

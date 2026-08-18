@@ -32,7 +32,7 @@ export default function ManageJokesPage() {
     
     if (authLoading || (!user && !authLoading)) {
         return (
-            <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+            <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                  <p className="mt-2 text-muted-foreground">Checking authentication...</p>
             </div>
@@ -43,7 +43,7 @@ export default function ManageJokesPage() {
     // existing categories are known before offering the import.
     if (loadingCategories) {
       return (
-        <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+        <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="mt-2 text-muted-foreground">Loading necessary data...</p>
         </div>
@@ -51,7 +51,7 @@ export default function ManageJokesPage() {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-8">
+        <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
             <Header title="Manage Your Jokes" />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">

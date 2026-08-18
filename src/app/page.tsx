@@ -50,10 +50,10 @@ export default function LandingPage() {
     !filtersEqual(loadedFilters, HOME_PAGE_FILTERS);
 
   return (
-    <div className="container mx-auto px-4 py-10 sm:py-16 text-center">
+    <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 text-center">
       <header className="mb-12 sm:mb-16">
         <Logo width={400} className="mx-auto mb-5" />
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-16">
+        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
           Your personal space to collect, create, and cherish every chuckle. Dive in and let the laughter begin!
         </p>
       </header>
@@ -113,7 +113,7 @@ export default function LandingPage() {
         )}
       </section>
 
-      <footer className="mt-20 pt-10 border-t border-border/30">
+      <footer className="mt-16 pt-10 border-t border-border/30">
         <p className="text-xs sm:text-sm text-muted-foreground">
           &copy; {new Date().getFullYear()} Joke Hub. Keep laughing!
         </p>

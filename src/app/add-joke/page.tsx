@@ -140,7 +140,7 @@ export default function AddJokePage() {
   
   if (authLoading) {
     return (
-      <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Verifying authentication...</p>
       </div>
@@ -149,7 +149,7 @@ export default function AddJokePage() {
 
   if (!user) {
      return (
-        <div className="container mx-auto p-4 md:p-8">
+        <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
             <Header title="Add New Joke" />
             <Card className="max-w-md mx-auto">
                 <CardHeader>
@@ -171,7 +171,7 @@ export default function AddJokePage() {
 
   if (loadingCategories) {
     return (
-      <div className="container mx-auto p-4 md:p-8 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
+      <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-2 text-muted-foreground">Loading your categories...</p>
       </div>
@@ -179,7 +179,7 @@ export default function AddJokePage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
       <Header title="Craft a New Joke" />
       <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
         
