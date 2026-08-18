@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Home, Settings, LogIn, LogOut, UserCircle, Loader2, ListChecks } from 'lucide-react'; 
+import { Home, Upload, LogIn, LogOut, UserCircle, Loader2, ListChecks } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,8 @@ const Navbar = () => {
   const navItems = [
     { href: '/', label: 'Home', icon: Home, public: true },
     { href: '/jokes', label: 'Jokes', icon: ListChecks, public: true },
-    { href: '/manage', label: 'Manage', icon: Settings, public: false, requiresAuth: true },
+    // "Manage" promised settings and delivered a file input.
+    { href: '/manage', label: 'Import', icon: Upload, public: false, requiresAuth: true },
   ];
 
   if (loading) {

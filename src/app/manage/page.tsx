@@ -3,12 +3,12 @@
 
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import Header from '@/components/header';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/PageLoading';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const CSVImport = dynamic(() => import('@/components/csv-import'), {
     ssr: false,
@@ -38,24 +38,25 @@ export default function ManageJokesPage() {
 
     return (
         <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
-            <Header title="Manage Your Jokes" />
+            <Header
+              title="Import Jokes"
+              description="Bring a CSV of jokes into your collection in one go."
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                <div className="md:col-span-2"> {/* Allow CSVImport to take full width if it's the main component */}
-                  <CSVImport onImport={importJokes} />
-                </div>
+            <div className="max-w-4xl mx-auto">
+                <CSVImport onImport={importJokes} />
+                {/* Replaces the "About This Page" card, which spent a whole
+                    Card explaining that this page is for bulk import and that
+                    single jokes go elsewhere. One line, and the elsewhere is a
+                    link. */}
+                <p className="mt-6 text-center text-sm text-muted-foreground">
+                    Adding one joke, or writing with the AI assistant?{' '}
+                    <Link href="/add-joke" className="font-medium text-primary underline hover:text-primary/80">
+                        Add a single joke
+                    </Link>
+                    .
+                </p>
             </div>
-             <Card className="mt-8 max-w-4xl mx-auto">
-                <CardHeader>
-                    <CardTitle>About This Page</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <CardDescription>
-                        This page is dedicated to managing your jokes through bulk operations like CSV import. 
-                        To add individual jokes or generate them with AI, please use the &quot;Add New Joke&quot; button on the main &quot;Jokes&quot; page.
-                    </CardDescription>
-                </CardContent>
-            </Card>
         </div>
     );
 }
