@@ -58,11 +58,14 @@
     /* Cards and popovers sit *above* the page in dark mode. They used to share
        `0 0% 10%` with --background, and box-shadows are invisible on near
        black, so every card was separated from the page by nothing but its
-       border. Lightness is the only separation channel that works down here. */
-    --card: 0 0% 13%;
+       border. Lightness is the only separation channel that works down here,
+       and 13% was not enough of it: the step to the page read at ≈1.09:1,
+       below the ~1.2:1 where an edge becomes reliably visible without a
+       border. 16% puts it at ≈1.20:1. */
+    --card: 0 0% 16%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 13%;
+    --popover: 0 0% 16%;
     --popover-foreground: 0 0% 98%;
 
     --primary: 270 60% 65%; /* Brighter Purple for dark mode */
@@ -73,8 +76,9 @@
 
     /* One step above --card, so `bg-muted` blocks (skeleton bars, comment
        bubbles, the "used" card tint) read as recessed content on a card
-       rather than as holes punched through to the page. */
-    --muted: 0 0% 18%;
+       rather than as holes punched through to the page. Moves with --card:
+       at 18% against a 16% card the step had all but closed. */
+    --muted: 0 0% 20%;
     --muted-foreground: 0 0% 63.9%;
 
     --accent: 270 50% 25%; /* Darker Pastel Purple for dark mode accent bg */
