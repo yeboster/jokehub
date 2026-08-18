@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, SearchX, ShieldAlert } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { SearchX, ShieldAlert } from 'lucide-react';
 
 import type { Joke, UserRating } from '@/lib/types';
 import { useJokes } from '@/contexts/JokeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ratingDocId } from '@/services/ratingService';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import BackToFeedButton from '@/components/joke/BackToFeedButton';
 import JokeHeader from '@/components/joke/JokeHeader';
 import ExplanationCard from '@/components/joke/ExplanationCard';
 import RatingForm from '@/components/joke/RatingForm';
@@ -20,7 +20,6 @@ import PageLoading from '@/components/PageLoading';
 
 export default function JokeShowPage() {
   const params = useParams();
-  const router = useRouter();
   const { getJokeById, submitUserRating, fetchAllRatingsForJoke, toggleUsed } = useJokes();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -300,9 +299,7 @@ export default function JokeShowPage() {
     return (
       <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
         <div className="mb-6">
-          <Button variant="outline" size="sm" onClick={() => router.push('/jokes')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes
-          </Button>
+          <BackToFeedButton />
         </div>
         <Card>
           <CardHeader>
@@ -322,10 +319,8 @@ export default function JokeShowPage() {
   if (!joke) {
      return (
       <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
-         <div className="mb-6">
-          <Button variant="outline" size="sm" onClick={() => router.push('/jokes')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes
-          </Button>
+        <div className="mb-6">
+          <BackToFeedButton />
         </div>
         {/* The fourth empty state. It was a Card with the headline "Hmm..." —
             an interjection, not a statement of what is not here. */}
@@ -341,9 +336,7 @@ export default function JokeShowPage() {
   return (
     <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
       <div className="mb-6">
-          <Button variant="outline" size="sm" onClick={() => router.push('/jokes')}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes
-          </Button>
+        <BackToFeedButton />
       </div>
 
       {/* Joke Display Area */}

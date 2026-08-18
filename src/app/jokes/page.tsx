@@ -10,7 +10,8 @@ import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
 import { describeEmptyFeed } from '@/lib/feedEmptyState';
-import { activeFilterChips, filtersEqual, hasActiveFilters } from '@/lib/jokeFilters';
+import { FEED_PATH, rememberFeedUrl } from '@/lib/feedReturn';
+import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters } from '@/lib/jokeFilters';
 import Header from '@/components/header';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
 import JokeList from '@/components/joke-list';
@@ -92,6 +93,14 @@ function JokesPageComponent() {
     fetchedFiltersRef.current = filters;
     loadJokesWithFilters(filters);
   }, [authLoading, filters, loadJokesWithFilters]);
+
+  // Recorded from the canonical serialization rather than from `location`, so
+  // it is the same string the feed would build for these filters — and so it
+  // never carries a stray param the feed does not read.
+  useEffect(() => {
+    const query = filtersToSearchParams(filters).toString();
+    rememberFeedUrl(window.sessionStorage, query ? `${FEED_PATH}?${query}` : FEED_PATH);
+  }, [filters]);
 
   const jokesToDisplay = useMemo(() => jokes ?? [], [jokes]);
 
