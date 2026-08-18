@@ -1,11 +1,12 @@
 "use client";
 
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquareOff } from 'lucide-react';
 
 import type { UserRating } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StarRating from '@/components/StarRating';
+import EmptyState from '@/components/EmptyState';
 import { Separator } from '@/components/ui/separator';
 
 interface CommunityRatingsProps {
@@ -46,7 +47,12 @@ export default function CommunityRatings({
                 )}
 
                 {otherUserRatingsToDisplay.length === 0 ? (
-                    <p className="text-muted-foreground">{allUserRatings.length > 0 ? "No other community feedback yet." : "No community feedback yet. Be the first to rate!"}</p>
+                    <EmptyState
+                      size="sm"
+                      icon={MessageSquareOff}
+                      title={allUserRatings.length > 0 ? 'No other community feedback yet.' : 'No community feedback yet.'}
+                      hint={allUserRatings.length > 0 ? undefined : 'Be the first to rate this one.'}
+                    />
                 ) : (
                     <div className="space-y-6">
                         {otherUserRatingsToDisplay.map((rating, index) => (

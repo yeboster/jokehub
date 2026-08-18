@@ -5,6 +5,7 @@ import { useState, type FC } from 'react';
 import type { Joke } from '@/lib/types';
 // Removed Table related imports
 import JokeListItem from './joke-list-item';
+import EmptyState from './EmptyState';
 import { nextStaggerBatch, type StaggerBatch } from '@/lib/motion';
 import { Laugh } from 'lucide-react';
 
@@ -35,13 +36,11 @@ const JokeList: FC<JokeListProps> = ({ jokes, emptyMessage, emptyHint }) => {
 
   if (jokes.length === 0) {
     return (
-      <div className="text-center py-10">
-        <Laugh className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-        <p className="text-muted-foreground text-lg">{emptyMessage ?? 'No jokes found.'}</p>
-        <p className="text-sm text-muted-foreground">
-          {emptyHint ?? 'Try adding some or adjusting your filters!'}
-        </p>
-      </div>
+      <EmptyState
+        icon={Laugh}
+        title={emptyMessage ?? 'No jokes found.'}
+        hint={emptyHint ?? 'Try adding some or adjusting your filters!'}
+      />
     );
   }
 

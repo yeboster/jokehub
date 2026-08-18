@@ -7,8 +7,9 @@ import { useJokes, type FilterParams } from '@/contexts/JokeContext';
 import { filtersEqual } from '@/lib/jokeFilters';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Loader2, PlusCircle } from 'lucide-react';
+import { ArrowRight, Laugh, Loader2, PlusCircle } from 'lucide-react';
 import JokeListItem from '@/components/joke-list-item';
+import EmptyState from '@/components/EmptyState';
 import Logo from '@/components/logo';
 
 // The home page renders exactly three public jokes and owns that fetch (the
@@ -74,9 +75,11 @@ export default function LandingPage() {
             ))}
           </div>
         ) : (
-          <p className="text-muted-foreground">
-            No sample jokes to display right now. Check back soon!
-          </p>
+          <EmptyState
+            icon={Laugh}
+            title="No sample jokes to display right now."
+            hint="Check back soon — or sign in and add the first one."
+          />
         )}
       </section>
 
