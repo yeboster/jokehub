@@ -18,9 +18,11 @@ import { cn } from '@/lib/utils';
 interface JokeListItemProps {
   joke: Joke;
   /**
-   * Position in the grid. Drives the staggered entrance delay; omit it (the
-   * home page's three-card teaser, a one-off render) and the card simply
-   * enters with no delay.
+   * Position of the card within the batch that is entering — which is its
+   * position in the grid on a first load, but restarts at 0 for each page a
+   * "Load More" appends. Drives the staggered entrance delay; omit it (the home
+   * page's three-card teaser, a one-off render) and the card enters with no
+   * delay.
    *
    * The animation is a CSS mount animation, so it plays exactly when React
    * inserts the node. Cards are keyed by `joke.id`, so a "Load More" append
