@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, SearchX, ShieldAlert } from 'lucide-react';
 
 import type { Joke, UserRating } from '@/lib/types';
 import { useJokes } from '@/contexts/JokeContext';
@@ -15,6 +15,7 @@ import JokeHeader from '@/components/joke/JokeHeader';
 import ExplanationCard from '@/components/joke/ExplanationCard';
 import RatingForm from '@/components/joke/RatingForm';
 import CommunityRatings from '@/components/joke/CommunityRatings';
+import EmptyState from '@/components/EmptyState';
 import { Loader2 } from 'lucide-react';
 
 export default function JokeShowPage() {
@@ -330,12 +331,13 @@ export default function JokeShowPage() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Jokes
           </Button>
         </div>
-        <Card>
-          <CardHeader><CardTitle>Hmm...</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">We couldn&apos;t find the joke you&apos;re looking for.</p>
-          </CardContent>
-        </Card>
+        {/* The fourth empty state. It was a Card with the headline "Hmm..." —
+            an interjection, not a statement of what is not here. */}
+        <EmptyState
+          icon={SearchX}
+          title="We couldn't find that joke."
+          hint="It may have been deleted, or the link may be wrong."
+        />
       </div>
     );
   }
