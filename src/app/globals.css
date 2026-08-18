@@ -114,6 +114,13 @@
    * only the content placeholders move. Both colours are tokens, so the
    * shimmer reads in light mode (dark sweep on light gray) and in dark mode
    * (light sweep on dark gray) without a `dark:` variant.
+   *
+   * Never add the `animate-shimmer` utility to an element that already has
+   * `.skeleton-bar`. The sweep below is the whole feature; the utility on the
+   * element itself would translate the *bar* by ±100% of its own width — out of
+   * the card and back — on top of the pseudo-element's sweep. The reduced-motion
+   * block at the end of this file stops both paths, so the mistake is invisible
+   * with reduced motion on and obvious with it off.
    */
   .skeleton-bar {
     @apply relative overflow-hidden rounded bg-muted;

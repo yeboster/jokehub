@@ -33,19 +33,23 @@ function JokeGridSkeleton() {
     >
       <span className="sr-only">Loading jokes…</span>
       {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
+        // The card chrome here mirrors `JokeListItem` exactly so the swap from
+        // skeleton to content does not shift anything. The shimmer lives on
+        // the bars (`.skeleton-bar`), not on the card, so the border and the
+        // layout stay still while only the placeholders move.
         <div
           key={index}
-          className="flex flex-col rounded-lg border border-primary/20 bg-card shadow-lg overflow-hidden animate-pulse"
+          className="flex flex-col rounded-lg border border-primary/20 bg-card shadow-lg overflow-hidden"
         >
           <div className="p-5 flex-grow space-y-2">
-            <div className="h-3 w-full rounded bg-muted" />
-            <div className="h-3 w-11/12 rounded bg-muted" />
-            <div className="h-3 w-3/4 rounded bg-muted" />
-            <div className="h-5 w-20 rounded-md bg-muted mt-6" />
+            <div className="skeleton-bar h-3 w-full" />
+            <div className="skeleton-bar h-3 w-11/12" />
+            <div className="skeleton-bar h-3 w-3/4" />
+            <div className="skeleton-bar h-5 w-20 rounded-md mt-6" />
           </div>
           <div className="p-4 border-t border-border/50 flex items-center justify-between">
-            <div className="h-3 w-24 rounded bg-muted" />
-            <div className="h-3 w-16 rounded bg-muted" />
+            <div className="skeleton-bar h-3 w-24" />
+            <div className="skeleton-bar h-3 w-16" />
           </div>
         </div>
       ))}
