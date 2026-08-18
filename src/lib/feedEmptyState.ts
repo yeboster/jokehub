@@ -37,7 +37,9 @@ export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters, erro
   if (error) {
     return {
       title: "We couldn't load the jokes.",
-      hint: `${error.replace(/\.?$/, '.')} Check your connection and try again.`,
+      // Any terminal punctuation is replaced, not just a period: `/\.?$/` left
+      // "Failed!" as "Failed!." in front of the next sentence.
+      hint: `${error.replace(/[.!?]?$/, '.')} Check your connection and try again.`,
       offerClearFilters: false,
       offerRetry: true,
     };

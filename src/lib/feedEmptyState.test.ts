@@ -75,7 +75,16 @@ describe('describeEmptyFeed', () => {
   });
 
   it('ends the failure hint in exactly one period, whatever the message brings', () => {
-    for (const message of ['Network request failed', 'Network request failed.']) {
+    // Including a message that ends in other terminal punctuation: an
+    // exclamation mark used to be kept and a period added after it.
+    const messages = [
+      'Network request failed',
+      'Network request failed.',
+      'Network request failed!',
+      'Network request failed?',
+    ];
+
+    for (const message of messages) {
       const copy = describeEmptyFeed(input({ error: message }));
       expect(copy.hint).toBe('Network request failed. Check your connection and try again.');
     }

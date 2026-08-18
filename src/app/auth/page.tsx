@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type FormEvent, useEffect, Suspense } from 'react';
+import { useState, type FormEvent, useEffect, useRef, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/co
 import { useToast } from '@/hooks/use-toast';
 import PageLoading from '@/components/PageLoading';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+
+/**
+ * The shape check the browser used to do for `type="email"` before `noValidate`
+ * turned it off. Deliberately not a full validator — no regex is correct for
+ * addresses, and Firebase is the real authority. This only catches the typo
+ * ("abc", "you@example") that would otherwise come back as an unmapped
+ * `auth/invalid-email` and print Firebase's own wording into the form.
+ */
+function looksLikeEmail(value: string): boolean {
+  const at = value.indexOf('@');
+  const dot = value.indexOf('.', at);
+  return at > 0 && dot > at + 1 && dot < value.length - 1;
+}
 
 function AuthPageComponent() {
   const [email, setEmail] = useState('');
@@ -23,6 +36,10 @@ function AuthPageComponent() {
   // before `handleSubmit` ever ran, so the copy written for the user was never
   // shown to the user.
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  // Only so a failed submit can put the caret where the problem is; `noValidate`
+  // took the browser's focus-the-first-bad-field behaviour away with it.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,10 +58,15 @@ function AuthPageComponent() {
 
     const nextErrors: { email?: string; password?: string } = {};
     if (!email.trim()) nextErrors.email = 'Enter your email address.';
+    else if (!looksLikeEmail(email.trim())) nextErrors.email = 'That doesn’t look like an email address.';
     if (!password) nextErrors.password = 'Enter your password.';
     else if (password.length < 6) nextErrors.password = 'Passwords are at least 6 characters.';
     if (nextErrors.email || nextErrors.password) {
       setErrors(nextErrors);
+      // Move to the first field at fault. The message itself is a live region,
+      // but a screen-reader user left standing on the submit button would have
+      // no way to reach the field the announcement is about.
+      (nextErrors.email ? emailRef : passwordRef).current?.focus();
       return;
     }
 
@@ -68,6 +90,8 @@ function AuthPageComponent() {
         errorMessage = 'That email and password do not match an account.';
       } else if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'That email is already registered — try logging in instead.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'That doesn’t look like an email address.';
       }
       // Inline, not a toast: the failure belongs to this form, the form is the
       // only thing on the page, and a toast can be missed or dismissed while
@@ -113,6 +137,7 @@ function AuthPageComponent() {
               <Label htmlFor="email">Email Address</Label>
               <Input
                 id="email"
+                ref={emailRef}
                 type="email"
                 // Without these a password manager cannot recognise the form,
                 // which is the single largest source of friction on a sign-in
@@ -126,13 +151,16 @@ function AuthPageComponent() {
                 aria-describedby={errors.email ? 'email-error' : undefined}
                 className="text-base"
               />
-              {errors.email && <p id="email-error" className="text-sm font-medium text-destructive">{errors.email}</p>}
+              {/* `role="alert"` as on the form-level block below: with `noValidate`
+                  nothing else speaks these messages aloud. */}
+              {errors.email && <p id="email-error" role="alert" className="text-sm font-medium text-destructive">{errors.email}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
+                  ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={isLogin ? 'current-password' : 'new-password'}
                   value={password}
@@ -159,7 +187,7 @@ function AuthPageComponent() {
                 </button>
               </div>
               {errors.password ? (
-                <p id="password-error" className="text-sm font-medium text-destructive">{errors.password}</p>
+                <p id="password-error" role="alert" className="text-sm font-medium text-destructive">{errors.password}</p>
               ) : (
                 !isLogin && <p id="password-hint" className="text-sm text-muted-foreground">At least 6 characters.</p>
               )}
