@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -84,10 +84,22 @@ function AuthPageComponent() {
   }
 
   return (
-    <div className="container mx-auto flex justify-center items-center py-12 px-4">
+    // The canonical page container (globals.css), with the centring moved onto
+    // it. `items-start` rather than `items-center`: vertical centring fought
+    // the container's own `py-*` and pushed the card below the fold on a short
+    // phone viewport once the keyboard opened.
+    <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 flex justify-center items-start">
       <Card className="w-full max-w-md shadow-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">{isLogin ? 'Login to Joke Hub' : 'Create Your Joke Hub Account'}</CardTitle>
+          {/*
+            A real <h1>, not <CardTitle> (which is a <div>): this card is the
+            whole page, so its title is the page's heading and the page had no
+            h1 at all. The size is the documented section-title step — the
+            card-title step would be smaller than the button below it.
+          */}
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">
+            {isLogin ? 'Login to Joke Hub' : 'Create Your Joke Hub Account'}
+          </h1>
           <CardDescription>
             {isLogin ? 'Access your personal joke collection.' : 'Join to save and manage your jokes.'}
           </CardDescription>
