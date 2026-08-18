@@ -60,12 +60,55 @@ describe('describeEmptyFeed', () => {
     }
   });
 
+  it('reports the failure rather than the filters, search term and all', () => {
+    // The error outranks every other reading of an empty list: before this,
+    // a dropped connection was reported as "no jokes matched your search".
+    const copy = describeEmptyFeed(
+      input({ search: 'penguin', hasActiveFilters: true, error: 'Network request failed' })
+    );
+
+    expect(copy.title).toBe("We couldn't load the jokes.");
+    expect(copy.hint).toBe('Network request failed. Check your connection and try again.');
+    expect(copy.offerRetry).toBe(true);
+    // Clearing the filters would not fix a network failure.
+    expect(copy.offerClearFilters).toBe(false);
+  });
+
+  it('ends the failure hint in exactly one period, whatever the message brings', () => {
+    for (const message of ['Network request failed', 'Network request failed.']) {
+      const copy = describeEmptyFeed(input({ error: message }));
+      expect(copy.hint).toBe('Network request failed. Check your connection and try again.');
+    }
+  });
+
+  it('treats an empty-string error as no error', () => {
+    const copy = describeEmptyFeed(input({ error: '' }));
+
+    expect(copy.title).toBe('No jokes here yet.');
+    expect(copy.offerRetry).toBe(false);
+  });
+
+  it('never offers a retry when nothing failed', () => {
+    const cases: Partial<FeedEmptyInput>[] = [
+      {},
+      { hasActiveFilters: true },
+      { search: 'x', hasMoreJokes: true },
+      { search: 'x', hasMoreJokes: false },
+      { error: null },
+    ];
+
+    for (const override of cases) {
+      expect(describeEmptyFeed(input(override)).offerRetry).toBe(false);
+    }
+  });
+
   it('always returns a title and a hint that end in a full stop', () => {
     const cases: Partial<FeedEmptyInput>[] = [
       {},
       { hasActiveFilters: true },
       { search: 'x', hasMoreJokes: true },
       { search: 'x', hasMoreJokes: false },
+      { error: 'Network request failed' },
     ];
 
     for (const override of cases) {

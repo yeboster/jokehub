@@ -23,6 +23,16 @@ interface JokeContextProps {
    * tell "my results" from "the previous page's results, still in state".
    */
   loadedFilters: FilterParams | null;
+  /**
+   * Why the last initial fetch failed, or null. Separate from `jokes`, which
+   * the failing fetch sets to `[]` so the page stops painting skeletons: an
+   * empty list and a failed load look identical from the outside, and the
+   * pages were reporting a network failure as "no jokes match your filters".
+   *
+   * Only initial fetches set it. A failed "load more" keeps the pages the user
+   * already has and is reported by the error toast alone.
+   */
+  jokesError: string | null;
   categories: Category[] | null;
   hasMoreJokes: boolean;
   loadingInitialJokes: boolean;
@@ -49,6 +59,7 @@ const JokeContext = createContext<JokeContextProps | undefined>(undefined);
 export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [jokes, setJokes] = useState<Joke[] | null>(null);
   const [loadedFilters, setLoadedFilters] = useState<FilterParams | null>(null);
+  const [jokesError, setJokesError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [loadingInitialJokes, setLoadingInitialJokes] = useState<boolean>(true);
   const [loadingMoreJokes, setLoadingMoreJokes] = useState<boolean>(false);
@@ -119,6 +130,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (filters.scope === 'user' && !user) {
       setJokes([]);
       if (!isLoadMore) setLoadedFilters(filters);
+      // Not a failure: an empty list is the correct answer for a signed-out
+      // visitor asking for their own jokes, so a previous failure's message
+      // must not survive into it.
+      if (!isLoadMore) setJokesError(null);
       setHasMoreJokes(false);
       if (isLoadMore) setLoadingMoreJokes(false); else setLoadingInitialJokes(false);
       return;
@@ -132,6 +147,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // pages' first-paint spinner fired on every filter change and tore down
       // the whole page. Consumers render their loading state off
       // `loadingInitialJokes`; `jokes === null` now means "no list yet" only.
+      //
+      // Cleared at the start of the attempt, so a retry does not render the
+      // previous failure over its own in-flight skeletons.
+      setJokesError(null);
       setLoadingInitialJokes(true);
       lastVisibleJokeDocRef.current = null;
     }
@@ -158,6 +177,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Stamped with the result, not at request time, so it always describes
         // the list currently in `jokes` — and only the newest request gets here.
         setLoadedFilters(filters);
+        setJokesError(null);
       }
 
       lastVisibleJokeDocRef.current = lastVisible;
@@ -171,6 +191,10 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isLoadMore) {
         setJokes([]);
         setLoadedFilters(filters);
+        // `setLoadedFilters` above stays exactly where it was — it is what
+        // stops a failed fetch painting skeletons forever. This records *why*
+        // the now-empty list is empty, which `jokes: []` alone cannot say.
+        setJokesError(err.message || 'Could not load jokes.');
       }
       setHasMoreJokes(false);
     } finally {
@@ -369,6 +393,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: JokeContextProps = {
     jokes,
     loadedFilters,
+    jokesError,
     categories,
     hasMoreJokes,
     loadingInitialJokes,

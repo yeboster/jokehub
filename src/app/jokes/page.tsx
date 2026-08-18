@@ -67,6 +67,7 @@ function JokesPageComponent() {
   const {
     jokes,
     loadedFilters,
+    jokesError,
     loadJokesWithFilters,
     loadMoreFilteredJokes,
     hasMoreJokes,
@@ -249,8 +250,12 @@ function JokesPageComponent() {
             search: filters.search,
             hasMoreJokes,
             hasActiveFilters: hasActiveFilters(filters),
+            error: jokesError,
           })}
           onClearFilters={clearFilters}
+          // The page's fetch effect is guarded by value against `filters`, so
+          // it will not re-fire on its own — a retry has to ask directly.
+          onRetry={() => loadJokesWithFilters(filters)}
         />
       )}
 

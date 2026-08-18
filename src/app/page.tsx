@@ -7,7 +7,7 @@ import { useJokes, type FilterParams } from '@/contexts/JokeContext';
 import { filtersEqual } from '@/lib/jokeFilters';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Laugh, PlusCircle } from 'lucide-react';
+import { ArrowRight, Laugh, PlusCircle, WifiOff } from 'lucide-react';
 import JokeListItem from '@/components/joke-list-item';
 import EmptyState from '@/components/EmptyState';
 import PageLoading from '@/components/PageLoading';
@@ -27,7 +27,7 @@ const HOME_PAGE_FILTERS: FilterParams = {
 
 export default function LandingPage() {
   const { user, loading: authLoading } = useAuth();
-  const { jokes, loadedFilters, loadJokesWithFilters, loadingInitialJokes } = useJokes();
+  const { jokes, loadedFilters, jokesError, loadJokesWithFilters, loadingInitialJokes } = useJokes();
 
   useEffect(() => {
     if (authLoading) return;
@@ -73,10 +73,12 @@ export default function LandingPage() {
             ))}
           </div>
         ) : (
+          // No retry button here: the teaser is not the feed, and the feed —
+          // which does offer one — is one click away below.
           <EmptyState
-            icon={Laugh}
-            title="No sample jokes to display right now."
-            hint="Check back soon — or sign in and add the first one."
+            icon={jokesError ? WifiOff : Laugh}
+            title={jokesError ? "We couldn't load the jokes." : 'No sample jokes to display right now.'}
+            hint={jokesError ? 'Check your connection, or head to the feed.' : 'Check back soon — or sign in and add the first one.'}
           />
         )}
       </section>

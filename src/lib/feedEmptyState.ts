@@ -15,6 +15,8 @@ export interface FeedEmptyCopy {
   hint: string;
   /** Whether the caller should offer a "Clear filters" action. */
   offerClearFilters: boolean;
+  /** Whether the caller should offer a "Try again" action. */
+  offerRetry: boolean;
 }
 
 export interface FeedEmptyInput {
@@ -24,9 +26,23 @@ export interface FeedEmptyInput {
   hasMoreJokes: boolean;
   /** Whether anything at all is filtered (search included). */
   hasActiveFilters: boolean;
+  /** The message from a failed fetch, or null when the feed simply has nothing. */
+  error?: string | null;
 }
 
-export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters }: FeedEmptyInput): FeedEmptyCopy {
+export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters, error }: FeedEmptyInput): FeedEmptyCopy {
+  // A failure outranks every other reading of an empty list: the previous copy
+  // blamed the user's filters for a dropped connection, and offered to adjust
+  // them.
+  if (error) {
+    return {
+      title: "We couldn't load the jokes.",
+      hint: `${error.replace(/\.?$/, '.')} Check your connection and try again.`,
+      offerClearFilters: false,
+      offerRetry: true,
+    };
+  }
+
   if (search) {
     // A multi-word search is only partly expressible as a Firestore query, so
     // the service ANDs the remaining tokens client-side and can hand back an
@@ -39,11 +55,13 @@ export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters }: Fe
           title: `No jokes on this page matched “${search}”.`,
           hint: 'There may be matches further down — load more to keep looking.',
           offerClearFilters: false,
+          offerRetry: false,
         }
       : {
           title: `No jokes matched “${search}”.`,
           hint: 'Search matches whole keywords of three or more letters. Try a single word, or clear the filters.',
           offerClearFilters: true,
+          offerRetry: false,
         };
   }
 
@@ -52,6 +70,7 @@ export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters }: Fe
       title: 'No jokes match these filters.',
       hint: 'Loosen one of them, or clear them all and start over.',
       offerClearFilters: true,
+      offerRetry: false,
     };
   }
 
@@ -59,5 +78,6 @@ export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters }: Fe
     title: 'No jokes here yet.',
     hint: 'Add the first one and it shows up right away.',
     offerClearFilters: false,
+    offerRetry: false,
   };
 }
