@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator';
 
 export default function AddJokePage() {
   const { user, loading: authLoading } = useAuth();
-  const { addJoke, loadingCategories } = useJokes();
+  const { addJoke } = useJokes();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -166,9 +166,10 @@ export default function AddJokePage() {
      );
   }
 
-  if (loadingCategories) {
-    return <PageLoading label="Loading your categories…" />;
-  }
+  // No category-loading gate here: it made the whole page a spinner — the AI
+  // panel included — while a subscription that only feeds one combobox landed.
+  // `CategoryCombobox` disables itself while it loads, which is the right scope
+  // for it.
 
   return (
     /*

@@ -102,7 +102,11 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
     }
   };
 
-  const isFormDisabled = !user || isSubmitting || loadingCategories;
+  // Deliberately does NOT include `loadingCategories`: it used to disable the
+  // joke text field too, so the user could not start writing until a
+  // subscription feeding one combobox had landed. `CategoryCombobox` disables
+  // itself while categories load.
+  const isFormDisabled = !user || isSubmitting;
 
   return (
     <>
@@ -178,7 +182,7 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
                 {form.formState.errors.root.message}
               </p>
            )}
-          <Button type="submit" className="w-full" disabled={isFormDisabled} size="sm">
+          <Button type="submit" className="w-full" disabled={isFormDisabled || loadingCategories} size="sm">
             {isSubmitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
