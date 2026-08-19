@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/navbar';
+import RouteFocus from '@/components/RouteFocus';
 import { JokeProvider } from '@/contexts/JokeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -70,6 +71,7 @@ export default function RootLayout({
                 Skip to content
               </a>
               <Navbar />
+              <RouteFocus />
               {/*
                 `tabIndex={-1}` makes this a programmatic focus target — for the
                 skip link above (some browsers park focus on the fragment's
