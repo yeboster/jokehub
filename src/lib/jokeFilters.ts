@@ -190,3 +190,17 @@ export function activeFilterChips(filters: FilterParams): FilterChip[] {
 
   return chips;
 }
+
+/**
+ * Where focus goes when the chip `removedKey` is removed from `chips`: the chip
+ * that will occupy its position, or the one before it if it was last, or `null`
+ * for "nothing in this row survives — the caller's fallback control".
+ *
+ * `chips` is the list *before* the removal, so the caller can compute this in
+ * the click handler, before the navigation that unmounts the button.
+ */
+export function nextChipFocusKey(chips: FilterChip[], removedKey: string): string | null {
+  const index = chips.findIndex((chip) => chip.key === removedKey);
+  if (index === -1) return null;
+  return chips[index + 1]?.key ?? chips[index - 1]?.key ?? null;
+}

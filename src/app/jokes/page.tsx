@@ -12,7 +12,7 @@ import type { FilterParams } from '@/services/jokeService';
 import { describeFeedAppend, type FeedCountSnapshot } from '@/lib/feedAnnounce';
 import { describeEmptyFeed } from '@/lib/feedEmptyState';
 import { FEED_PATH, rememberFeedUrl } from '@/lib/feedReturn';
-import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters } from '@/lib/jokeFilters';
+import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters, nextChipFocusKey } from '@/lib/jokeFilters';
 import Header from '@/components/header';
 import JokeFilterDialog from '@/components/jokes/JokeFilterDialog';
 import JokeList from '@/components/joke-list';
@@ -144,6 +144,27 @@ function JokesPageComponent() {
     if (notice) setAppendNotice(notice);
   }, [feedKey, jokesToDisplay.length, isReloadingResults]);
 
+  // Hoisted out of the JSX: the click handler needs the list as it stands
+  // *before* the removal to work out which chip takes the removed one's place.
+  const chips = useMemo(() => activeFilterChips(filters), [filters]);
+
+  // A chip's remove button unmounts as soon as the navigation lands, so focus
+  // has to be handed on deliberately or it falls to <body> and the user is
+  // returned to the top of the page for every filter they drop.
+  const chipRemoveRefs = useRef(new Map<string, HTMLButtonElement>());
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
+  // `{ key }` rather than a bare `string | null`, so "focus the Filters button"
+  // (key: null) is distinguishable from "no pending request" (ref: null).
+  const pendingChipFocusRef = useRef<{ key: string | null } | null>(null);
+
+  useEffect(() => {
+    const pending = pendingChipFocusRef.current;
+    if (!pending) return;
+    pendingChipFocusRef.current = null;
+    const target = pending.key ? chipRemoveRefs.current.get(pending.key) : filtersButtonRef.current;
+    target?.focus();
+  }, [filters]);
+
   if (authLoading) {
     return <PageLoading label="Loading jokes…" />;
   }
@@ -217,7 +238,7 @@ function JokesPageComponent() {
           </div>
         )}
 
-        <JokeFilterDialog value={filters} onApply={applyFilters} />
+        <JokeFilterDialog value={filters} onApply={applyFilters} triggerRef={filtersButtonRef} />
 
         {/* `min-h-[36px]` keeps the row from changing height as chips appear
             and disappear, and `basis-full` gives it its own line on a phone —
@@ -225,17 +246,26 @@ function JokesPageComponent() {
             band above the action cluster. `empty:hidden` drops the row out of
             the flex flow entirely in that case, so it also takes no gap. */}
         <ul className="flex flex-wrap items-center gap-2 flex-grow basis-full sm:basis-auto min-h-[36px] empty:hidden list-none p-0 m-0">
-          {activeFilterChips(filters).map((chip) => (
+          {chips.map((chip) => (
             <li key={chip.key}>
               <Badge variant="secondary" className="py-1 pl-2 pr-0.5 gap-1">
                 {chip.label}
                 <button
                   type="button"
+                  ref={(node) => {
+                    // React 18: the callback runs with `null` on unmount, which
+                    // is how a removed chip leaves the map.
+                    if (node) chipRemoveRefs.current.set(chip.key, node);
+                    else chipRemoveRefs.current.delete(chip.key);
+                  }}
                   aria-label={`Remove filter: ${chip.label}`}
                   // Applying `chip.next` navigates, exactly as the dialog's
                   // Apply does — the URL stays the single source of truth for
                   // the feed, so a removed chip is in the back button too.
-                  onClick={() => applyFilters(chip.next)}
+                  onClick={() => {
+                    pendingChipFocusRef.current = { key: nextChipFocusKey(chips, chip.key) };
+                    applyFilters(chip.next);
+                  }}
                   className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                 >
                   <XIcon className="h-3 w-3" />
@@ -254,7 +284,17 @@ function JokesPageComponent() {
           </Button>
 
           {hasActiveFilters(filters) && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-2 h-9">
+            <Button
+              variant="ghost"
+              size="sm"
+              // This button disappears with the filters it clears, so it hands
+              // focus on to the Filters trigger rather than dropping it.
+              onClick={() => {
+                pendingChipFocusRef.current = { key: null };
+                clearFilters();
+              }}
+              className="ml-2 h-9"
+            >
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Clear All
             </Button>
           )}

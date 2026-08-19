@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type Ref } from 'react';
 import { Check, ChevronsUpDown, Filter as FilterIcon, XIcon } from 'lucide-react';
 
 import type { FilterParams } from '@/services/jokeService';
@@ -36,6 +36,9 @@ interface JokeFilterDialogProps {
   value: FilterParams;
   /** Called with the edited filters when "Apply Filters" is pressed. */
   onApply: (filters: FilterParams) => void;
+  /** Forwarded to the trigger button, so the page can return focus here when
+   *  the last filter chip is removed and its row disappears. */
+  triggerRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -52,7 +55,7 @@ interface JokeFilterDialogProps {
  * used to hold and reset in three different places. Nothing is committed until
  * "Apply Filters", so Cancel/dismiss simply discards the draft.
  */
-export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogProps) {
+export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFilterDialogProps) {
   const { categoryNames, loadingCategories } = useUserCategories();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -102,7 +105,7 @@ export default function JokeFilterDialog({ value, onApply }: JokeFilterDialogPro
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" onClick={openDialog} className="h-9">
+        <Button ref={triggerRef} variant="outline" size="sm" onClick={openDialog} className="h-9">
           <FilterIcon className="mr-2 h-4 w-4" />
           Filters
           {hasActiveFilters(value) && <span className="ml-2 h-2 w-2 rounded-full bg-primary" />}

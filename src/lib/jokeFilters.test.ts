@@ -8,6 +8,7 @@ import {
   filtersToSearchParams,
   getFunnyRateLabel,
   hasActiveFilters,
+  nextChipFocusKey,
   parseFiltersFromParams,
 } from '@/lib/jokeFilters';
 
@@ -349,5 +350,39 @@ describe('activeFilterChips', () => {
       expect(chips).toHaveLength(1);
       expect(hasActiveFilters(chips[0].next)).toBe(false);
     }
+  });
+});
+
+describe('nextChipFocusKey', () => {
+  /** Three chips in the order `activeFilterChips` builds them. */
+  const threeChips = activeFilterChips(
+    filters({ search: 'cat', scope: 'user', usageStatus: 'used' })
+  );
+
+  it('hands focus to the chip that takes the removed one’s place', () => {
+    expect(threeChips.map((chip) => chip.key)).toEqual(['search', 'scope', 'usageStatus']);
+    expect(nextChipFocusKey(threeChips, 'search')).toBe('scope');
+  });
+
+  it('hands focus forwards when the middle chip goes', () => {
+    expect(nextChipFocusKey(threeChips, 'scope')).toBe('usageStatus');
+  });
+
+  it('hands focus backwards when the last chip goes', () => {
+    expect(nextChipFocusKey(threeChips, 'usageStatus')).toBe('scope');
+  });
+
+  it('returns null for the only chip, so the caller falls back to its own control', () => {
+    const single = activeFilterChips(filters({ search: 'penguin' }));
+    expect(single).toHaveLength(1);
+    expect(nextChipFocusKey(single, 'search')).toBeNull();
+  });
+
+  it('returns null for a key that is not in the row', () => {
+    expect(nextChipFocusKey(threeChips, 'funnyRate')).toBeNull();
+  });
+
+  it('returns null for an empty row', () => {
+    expect(nextChipFocusKey([], 'search')).toBeNull();
   });
 });
