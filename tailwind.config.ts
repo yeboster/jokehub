@@ -44,6 +44,9 @@ export default {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
+  			// Destructive *text*, at 4.5:1 in both themes. `destructive` is the
+  			// surface token and is far too dark to read as text in dark mode.
+  			error: 'hsl(var(--error))',
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',

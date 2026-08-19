@@ -175,9 +175,9 @@ export default function EditJokePage() {
             <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
                  <Header title="Edit Joke" />
                  <Card className="max-w-2xl mx-auto">
-                    <CardHeader> <CardTitle as="h2" className="text-lg text-destructive">Error</CardTitle> </CardHeader>
+                    <CardHeader> <CardTitle as="h2" className="text-lg text-error">Error</CardTitle> </CardHeader>
                     <CardContent>
-                        <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive flex items-center">
+                        <div className="mb-4 p-3 rounded-md bg-error/10 border border-error/30 text-error flex items-center">
                              <ShieldAlert className="mr-2 h-5 w-5 flex-shrink-0" /> <p>{fetchError}</p>
                         </div>
                         <Button variant="outline" onClick={() => router.push('/jokes')}>

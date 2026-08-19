@@ -153,7 +153,7 @@ function AuthPageComponent() {
               />
               {/* `role="alert"` as on the form-level block below: with `noValidate`
                   nothing else speaks these messages aloud. */}
-              {errors.email && <p id="email-error" role="alert" className="text-sm font-medium text-destructive">{errors.email}</p>}
+              {errors.email && <p id="email-error" role="alert" className="text-sm font-medium text-error">{errors.email}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -187,13 +187,13 @@ function AuthPageComponent() {
                 </button>
               </div>
               {errors.password ? (
-                <p id="password-error" role="alert" className="text-sm font-medium text-destructive">{errors.password}</p>
+                <p id="password-error" role="alert" className="text-sm font-medium text-error">{errors.password}</p>
               ) : (
                 !isLogin && <p id="password-hint" className="text-sm text-muted-foreground">At least 6 characters.</p>
               )}
             </div>
             {errors.form && (
-              <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+              <p role="alert" className="rounded-md border border-error/30 bg-error/10 p-3 text-sm font-medium text-error">
                 {errors.form}
               </p>
             )}

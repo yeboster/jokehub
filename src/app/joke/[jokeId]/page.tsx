@@ -303,10 +303,10 @@ export default function JokeShowPage() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle as="h1" className="text-lg text-destructive">Error</CardTitle>
+            <CardTitle as="h1" className="text-lg text-error">Error</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive flex items-center">
+            <div className="mb-4 p-3 rounded-md bg-error/10 border border-error/30 text-error flex items-center">
               <ShieldAlert className="mr-2 h-5 w-5 flex-shrink-0" />
               <p>{error}</p>
             </div>

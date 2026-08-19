@@ -150,10 +150,10 @@ export default function AddJokePage() {
             <Header title="Add New Joke" />
             <Card className="max-w-md mx-auto">
                 <CardHeader>
-                    <CardTitle as="h2" className="text-lg text-destructive">Access Denied</CardTitle>
+                    <CardTitle as="h2" className="text-lg text-error">Access Denied</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive flex items-center">
+                    <div className="mb-4 p-3 rounded-md bg-error/10 border border-error/30 text-error flex items-center">
                         <ShieldAlert className="mr-2 h-5 w-5 flex-shrink-0" />
                         <p>You must be logged in to add a new joke.</p>
                     </div>

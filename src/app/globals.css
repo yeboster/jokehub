@@ -25,8 +25,18 @@
     --accent: 270 80% 95%; /* Very Light Pastel Purple (e.g., #F3E8FD, for Home nav bg, secondary button bgs) */
     --accent-foreground: 270 60% 50%; /* Vibrant Purple (for text on accent bg, matching primary) */
 
-    --destructive: 0 84.2% 60.2%; /* Default Red */
-    --destructive-foreground: 0 0% 98%; /* Almost White */
+    /* The destructive *surface*. Was `0 84.2% 60.2%` = rgb(239,68,68), which
+       put `--destructive-foreground` (98%) at 3.76:1 on its own button and its
+       own toast — below the 4.5:1 floor. At 45% lightness the white label
+       reads at 5.81:1 and the tint keeps its meaning. */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Destructive *text*: form messages, error blocks, the sign-out menu item.
+       A surface colour and a text colour cannot be the same token — in dark
+       mode they need opposite luminances. 6.47:1 on `--background`, 5.47:1 on
+       `bg-error/10`. */
+    --error: 0 72% 42%;
 
     --border: 0 0% 89.8%; /* Light Gray Border */
     --input: 0 0% 89.8%; /* Light Gray Input */
@@ -68,7 +78,12 @@
     --popover: 0 0% 16%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 270 60% 65%; /* Brighter Purple for dark mode */
+    /* 65% put in-card links at 4.22:1 — `text-primary` on `--card` (16%) —
+       and at 4.14:1 inside a `bg-primary/10` alert. 70% takes those to 5.14:1
+       and 5.02:1. `--primary-foreground` (10%) on it is still 6.07:1, so the
+       filled button is unaffected, and `--ring` stays at 65% (a focus
+       indicator needs 3:1, and it has 4.98:1). */
+    --primary: 270 60% 70%; /* Brighter Purple for dark mode */
     --primary-foreground: 0 0% 10%; /* Dark text on brighter purple */
 
     --secondary: 0 0% 25%;
@@ -84,8 +99,15 @@
     --accent: 270 50% 25%; /* Darker Pastel Purple for dark mode accent bg */
     --accent-foreground: 270 60% 75%; /* Lighter Purple for text on dark accent */
 
-    --destructive: 0 62.8% 50.6%; 
-    --destructive-foreground: 0 0% 98%; 
+    /* Unchanged: `--destructive-foreground` (98%) on this reads 5.02:1. */
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* The dark counterpart to `--error`. The surface value above is 2.95:1 as
+       text on `--card` — light text on a dark plane is the only thing that
+       works down here. 6.19:1 on `--card`, 7.30:1 on `--background`, 4.92:1 on
+       `bg-error/10`. */
+    --error: 0 90% 75%;
 
     --border: 0 0% 25%; 
     --input: 0 0% 25%; 
@@ -131,6 +153,10 @@
    *   in-flow card       shadow-sm  (hover: shadow-md)
    *   floating surface   shadow-lg  (dialog, popover, dropdown, toast)
    *   focal card         shadow-md  (auth)
+   *
+   * Destructive colours (round 6):
+   *   --destructive       surface only (button, toast, tinted block borders)
+   *   --error             destructive *text*, >= 4.5:1 on background and card
    *
    * Page container (round 4):
    *   container mx-auto px-4 py-8 sm:px-6 md:py-12
