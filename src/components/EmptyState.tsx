@@ -42,7 +42,7 @@ const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, clas
     // it, and a live region only announces text that changes *after* it is in
     // the DOM (round 6). It claimed to announce an empty result for two rounds
     // and never did. Announcing is the page's job — `/jokes` has a permanently
-    // mounted region that speaks this exact `title`.
+    // mounted region that speaks this headline and its hint as one utterance.
     <div className={cn('text-center', isSmall ? 'py-6' : 'py-12', className)}>
       <div
         className={cn(

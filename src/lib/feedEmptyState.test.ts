@@ -174,7 +174,7 @@ describe('emptyFeedAnnouncement', () => {
     ).toBe('No jokes here yet.');
   });
 
-  it('never returns an empty string, which a permanently mounted region cannot announce', () => {
+  it('returns nothing rather than inventing text when both strings are blank', () => {
     expect(
       emptyFeedAnnouncement({ title: '  ', hint: '  ', offerClearFilters: false, offerRetry: false })
     ).toBe('');

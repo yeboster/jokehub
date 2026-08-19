@@ -59,10 +59,10 @@ export interface FeedSnapshot {
 export function describeFeedStatus(
   previous: FeedSnapshot | null,
   next: FeedSnapshot,
-  emptyTitle: string
+  emptyAnnouncement: string
 ): string {
   if (next.count === null) return 'Loading jokes…';
-  if (next.count === 0) return emptyTitle;
+  if (next.count === 0) return emptyAnnouncement;
 
   const append =
     previous && previous.count !== null
