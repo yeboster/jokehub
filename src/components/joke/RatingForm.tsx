@@ -74,8 +74,12 @@ export default function RatingForm({
                   disabled={isSubmittingRating}
                   maxLength={1000}
                   rows={3}
+                  // Described-by, not a live region: it changes on every
+                  // keystroke, and announcing "413/1000 characters" after each
+                  // one would make the field unusable.
+                  aria-describedby="user-rating-comment-count"
                 />
-                <p className="text-xs text-muted-foreground mt-1">{commentInputValue.length}/1000 characters</p>
+                <p id="user-rating-comment-count" className="text-xs text-muted-foreground mt-1">{commentInputValue.length}/1000 characters</p>
               </div>
               <Button type="submit" disabled={isSubmittingRating || ratingInputValue === 0}>
                 {isSubmittingRating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}

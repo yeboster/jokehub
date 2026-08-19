@@ -218,7 +218,7 @@ export default function EditJokePage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField control={form.control} name="text" render={({ field }) => (
                   <FormItem> <FormLabel>Joke Text</FormLabel> <FormControl>
-                      <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={5} />
+                      <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={5} aria-required />
                   </FormControl> <FormMessage /> </FormItem>
               )} />
               <FormField control={form.control} name="category" render={({ field }) => (
@@ -228,6 +228,7 @@ export default function EditJokePage() {
                         value={field.value}
                         onChange={(category) => form.setValue('category', category, { shouldValidate: true })}
                         disabled={isFormDisabled}
+                        aria-required
                       />
                     </FormControl>
                     <FormMessage />
@@ -264,7 +265,18 @@ export default function EditJokePage() {
                 )}
               />
               {form.formState.errors.root && (
-                <FormMessage>{form.formState.errors.root.message}</FormMessage>
+                /*
+                  Not <FormMessage>: that reads FormFieldContext, which does not
+                  exist out here. It rendered with the id
+                  `undefined-form-item-message`, was referenced by no control and
+                  carried no role — so the message was announced by nothing at
+                  all. A root error is a statement about the whole form, which is
+                  what role="alert" is for; it fires the moment the element
+                  appears.
+                */
+                <p role="alert" className="text-sm font-medium text-error">
+                  {form.formState.errors.root.message}
+                </p>
               )}
               <div className="flex flex-col sm:flex-row gap-2 justify-between items-center">
                 <AlertDialog

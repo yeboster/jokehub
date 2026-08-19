@@ -233,11 +233,16 @@ export default function AddJokePage() {
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <Label htmlFor="temperature-slider" className="text-sm font-medium">Creativity (Temperature)</Label>
+                                {/* No `htmlFor`: Radix puts the id on the
+                                    slider's wrapper span, which is not a
+                                    labelable element. The name rides on the
+                                    thumb via `thumbLabel`. */}
+                                <span className="text-sm font-medium">Creativity (Temperature)</span>
                                 <span className="text-sm font-mono text-muted-foreground">{temperature[0].toFixed(1)}</span>
                             </div>
                             <Slider
                                 id="temperature-slider"
+                                thumbLabel="Creativity (temperature)"
                                 min={0}
                                 max={2}
                                 step={0.1}

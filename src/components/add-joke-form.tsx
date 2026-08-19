@@ -126,7 +126,7 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
                   {/* No `text-sm`: `Textarea` is `text-base md:text-sm` on
                       purpose, and anything under 16px makes iOS Safari zoom
                       the viewport when the field takes focus. */}
-                  <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={3} className="h-auto" />
+                  <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={3} className="h-auto" aria-required />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -144,6 +144,7 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
                       onChange={(category) => form.setValue('category', category, { shouldValidate: true })}
                       disabled={isFormDisabled}
                       className="h-9"
+                      aria-required
                     />
                   </FormControl>
                    <FormMessage />
@@ -164,7 +165,18 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
             )}
           />
            {form.formState.errors.root && (
-              <FormMessage>{form.formState.errors.root.message}</FormMessage>
+              /*
+                Not <FormMessage>: that reads FormFieldContext, which does not
+                exist out here. It rendered with the id
+                `undefined-form-item-message`, was referenced by no control and
+                carried no role — so "You do not have permission to add this
+                joke." was announced by nothing at all. A root error is a
+                statement about the whole form, which is what role="alert" is
+                for; it fires the moment the element appears.
+              */
+              <p role="alert" className="text-sm font-medium text-error">
+                {form.formState.errors.root.message}
+              </p>
            )}
           <Button type="submit" className="w-full" disabled={isFormDisabled} size="sm">
             {isSubmitting ? (
