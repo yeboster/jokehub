@@ -10,7 +10,7 @@ import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
 import { describeFeedStatus, describeFeedTally, type FeedSnapshot } from '@/lib/feedAnnounce';
-import { describeEmptyFeed } from '@/lib/feedEmptyState';
+import { describeEmptyFeed, emptyFeedAnnouncement } from '@/lib/feedEmptyState';
 import { FEED_PATH, rememberFeedUrl } from '@/lib/feedReturn';
 import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters, nextChipFocusKey } from '@/lib/jokeFilters';
 import Header from '@/components/header';
@@ -134,6 +134,11 @@ function JokesPageComponent() {
     [filters, hasMoreJokes, jokesError]
   );
 
+  // What the status region says when the result is empty: the same two
+  // sentences the empty state shows, joined. The region has no layout, so the
+  // headline alone left every hint this app writes unannounced.
+  const emptyAnnouncement = useMemo(() => emptyFeedAnnouncement(emptyCopy), [emptyCopy]);
+
   // The feed's own serialization, so the key is exactly the one the URL would
   // carry — the same string `rememberFeedUrl` records above.
   const feedKey = useMemo(() => filtersToSearchParams(filters).toString(), [filters]);
@@ -145,16 +150,16 @@ function JokesPageComponent() {
     // next result has to be compared against the last real one, or an append
     // would look like a fresh result set.
     if (isReloadingResults) {
-      setFeedStatus(describeFeedStatus(feedSnapshotRef.current, { key: feedKey, count: null }, emptyCopy.title));
+      setFeedStatus(describeFeedStatus(feedSnapshotRef.current, { key: feedKey, count: null }, emptyAnnouncement));
       return;
     }
     const next: FeedSnapshot = { key: feedKey, count: jokesToDisplay.length };
     // State set from an effect, deliberately: the announcement is derived from
     // a *transition* between two committed renders, which is not expressible
     // during render; the ref holds the previous side of it.
-    setFeedStatus(describeFeedStatus(feedSnapshotRef.current, next, emptyCopy.title));
+    setFeedStatus(describeFeedStatus(feedSnapshotRef.current, next, emptyAnnouncement));
     feedSnapshotRef.current = next;
-  }, [feedKey, jokesToDisplay.length, isReloadingResults, emptyCopy.title]);
+  }, [feedKey, jokesToDisplay.length, isReloadingResults, emptyAnnouncement]);
 
   // Hoisted out of the JSX: the click handler needs the list as it stands
   // *before* the removal to work out which chip takes the removed one's place.

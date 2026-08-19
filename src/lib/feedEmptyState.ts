@@ -83,3 +83,23 @@ export function describeEmptyFeed({ search, hasMoreJokes, hasActiveFilters, erro
     offerRetry: false,
   };
 }
+
+/**
+ * The empty feed as one announced sentence.
+ *
+ * The visible block stacks the headline above the hint and a sighted user reads
+ * both. A live region has no layout: it announces the text it holds, so the two
+ * lines are one utterance or the second one reaches nobody. The feed's region
+ * spoke the headline alone until now, which meant every instruction this module
+ * writes — how search tokenizes, that filters can be cleared, that a failed
+ * fetch can be retried — was invisible to a screen reader.
+ *
+ * Both strings already end in a full stop (pinned by this module's suite), so a
+ * single space is the whole join.
+ */
+export function emptyFeedAnnouncement(copy: FeedEmptyCopy): string {
+  return [copy.title, copy.hint]
+    .map(part => part.trim())
+    .filter(Boolean)
+    .join(' ');
+}

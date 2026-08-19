@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { describeEmptyFeed, type FeedEmptyInput } from '@/lib/feedEmptyState';
+import { describeEmptyFeed, emptyFeedAnnouncement, type FeedEmptyInput } from '@/lib/feedEmptyState';
 
 function input(overrides: Partial<FeedEmptyInput> = {}): FeedEmptyInput {
   return { search: '', hasMoreJokes: false, hasActiveFilters: false, ...overrides };
@@ -125,5 +125,58 @@ describe('describeEmptyFeed', () => {
       expect(copy.title.endsWith('.')).toBe(true);
       expect(copy.hint.endsWith('.')).toBe(true);
     }
+  });
+});
+
+describe('emptyFeedAnnouncement', () => {
+  it('reads the headline and the hint as one utterance', () => {
+    expect(
+      emptyFeedAnnouncement({
+        title: 'No jokes match these filters.',
+        hint: 'Loosen one of them, or clear them all and start over.',
+        offerClearFilters: true,
+        offerRetry: false,
+      })
+    ).toBe('No jokes match these filters. Loosen one of them, or clear them all and start over.');
+  });
+
+  it('carries the reason for a failed fetch, which is the hint on that branch', () => {
+    const copy = describeEmptyFeed(input({ error: 'Network request failed' }));
+
+    expect(emptyFeedAnnouncement(copy)).toBe(
+      "We couldn't load the jokes. Network request failed. Check your connection and try again."
+    );
+  });
+
+  it('is exactly the visible copy, for every branch — the region cannot contradict the screen', () => {
+    const cases: Partial<FeedEmptyInput>[] = [
+      {},
+      { hasActiveFilters: true },
+      { search: 'x', hasMoreJokes: true },
+      { search: 'x', hasMoreJokes: false },
+      { error: 'Network request failed' },
+    ];
+
+    for (const override of cases) {
+      const copy = describeEmptyFeed(input(override));
+      expect(emptyFeedAnnouncement(copy)).toBe(`${copy.title} ${copy.hint}`);
+    }
+  });
+
+  it('does not leave a trailing space when there is no hint', () => {
+    expect(
+      emptyFeedAnnouncement({
+        title: 'No jokes here yet.',
+        hint: '',
+        offerClearFilters: false,
+        offerRetry: false,
+      })
+    ).toBe('No jokes here yet.');
+  });
+
+  it('never returns an empty string, which a permanently mounted region cannot announce', () => {
+    expect(
+      emptyFeedAnnouncement({ title: '  ', hint: '  ', offerClearFilters: false, offerRetry: false })
+    ).toBe('');
   });
 });
