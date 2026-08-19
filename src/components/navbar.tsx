@@ -31,7 +31,7 @@ const Navbar = () => {
 
   if (loading) {
     return (
-      <nav className="bg-background sticky top-0 z-50 border-b border-border/50">
+      <nav aria-label="Main" className="bg-background sticky top-0 z-50 border-b border-border/50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
             <Logo width={96} priority />
@@ -45,7 +45,7 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="bg-background sticky top-0 z-50 border-b border-border/50">
+    <nav aria-label="Main" className="bg-background sticky top-0 z-50 border-b border-border/50">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2">
           <Logo width={96} priority />
