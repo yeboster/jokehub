@@ -81,7 +81,11 @@ const Navbar = () => {
              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center text-muted-foreground hover:text-primary hover:bg-accent/50">
-                  <UserCircle className="mr-0 h-5 w-5 sm:mr-2 text-primary" />
+                  {/* The margin appears with the label, not before it. Round 7
+                      moved this label to the large breakpoint and left the gap
+                      on the small one, so between them the icon carried 8px of
+                      trailing space with nothing after it. */}
+                  <UserCircle className="mr-0 h-5 w-5 lg:mr-2 text-primary" />
                   {/* `sr-only` up to `lg`, not `sm` like the three nav links:
                       the visible string here is an email address, and at
                       640–768px it shared one row with the wordmark, three
