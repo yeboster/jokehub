@@ -246,7 +246,7 @@ export default function AddJokePage() {
                                       labelable element. The name rides on the
                                       thumb via `thumbLabel`. */}
                                   <span className="text-sm font-medium">Creativity (Temperature)</span>
-                                  <span className="text-sm font-mono text-muted-foreground">{temperature[0].toFixed(1)}</span>
+                                  <span className="text-sm tabular-nums text-muted-foreground">{temperature[0].toFixed(1)}</span>
                               </div>
                               <Slider
                                   id="temperature-slider"

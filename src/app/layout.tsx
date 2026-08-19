@@ -1,6 +1,6 @@
 
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/navbar';
@@ -11,11 +11,6 @@ import { ThemeProvider } from '@/components/theme-provider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
   subsets: ['latin'],
 });
 
@@ -30,7 +25,12 @@ export const metadata: Metadata = {
   },
   description: 'Manage and filter your jokes',
   icons: {
-    icon: '/logo.png',
+    // Not `/logo.png`: a <link rel="icon"> is fetched raw, so the wordmark put
+    // 209KB on every page load to render a 1395×312 image into a 16px square,
+    // where it was an illegible sliver. An SVG mark is ~300 bytes and sharp at
+    // every size. Swap in a designed 32×32/180×180 PNG pair here if one is ever
+    // made; nothing else needs to change.
+    icon: '/favicon.svg',
   },
 };
 
@@ -42,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <body 
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+        className={`${geistSans.variable} antialiased flex flex-col min-h-screen`}
         suppressHydrationWarning={true}
       >
         <ThemeProvider
