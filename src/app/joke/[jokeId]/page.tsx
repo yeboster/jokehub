@@ -18,6 +18,11 @@ import RatingForm from '@/components/joke/RatingForm';
 import CommunityRatings from '@/components/joke/CommunityRatings';
 import EmptyState from '@/components/EmptyState';
 import PageLoading from '@/components/PageLoading';
+import {
+  describeJokeLoadResult,
+  JOKE_NOT_FOUND_HINT,
+  JOKE_NOT_FOUND_TITLE,
+} from '@/lib/jokeStatus';
 
 export default function JokeShowPage() {
   const params = useParams();
@@ -28,6 +33,10 @@ export default function JokeShowPage() {
   const [joke, setJoke] = useState<Joke | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Filled from an effect once the load settles, never at mount: a live region
+  // announces text that *changes* after it is in the DOM, and one that mounts
+  // holding its message announces nothing at all (round 6).
+  const [loadStatus, setLoadStatus] = useState('');
 
   // User Rating State
   const [currentUserRating, setCurrentUserRating] = useState<UserRating | null>(null);
@@ -216,6 +225,15 @@ export default function JokeShowPage() {
     }
   }, [jokeId, user, getJokeById, fetchAllRatingsForJoke, authLoading]);
 
+  useEffect(() => {
+    if (isLoading || authLoading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the announcement is derived from a transition between two committed renders, which is not expressible during render
+      setLoadStatus('');
+      return;
+    }
+    setLoadStatus(describeJokeLoadResult({ error, found: !!joke }));
+  }, [isLoading, authLoading, error, joke]);
+
 
   const handleRatingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,6 +320,11 @@ export default function JokeShowPage() {
         <div className="mb-6">
           <BackToFeedButton />
         </div>
+        {/* Mounted empty and filled by the effect above, so it actually
+            announces. Not `role="alert"`: this is the outcome of a page load
+            the user asked for, not an interruption, and the sensitivity rule
+            the toasts follow says the same thing. */}
+        <p role="status" className="sr-only">{loadStatus}</p>
         <Card>
           <CardHeader>
             <CardTitle as="h1" className="text-error">Error</CardTitle>
@@ -323,14 +346,20 @@ export default function JokeShowPage() {
         <div className="mb-6">
           <BackToFeedButton />
         </div>
+        {/* See the error branch: mounted empty, filled from the effect. Round 7
+            made a shared link to a deleted joke a real path, and this branch
+            announced nothing at all. */}
+        <p role="status" className="sr-only">{loadStatus}</p>
         {/* The fourth empty state. It was a Card with the headline "Hmm..." —
-            an interjection, not a statement of what is not here. */}
+            an interjection, not a statement of what is not here. The two
+            strings come from the module that also builds the announcement, so
+            the region and the screen say the same thing. */}
         <EmptyState
           icon={SearchX}
           // The page's only heading, because this branch renders no Header.
           titleAs="h1"
-          title="We couldn't find that joke."
-          hint="It may have been deleted, or the link may be wrong."
+          title={JOKE_NOT_FOUND_TITLE}
+          hint={JOKE_NOT_FOUND_HINT}
         />
       </div>
     );
