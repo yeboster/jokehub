@@ -197,7 +197,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle as="h2" className="text-lg">Import Jokes from CSV</CardTitle>
+        <CardTitle as="h2">Import Jokes from CSV</CardTitle>
         <CardDescription>
           Upload a CSV file with &quot;text&quot;, &quot;category&quot; columns. Optionally include &quot;funnyrate&quot; (0-5) and &quot;source&quot;.
           Headers are case-insensitive.

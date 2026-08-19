@@ -25,7 +25,7 @@ export default function ExplanationCard({
     <Card className="shadow-sm mb-8 bg-accent/50 border-primary/20">
       <CardHeader>
         <div className="flex items-center justify-between gap-4">
-          <CardTitle as="h2" className="text-lg flex items-center gap-2 text-accent-foreground">
+          <CardTitle as="h2" className="flex items-center gap-2 text-accent-foreground">
             <Lightbulb className="h-5 w-5" /> The Comedian&apos;s Take
           </CardTitle>
           <Button

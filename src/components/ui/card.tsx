@@ -29,28 +29,35 @@ const CardHeader = React.forwardRef<
 ))
 CardHeader.displayName = "CardHeader"
 
-interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+type CardTitleTag = 'div' | 'h1' | 'h2' | 'h3';
+
+interface CardTitleProps extends React.HTMLAttributes<HTMLElement> {
   /**
    * Element to render. `div` — shadcn's original — is right for a card whose
    * title is not a section of the page. Pass `h1`/`h2`/`h3` when the card *is*
    * a section: with everything a div, `/joke/[jokeId]` and `/add-joke` had one
    * heading each and no outline for a screen reader to navigate.
    */
-  as?: 'div' | 'h1' | 'h2' | 'h3';
+  as?: CardTitleTag;
 }
 
-const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
+const CardTitle = React.forwardRef<HTMLElement, CardTitleProps>(
   ({ className, as = 'div', ...props }, ref) => {
-    // Widened to `ElementType` on purpose: a union of intrinsic tags in JSX
-    // position makes TypeScript resolve the ref against every member at once
+    // `ElementType` rather than the union directly: a union of intrinsic tags in
+    // JSX position makes TypeScript resolve the ref against every member at once
     // (HTMLDivElement *and* HTMLHeadingElement), which no single ref satisfies.
+    // The ref is typed `HTMLElement` — the one type that is honest for all four
+    // tags — instead of `HTMLHeadingElement`, which was a lie for the default.
     const Comp = as as React.ElementType;
 
     return (
       <Comp
         ref={ref}
+        // The documented card-title step (globals.css). It used to be `text-2xl`
+        // and every one of the eleven call sites passed `text-lg` to undo it, so
+        // the scale lived in the call sites and the component fought them.
         className={cn(
-          "text-2xl font-semibold leading-none tracking-tight",
+          "text-lg font-semibold leading-none tracking-tight",
           className
         )}
         {...props}

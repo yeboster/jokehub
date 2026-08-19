@@ -150,7 +150,7 @@ export default function AddJokePage() {
             <Header title="Add New Joke" />
             <Card className="max-w-md mx-auto">
                 <CardHeader>
-                    <CardTitle as="h2" className="text-lg text-error">Access Denied</CardTitle>
+                    <CardTitle as="h2" className="text-error">Access Denied</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="mb-4 p-3 rounded-md bg-error/10 border border-error/30 text-error flex items-center">
@@ -187,7 +187,7 @@ export default function AddJokePage() {
           <div className="lg:col-span-1 flex flex-col gap-6">
              <Card className="sticky top-24">
                   <CardHeader>
-                  <CardTitle as="h2" className="text-lg flex items-center">
+                  <CardTitle as="h2" className="flex items-center">
                       <PlusCircle className="mr-2 h-5 w-5 text-primary"/> Your New Joke
                   </CardTitle>
                   <CardDescription className="text-sm">
@@ -214,7 +214,7 @@ export default function AddJokePage() {
           <div className="lg:col-span-2">
               <Card>
                   <CardHeader>
-                    <CardTitle as="h2" className="text-lg flex items-center">
+                    <CardTitle as="h2" className="flex items-center">
                         <Wand2 className="mr-2 h-5 w-5 text-primary"/> AI Assistant
                     </CardTitle>
                     <CardDescription className="text-sm">
