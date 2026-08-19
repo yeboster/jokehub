@@ -292,7 +292,12 @@ export default function EditJokePage() {
                         <Trash2 className="mr-2 h-4 w-4" /> Delete Joke
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent aria-busy={isDeleting}>
+                  {/* `aria-busy` belongs on the action button, not here: on the
+                      content it covers the status paragraph below, and a live
+                      region inside a busy subtree is held back until busy
+                      clears — which for a successful delete never happens,
+                      because the dialog unmounts. */}
+                  <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete this joke?</AlertDialogTitle>
                       <AlertDialogDescription>
@@ -312,6 +317,7 @@ export default function EditJokePage() {
                           handleDelete();
                         }}
                         disabled={isDeleting}
+                        aria-busy={isDeleting}
                         className="bg-destructive hover:bg-destructive/90"
                       >
                          {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

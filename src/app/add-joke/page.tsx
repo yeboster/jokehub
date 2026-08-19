@@ -304,11 +304,18 @@ export default function AddJokePage() {
                           </Button>
                       </div>
                     
+                      {/* Always in the DOM so it is a live region *before* the
+                          text changes — a role="status" that mounts with its
+                          message already inside it does not announce. The
+                          placeholder below carries the same words on screen. */}
+                      <p role="status" className="sr-only">
+                        {isGeneratingJoke ? 'Generating witty humor…' : ''}
+                      </p>
+
                       <AnimatePresence>
                         {isGeneratingJoke && (
                             <motion.div
                                 key="loading"
-                                role="status"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}

@@ -23,8 +23,10 @@ export function Toaster() {
             // every toast. Assertive is correct for a failure the user has to
             // act on and wrong for a confirmation: "Joke added" was
             // interrupting whatever was being read. Successes wait their turn.
-            type={props.variant === 'destructive' ? 'foreground' : 'background'}
+            // It comes after the spread on purpose: a `type` from the call site
+            // must not quietly override the rule.
             {...props}
+            type={props.variant === 'destructive' ? 'foreground' : 'background'}
           >
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
