@@ -274,3 +274,55 @@
     animation: none;
   }
 }
+
+/*
+ * Print.
+ *
+ * A joke collection is something people print: a set list to take on stage,
+ * with the used flag beside each one. Unstyled, that sheet carries the sticky
+ * navigation bar, whatever toast was open, a shadow rendered as a grey smear,
+ * and buttons nobody can press on paper — and in dark mode it prints a
+ * near-black page.
+ *
+ * Unlayered and last in the file, for the same reason the reduced-motion block
+ * above is: it has to outrank the utilities it overrides, and at equal
+ * specificity source order decides.
+ *
+ * Colours are pinned rather than left to the tokens. Browsers drop background
+ * colours when printing but keep foreground ones, so a dark-mode page would
+ * print pale grey text on the paper's white with nothing behind it.
+ */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Chrome that is interaction, not content. The toast viewport opts out at its
+     own call site instead, because it is a portal and does not sit under any
+     landmark this could name. */
+  nav,
+  button {
+    display: none !important;
+  }
+
+  /* On paper an underlined, coloured link is noise: the destination is not
+     reachable from the sheet. */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Elevation is a screen idea. */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* A joke card is one unit: a page break through the middle of one puts the
+     setup on one sheet and the punchline on the next. */
+  .rounded-lg,
+  li {
+    break-inside: avoid;
+  }
+}
