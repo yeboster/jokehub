@@ -18,6 +18,10 @@ interface EmptyStateProps {
   className?: string;
   /** `sm` for empty states nested inside a card. */
   size?: 'default' | 'sm';
+  /** Element for the headline. `p` by default — an empty state nested in a page
+   *  that already has headings is not itself a section. `h1`/`h2` for the
+   *  "joke not found" page, where this block *is* the page. */
+  titleAs?: 'p' | 'h1' | 'h2';
 }
 
 /**
@@ -29,7 +33,7 @@ interface EmptyStateProps {
  * empty result set caused by four active filters, or by a failed fetch, needs
  * a way out that is not "work out what you did and undo it".
  */
-const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, className, size = 'default' }) => {
+const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, className, size = 'default', titleAs = 'p' }) => {
   const isSmall = size === 'sm';
 
   return (
@@ -52,7 +56,14 @@ const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, clas
       >
         <Icon className={isSmall ? 'h-5 w-5' : 'h-7 w-7'} aria-hidden="true" />
       </div>
-      <p className={cn('font-medium text-foreground', isSmall ? 'text-sm' : 'text-lg')}>{title}</p>
+      {(() => {
+        const TitleTag = titleAs as React.ElementType;
+        return (
+          <TitleTag className={cn('font-medium text-foreground', isSmall ? 'text-sm' : 'text-lg')}>
+            {title}
+          </TitleTag>
+        );
+      })()}
       {hint && <p className="mt-1.5 text-sm text-muted-foreground max-w-md mx-auto">{hint}</p>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>

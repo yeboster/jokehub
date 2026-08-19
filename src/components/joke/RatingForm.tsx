@@ -38,7 +38,7 @@ export default function RatingForm({
   return (
     <Card className="shadow-sm mb-8">
       <CardHeader>
-        <CardTitle className="text-lg">
+        <CardTitle as="h2" className="text-lg">
           Rate this Joke
         </CardTitle>
         {!user && <CardDescription>Please <Link href={`/auth?redirect=/joke/${joke.id}`} className="underline text-primary hover:text-primary/80">log in or sign up</Link> to rate this joke.</CardDescription>}

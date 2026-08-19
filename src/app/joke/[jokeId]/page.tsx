@@ -303,7 +303,7 @@ export default function JokeShowPage() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-destructive">Error</CardTitle>
+            <CardTitle as="h1" className="text-lg text-destructive">Error</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive flex items-center">
@@ -326,6 +326,8 @@ export default function JokeShowPage() {
             an interjection, not a statement of what is not here. */}
         <EmptyState
           icon={SearchX}
+          // The page's only heading, because this branch renders no Header.
+          titleAs="h1"
           title="We couldn't find that joke."
           hint="It may have been deleted, or the link may be wrong."
         />
