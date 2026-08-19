@@ -48,7 +48,18 @@ const DialogContent = React.forwardRef<
         // See DialogOverlay: the duration is pinned through the `data-[state=…]:`
         // variant because a bare `duration-200` loses to `.animate-in`'s own
         // 150ms on specificity.
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg data-[state=open]:duration-200 data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        //
+        // `max-h`/`overflow-y-auto`: the panel is vertically centred with no
+        // height bound, so on a short viewport — a phone in landscape, or a
+        // small window — the footer went off-screen with nothing to scroll, and
+        // "Apply Filters" was simply unreachable. `dvh` and not `vh` because
+        // mobile Safari's `vh` counts retracted browser chrome, which is the
+        // case this is for. The 2rem leaves a 1rem gutter top and bottom.
+        //
+        // Known limit (deferred, see the plan): this handles a short *layout*
+        // viewport. It does not reposition when the on-screen keyboard shrinks
+        // the *visual* viewport — that needs a `visualViewport` listener.
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg data-[state=open]:duration-200 data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
         className
       )}
       {...props}
