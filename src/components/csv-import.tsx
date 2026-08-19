@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast'; // Ensure this path is correct
 import { useAuth } from '@/contexts/AuthContext'; // Ensure this path is correct
 import { cn } from '@/lib/utils';
 import { parseCSVLine } from '@/lib/csv';
+import { summarizeImport, type SkippedRow } from '@/lib/csvReport';
 
 interface CSVImportProps {
   // Defines the expected structure of jokes after parsing from CSV, before adding to DB
@@ -24,30 +25,14 @@ interface CSVImportProps {
 
 /** Mirrors the `source.size() <= 100` create rule in `firestore.rules`. */
 const MAX_SOURCE_LENGTH = 100;
-/** How many individual row numbers to name before summarizing the rest. */
-const MAX_REPORTED_ROWS = 10;
-
-interface SkippedRow {
-  /** 1-based line number in the uploaded file, blank lines included. */
-  lineNumber: number;
-  reason: string;
-}
-
-/**
- * `rows 4, 19, 27 and 3 more (missing "text" or "category")` — the row numbers
- * as the user sees them in their file, plus every distinct reason.
- */
-function describeSkippedRows(skipped: SkippedRow[]): string {
-  const listed = skipped.slice(0, MAX_REPORTED_ROWS).map((row) => row.lineNumber);
-  const remainder = skipped.length - listed.length;
-  const rowList = `row${skipped.length === 1 ? '' : 's'} ${listed.join(', ')}${remainder > 0 ? ` and ${remainder} more` : ''}`;
-  const reasons = Array.from(new Set(skipped.map((row) => row.reason)));
-  return `${rowList} (${reasons.join('; ')})`;
-}
 
 const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  // Mirrors the toast into a region that stays on the page. A toast is
+  // announced once and then has to be dismissed; an import result is
+  // something the user reads back against their file.
+  const [statusMessage, setStatusMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth(); // Get user state from AuthContext
 
@@ -68,6 +53,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
     if (!file) return;
 
     setIsLoading(true);
+    setStatusMessage('Processing your file…');
     const reader = new FileReader();
 
     reader.onload = async (e) => {
@@ -78,6 +64,8 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           description: 'Could not read the file content.',
           variant: 'destructive',
         });
+        // The destructive toast is the report for this path.
+        setStatusMessage('');
         setIsLoading(false);
         return;
       }
@@ -152,25 +140,16 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           });
         }
 
+        const summary = summarizeImport(importedJokes.length, skippedRows);
         if (importedJokes.length > 0) {
-          await onImport(importedJokes); // Call the provided onImport function
-          toast({
-            title: skippedRows.length > 0 ? 'Import finished with skipped rows' : 'Import finished',
-            description:
-              skippedRows.length > 0
-                ? `${importedJokes.length} imported, ${skippedRows.length} skipped — ${describeSkippedRows(skippedRows)}.`
-                : `${importedJokes.length} joke(s) imported.`,
-          });
-        } else {
-           toast({
-            title: 'Nothing imported',
-            description:
-              skippedRows.length > 0
-                ? `No jokes imported — all ${skippedRows.length} row(s) were skipped: ${describeSkippedRows(skippedRows)}.`
-                : 'No valid jokes found in the CSV file to import.',
-            variant: 'default', // Or 'destructive' if considered an error
-          });
+          await onImport(importedJokes);
         }
+        setStatusMessage(`${summary.title}. ${summary.description}`);
+        toast({
+          title: summary.title,
+          description: summary.description,
+          variant: 'default',
+        });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PapaParse error objects have a dynamic shape.
       } catch (error: any) {
@@ -179,6 +158,8 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           description: error.message || 'Failed to parse or process the CSV file.',
           variant: 'destructive',
         });
+        // The destructive toast is the report for this path.
+        setStatusMessage('');
       } finally {
         setIsLoading(false);
         // Reset file input so the same file can be selected again if needed
@@ -194,6 +175,8 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         description: 'An error occurred while reading the file.',
         variant: 'destructive',
       });
+      // The destructive toast is the report for this path.
+      setStatusMessage('');
       setIsLoading(false);
        if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -244,7 +227,13 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
                 )}
              />
           </div>
-          {isLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Processing your file…</p>}
+          {/* Always in the DOM so it is a live region *before* the text
+              changes — a role="status" mounted with its message already in
+              it does not announce. `min-h` keeps the card from jumping as
+              the sentence appears. */}
+          <p role="status" className="mt-2 min-h-[1.25rem] text-center text-sm text-muted-foreground">
+            {statusMessage}
+          </p>
         </div>
       </CardContent>
     </Card>
