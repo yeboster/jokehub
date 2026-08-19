@@ -28,11 +28,7 @@ export function describeSkippedRows(skipped: SkippedRow[]): string {
 }
 
 export interface ImportSummary {
-  /**
-   * Toast title — sentence case, kept short (see `use-toast.ts`). The
-   * convention is three words or fewer; `Import finished with skipped rows`
-   * is the one exception, because the partial outcome needs the words.
-   */
+  /** Toast title — sentence case, three words or fewer (see `use-toast.ts`). */
   title: string;
   /** One sentence, ending in a period. */
   description: string;
@@ -47,7 +43,7 @@ export function summarizeImport(importedCount: number, skipped: SkippedRow[]): I
   if (importedCount > 0) {
     return skipped.length > 0
       ? {
-          title: 'Import finished with skipped rows',
+          title: 'Some rows skipped',
           description: `${importedCount} imported, ${skipped.length} skipped — ${describeSkippedRows(skipped)}.`,
         }
       : {

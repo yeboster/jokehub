@@ -63,7 +63,7 @@ describe('summarizeImport', () => {
 
   it('names both counts and the rows for a partial import', () => {
     expect(summarizeImport(8, rows(2, 3))).toEqual({
-      title: 'Import finished with skipped rows',
+      title: 'Some rows skipped',
       description: `8 imported, 2 skipped — rows 3, 4 (${MISSING}).`,
     });
   });
@@ -87,6 +87,18 @@ describe('summarizeImport', () => {
       title: 'Nothing imported',
       description: 'No valid jokes found in the CSV file to import.',
     });
+  });
+
+  it('keeps every title within the three-word toast convention', () => {
+    const titles = [
+      summarizeImport(3, []).title,
+      summarizeImport(3, [{ lineNumber: 4, reason: MISSING }]).title,
+      summarizeImport(0, [{ lineNumber: 4, reason: MISSING }]).title,
+      summarizeImport(0, []).title,
+    ];
+    for (const title of titles) {
+      expect(title.split(' ').length).toBeLessThanOrEqual(3);
+    }
   });
 
   it('ends every description with a period', () => {
