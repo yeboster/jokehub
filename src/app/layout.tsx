@@ -8,13 +8,20 @@ import RouteFocus from '@/components/RouteFocus';
 import { JokeProvider } from '@/contexts/JokeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/components/theme-provider';
+import { SITE_URL } from '@/lib/siteUrl';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
 });
 
+const SITE_DESCRIPTION = 'Collect, filter and rate jokes. Yours and everyone else’s.';
+
 export const metadata: Metadata = {
+  // Without this, every relative URL below stays relative and an unfurler has
+  // nothing to fetch — Next also warns about it during the build. It is the
+  // resolved deployment origin, so a preview build advertises the preview.
+  metadataBase: new URL(SITE_URL),
   title: {
     // Every route below sets its own title through this template. That is not
     // only 2.4.2: Next's App Router announcer speaks `document.title` on each
@@ -23,7 +30,26 @@ export const metadata: Metadata = {
     default: 'Joke Hub',
     template: '%s · Joke Hub',
   },
-  description: 'Manage and filter your jokes',
+  description: SITE_DESCRIPTION,
+  // Round 7 added a "Copy link" button whose entire purpose is pasting a joke
+  // URL into a chat window. Until now that pasted as bare text: the document
+  // carried no Open Graph tags whatsoever. These are site-level and inherited
+  // by every route; a per-joke card needs the joke text at request time, which
+  // is a data-layer change (see the deferrals in the round-8 plan).
+  openGraph: {
+    type: 'website',
+    siteName: 'Joke Hub',
+    title: 'Joke Hub',
+    description: SITE_DESCRIPTION,
+    url: '/',
+    images: [{ url: '/logo.png', width: 1395, height: 312, alt: 'Joke Hub' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Joke Hub',
+    description: SITE_DESCRIPTION,
+    images: ['/logo.png'],
+  },
   icons: {
     // Not `/logo.png`: a <link rel="icon"> is fetched raw, so the wordmark put
     // 209KB on every page load to render a 1395×312 image into a 16px square,
