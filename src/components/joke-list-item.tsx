@@ -3,12 +3,11 @@
 
 import type { FC } from 'react';
 import { format } from 'date-fns';
-import { CalendarDays } from 'lucide-react'; // Removed UserCircle
+import { CalendarDays, Check } from 'lucide-react';
 import Link from 'next/link';
 
 import type { Joke } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import StarRating from '@/components/StarRating';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -62,7 +61,11 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
         "shadow-sm transition-[box-shadow,border-color,transform] [transition-duration:200ms] [transition-timing-function:theme(transitionTimingFunction.standard)]",
         "hover:shadow-md hover:border-primary/40",
         "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.995]",
-        joke.used && isOwner ? "bg-muted/30" : "bg-card"
+        // The `bg-muted/30` tint that used to mark a used joke is gone: it
+        // composites to 1.03:1 against the card in light mode and 1.04:1 in
+        // dark, so it marked nothing. The footer badge below does the job, in
+        // text, for everyone.
+        "bg-card"
     )}>
       <Link href={`/joke/${joke.id}`}
             className="block flex-grow flex flex-col hover:bg-accent/20 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-t-lg">
@@ -106,40 +109,52 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
           </Badge>
         </CardContent>
       </Link>
-      <CardFooter className="p-4 border-t border-border/50 flex items-center justify-between">
-        {/* Left side: Date */}
-        <div className="flex items-center flex-nowrap text-xs text-muted-foreground">
-            <div className="flex items-center gap-1 flex-shrink-0">
-                <CalendarDays className="h-4 w-4 mr-1" />
-                {format(joke.dateAdded, 'PP')}
-            </div>
+      <CardFooter className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-border/50 p-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            <CalendarDays className="h-4 w-4" aria-hidden="true" />
+            {format(joke.dateAdded, 'PP')}
+          </span>
+          {/*
+            The feed's only cue that a joke has already been told, and the
+            reason the `usageStatus` filter exists. It was a `bg-muted/30` tint
+            on the card — 1.03:1 in light mode, 1.04:1 in dark, computed — so
+            for six rounds the flag was invisible on the feed and legible only
+            on the detail page. Owner-only, because `used` is the owner's own
+            bookkeeping and means nothing to anyone else.
+          */}
+          {joke.used && isOwner && (
+            <Badge variant="outline" className="gap-1 px-1.5 py-0 text-xs font-medium">
+              <Check className="h-3 w-3" aria-hidden="true" />
+              Used
+            </Badge>
+          )}
         </div>
 
-        {/* Right side: Average Rating */}
-        <div className="flex items-center gap-2">
-            {joke.ratingCount && joke.ratingCount > 0 ? (
-                <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1 cursor-default">
-                                <StarRating
-                                    rating={joke.averageRating || 0}
-                                    readOnly
-                                    size={14}
-                                    starClassName="text-primary"
-                                    label={`Average rating ${(joke.averageRating || 0).toFixed(1)} out of 5, from ${joke.ratingCount} rating${joke.ratingCount === 1 ? '' : 's'}`}
-                                />
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Average rating: {(joke.averageRating || 0).toFixed(1)} from {joke.ratingCount} rating{joke.ratingCount === 1 ? '' : 's'}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ) : (
-                <span className="text-xs text-muted-foreground italic">No ratings yet</span>
-            )}
-        </div>
+        {joke.ratingCount && joke.ratingCount > 0 ? (
+          <div className="flex items-center gap-1.5">
+            <StarRating
+              rating={joke.averageRating || 0}
+              readOnly
+              size={14}
+              starClassName="text-primary"
+              label={`Average rating ${(joke.averageRating || 0).toFixed(1)} out of 5, from ${joke.ratingCount} rating${joke.ratingCount === 1 ? '' : 's'}`}
+            />
+            {/*
+              The number and the count used to live in a `TooltipContent` whose
+              trigger was a non-focusable div: unreachable by keyboard,
+              unreachable by touch, and one `TooltipProvider` mounted per card
+              (twelve per page, two hundred in a paged-in collection). As text
+              they reach everyone. `aria-hidden` because `StarRating`'s label
+              above already says both values — this is the same fact for eyes.
+            */}
+            <span className="text-xs text-muted-foreground" aria-hidden="true">
+              {(joke.averageRating || 0).toFixed(1)} ({joke.ratingCount})
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs italic text-muted-foreground">No ratings yet</span>
+        )}
       </CardFooter>
     </Card>
   );

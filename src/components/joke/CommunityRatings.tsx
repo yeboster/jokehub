@@ -60,7 +60,10 @@ export default function CommunityRatings({
                                 <div className="flex items-center gap-2 mb-1">
                                   <StarRating rating={rating.stars} readOnly size={20} starClassName="text-primary" />
                                   <span className="text-sm font-medium text-foreground">
-                                    User {/* Replace with user identifier if available, e.g., rating.userDisplayName || 'A User' */}
+                                    {/* "A user", as on the detail page's byline. There is no
+                                        display-name field in the data model; the bare "User"
+                                        it replaces read as unfinished scaffolding. */}
+                                    A user
                                   </span>
                                   <span className="text-xs text-muted-foreground">- {format(rating.updatedAt, 'MMM d, yyyy')}</span>
                                 </div>
