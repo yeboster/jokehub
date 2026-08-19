@@ -186,7 +186,9 @@ export function activeFilterChips(filters: FilterParams): FilterChip[] {
   if (filters.filterFunnyRate !== DEFAULT_FILTERS.filterFunnyRate) {
     chips.push({
       key: 'funnyRate',
-      label: `Rating: ${getFunnyRateLabel(filters.filterFunnyRate)}`,
+      // "Own rating", not "Rating": this filters the author's own score, and
+      // the number on every card is the community average.
+      label: `Own rating: ${getFunnyRateLabel(filters.filterFunnyRate)}`,
       next: { ...filters, filterFunnyRate: DEFAULT_FILTERS.filterFunnyRate },
     });
   }

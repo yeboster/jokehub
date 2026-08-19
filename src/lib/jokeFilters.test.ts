@@ -324,9 +324,9 @@ describe('activeFilterChips', () => {
   });
 
   it('labels the rating chip with the shared rate label', () => {
-    expect(activeFilterChips(filters({ filterFunnyRate: 0 }))[0].label).toBe('Rating: Unrated');
-    expect(activeFilterChips(filters({ filterFunnyRate: 1 }))[0].label).toBe('Rating: 1 Star');
-    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Rating: 3 Stars');
+    expect(activeFilterChips(filters({ filterFunnyRate: 0 }))[0].label).toBe('Own rating: Unrated');
+    expect(activeFilterChips(filters({ filterFunnyRate: 1 }))[0].label).toBe('Own rating: 1 Star');
+    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Own rating: 3 Stars');
     expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].next.filterFunnyRate).toBe(-1);
   });
 

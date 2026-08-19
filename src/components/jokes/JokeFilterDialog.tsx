@@ -4,6 +4,7 @@ import { useMemo, useState, type Ref } from 'react';
 import { Check, ChevronsUpDown, Filter as FilterIcon, XIcon } from 'lucide-react';
 
 import type { FilterParams } from '@/services/jokeService';
+import { useAuth } from '@/contexts/AuthContext';
 import { useUserCategories } from '@/hooks/useUserCategories';
 import { hasActiveFilters } from '@/lib/jokeFilters';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +58,7 @@ interface JokeFilterDialogProps {
  */
 export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFilterDialogProps) {
   const { categoryNames, loadingCategories } = useUserCategories();
+  const { user } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState<FilterParams>(value);
@@ -119,6 +121,12 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4 pr-3">
+          {/* Only when there is something to choose. Signed out — and signed in
+              before the first joke — this rendered a permanently disabled
+              combobox reading "Select categories…" with "No categories
+              available." behind it: a control that could not do anything on
+              this page load, taking the top slot in the dialog. */}
+          {(loadingCategories || categoryNames.length > 0) && (
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="modal-category-filter" className="text-right pt-2">
               Categories
@@ -206,30 +214,45 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
               )}
             </div>
           </div>
+          )}
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="modal-funny-rate-filter" className="text-right">Rating</Label>
-            <Select
-              value={draft.filterFunnyRate.toString()}
-              onValueChange={(rate) =>
-                setDraft((prev) => ({ ...prev, filterFunnyRate: Number.parseInt(rate, 10) }))
-              }
-            >
-              <SelectTrigger id="modal-funny-rate-filter" className="col-span-3">
-                <SelectValue placeholder="Select rating" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="-1">Any Rating</SelectItem>
-                <SelectItem value="0">Unrated</SelectItem>
-                {[1, 2, 3, 4, 5].map((rate) => (
-                  <SelectItem key={rate} value={rate.toString()}>
-                    {rate} Star{rate > 1 ? 's' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="modal-funny-rate-filter" className="text-right pt-2">Own rating</Label>
+            <div className="col-span-3 space-y-1.5">
+              <Select
+                value={draft.filterFunnyRate.toString()}
+                onValueChange={(rate) =>
+                  setDraft((prev) => ({ ...prev, filterFunnyRate: Number.parseInt(rate, 10) }))
+                }
+              >
+                <SelectTrigger id="modal-funny-rate-filter">
+                  <SelectValue placeholder="Select rating" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="-1">Any Rating</SelectItem>
+                  <SelectItem value="0">Unrated</SelectItem>
+                  {[1, 2, 3, 4, 5].map((rate) => (
+                    <SelectItem key={rate} value={rate.toString()}>
+                      {rate} Star{rate > 1 ? 's' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* This filters `funnyRate` — the score the joke's own author gave
+                  it — not the community average shown on every card. Labelled
+                  "Rating", it read as a filter on the number the user was
+                  looking at, and returned nothing for every joke added through
+                  the app. */}
+              <p id="modal-funny-rate-hint" className="text-xs text-muted-foreground">
+                The score a joke&apos;s author gave it, not the community average.
+              </p>
+            </div>
           </div>
 
+          {/* `used` is the owner's own bookkeeping — whether they have told this
+              joke. A signed-out visitor filtering the public feed by it is
+              filtering strangers' private notes. */}
+          {user && (
           <div className="grid grid-cols-4 items-start gap-4">
             <Label className="text-right pt-2">Usage Status</Label>
             <RadioGroup
@@ -253,6 +276,7 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
               </div>
             </RadioGroup>
           </div>
+          )}
         </div>
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
