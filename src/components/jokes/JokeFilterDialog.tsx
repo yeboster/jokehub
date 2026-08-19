@@ -225,7 +225,7 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
                   setDraft((prev) => ({ ...prev, filterFunnyRate: Number.parseInt(rate, 10) }))
                 }
               >
-                <SelectTrigger id="modal-funny-rate-filter">
+                <SelectTrigger id="modal-funny-rate-filter" aria-describedby="modal-funny-rate-hint">
                   <SelectValue placeholder="Select rating" />
                 </SelectTrigger>
                 <SelectContent>
