@@ -26,7 +26,7 @@ vi.mock('firebase/firestore', () => ({
 import { buildJokesQuery } from '@/services/jokeService';
 
 /** The default page size baked into `jokeService`. */
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12;
 
 interface Constraint {
   type: string;

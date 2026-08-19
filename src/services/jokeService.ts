@@ -24,7 +24,13 @@ import { toDate, toMillis } from '@/lib/firestoreTimestamps';
 
 const JOKES_COLLECTION = 'jokes';
 const JOKE_RATINGS_COLLECTION = 'jokeRatings';
-const PAGE_SIZE = 10;
+/**
+ * One page of the feed. Twelve, not ten: the grid is 1/2/3/4 columns
+ * (`joke-list.tsx`), and ten leaves a ragged last row at every breakpoint above
+ * one (4+4+2, 3+3+3+1) while twelve divides evenly by all four. It also cuts a
+ * 200-joke collection from twenty "Load More" presses to seventeen.
+ */
+const PAGE_SIZE = 12;
 /** Firestore's hard limit on writes in a single batch. */
 const MAX_BATCH_WRITES = 500;
 /**

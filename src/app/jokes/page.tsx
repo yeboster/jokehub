@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
-import { describeFeedStatus, type FeedSnapshot } from '@/lib/feedAnnounce';
+import { describeFeedStatus, describeFeedTally, type FeedSnapshot } from '@/lib/feedAnnounce';
 import { describeEmptyFeed } from '@/lib/feedEmptyState';
 import { FEED_PATH, rememberFeedUrl } from '@/lib/feedReturn';
 import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters, nextChipFocusKey } from '@/lib/jokeFilters';
@@ -341,21 +341,31 @@ function JokesPageComponent() {
       <p role="status" className="sr-only">{feedStatus}</p>
 
       <div className="mt-8 text-center">
-        {/* Hidden while the list reloads: "load more" pages from the *new*
-            filters and would append onto the outgoing list. */}
-        {isReloadingResults ? null : hasMoreJokes ? (
-          <Button onClick={loadMoreFilteredJokes} disabled={loadingMoreJokes} variant="outline" size="lg">
-            {loadingMoreJokes ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : (
-              <ChevronDown className="mr-2 h-5 w-5" />
+        {/* The size of the result set, which the feed has never stated. It
+            replaces the old end-of-list sentence, which reported the absence of
+            further pages for the current filters — where what a user with a
+            large collection wants is how many they have. Hidden while the list
+            reloads: it would be describing the outgoing set. */}
+        {isReloadingResults ? null : (
+          <>
+            {jokesToDisplay.length > 0 && (
+              <p className="mb-3 text-sm text-muted-foreground">
+                {describeFeedTally(jokesToDisplay.length, hasMoreJokes)}
+              </p>
             )}
-            {loadingMoreJokes ? 'Loading…' : 'Load More Jokes'}
-          </Button>
-        ) : (
-          jokesToDisplay.length > 0 && (
-            <p className="text-muted-foreground">No more jokes to load for the current filters.</p>
-          )
+            {/* Hidden while the list reloads: "load more" pages from the *new*
+                filters and would append onto the outgoing list. */}
+            {hasMoreJokes && (
+              <Button onClick={loadMoreFilteredJokes} disabled={loadingMoreJokes} variant="outline" size="lg">
+                {loadingMoreJokes ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <ChevronDown className="mr-2 h-5 w-5" />
+                )}
+                {loadingMoreJokes ? 'Loading…' : 'Load More Jokes'}
+              </Button>
+            )}
+          </>
         )}
       </div>
     </div>

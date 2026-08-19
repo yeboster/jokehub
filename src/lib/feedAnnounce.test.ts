@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   describeFeedAppend,
   describeFeedStatus,
+  describeFeedTally,
   type FeedCountSnapshot,
   type FeedSnapshot,
 } from '@/lib/feedAnnounce';
@@ -129,5 +130,32 @@ describe('describeFeedStatus', () => {
     for (const [previous, next] of transitions) {
       expect(describeFeedStatus(previous, next, EMPTY_TITLE)).not.toBe('');
     }
+  });
+});
+
+describe('describeFeedTally', () => {
+  it('says nothing for an empty result set, which the empty state already covers', () => {
+    expect(describeFeedTally(0, true)).toBe('');
+    expect(describeFeedTally(0, false)).toBe('');
+  });
+
+  it('says nothing for a count below zero, which cannot be shown', () => {
+    expect(describeFeedTally(-1, false)).toBe('');
+  });
+
+  it('says "joke" in the singular for a complete set of one', () => {
+    expect(describeFeedTally(1, false)).toBe('Showing all 1 joke.');
+  });
+
+  it('says "joke" in the singular for a first page of one', () => {
+    expect(describeFeedTally(1, true)).toBe('Showing 1 joke so far.');
+  });
+
+  it('reports the running total while more pages exist', () => {
+    expect(describeFeedTally(24, true)).toBe('Showing 24 jokes so far.');
+  });
+
+  it('reports the whole set once it is exhausted', () => {
+    expect(describeFeedTally(24, false)).toBe('Showing all 24 jokes.');
   });
 });

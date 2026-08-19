@@ -74,3 +74,18 @@ export function describeFeedStatus(
 
   return append || `${next.count} joke${next.count === 1 ? '' : 's'} shown.`;
 }
+
+/**
+ * The visible tally under the feed: `Showing 24 jokes so far.` while more
+ * pages exist, `Showing all 24 jokes.` once the set is exhausted.
+ *
+ * It replaces "No more jokes to load for the current filters.", which reported
+ * the absence of more jokes and never the size of what was there — the one
+ * number a user with a large collection actually wants. `''` for an empty set:
+ * the empty state is already saying everything there is to say.
+ */
+export function describeFeedTally(count: number, hasMore: boolean): string {
+  if (count <= 0) return '';
+  const jokes = `${count} joke${count === 1 ? '' : 's'}`;
+  return hasMore ? `Showing ${jokes} so far.` : `Showing all ${jokes}.`;
+}
