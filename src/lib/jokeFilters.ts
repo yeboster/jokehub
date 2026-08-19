@@ -20,6 +20,7 @@ const USAGE_STATUSES: ReadonlyArray<FilterParams['usageStatus']> = ['all', 'used
 /** Read surface shared by `URLSearchParams` and Next's `ReadonlyURLSearchParams`. */
 interface ReadableSearchParams {
   get(name: string): string | null;
+  getAll(name: string): string[];
 }
 
 /**
@@ -29,17 +30,24 @@ interface ReadableSearchParams {
  * user — that is auth state, not URL state (see `useJokeFilters`).
  */
 export function parseFiltersFromParams(params: ReadableSearchParams): FilterParams {
-  // Known limitation (accepted, see context/PROJECT_PROGRESS.md): categories
-  // round-trip through a single comma-separated param, so a category name that
-  // itself contains a comma parses back as two names and is then dropped as
-  // unknown. Fixing it means repeated `categories` params on both sides.
-  const rawCategories = params.get('categories');
-  const selectedCategories = rawCategories
-    ? rawCategories
-        .split(',')
-        .map((category) => category.trim())
-        .filter((category) => category !== '')
-    : [...DEFAULT_FILTERS.selectedCategories];
+  // One repeated `categories` param per category, not one comma-joined value.
+  // The old form could not represent a category whose own name contains a
+  // comma — `Dad, jokes` parsed back as two names, both unknown, and the filter
+  // was silently dropped. Trimmed and de-duplicated here so a hand-edited URL
+  // cannot produce a chip row with the same category twice.
+  //
+  // Accepted casualty, stated: a bookmarked URL in the old comma form now
+  // resolves to a single category literally named `A,B`, which matches nothing.
+  // Multi-category links were the only ones affected, and a link carrying a
+  // comma-containing name was already broken — that is the bug being fixed.
+  const rawCategories = params.getAll('categories');
+  const selectedCategories: string[] = [];
+  for (const raw of rawCategories) {
+    const category = raw.trim();
+    if (category !== '' && !selectedCategories.includes(category)) {
+      selectedCategories.push(category);
+    }
+  }
 
   const rawFunnyRate = params.get('funnyRate');
   let filterFunnyRate = DEFAULT_FILTERS.filterFunnyRate;
@@ -75,8 +83,11 @@ export function filtersToSearchParams(filters: FilterParams): URLSearchParams {
     params.set('scope', filters.scope);
   }
   if (filters.selectedCategories.length > 0) {
-    // See the comma limitation noted on `parseFiltersFromParams`.
-    params.set('categories', filters.selectedCategories.join(','));
+    // One param per category — see `parseFiltersFromParams`. `append`, not
+    // `set`: `set` replaces the previous value of the same key.
+    for (const category of filters.selectedCategories) {
+      params.append('categories', category);
+    }
   }
   if (filters.filterFunnyRate !== DEFAULT_FILTERS.filterFunnyRate) {
     params.set('funnyRate', filters.filterFunnyRate.toString());

@@ -32,7 +32,9 @@ describe('parseFiltersFromParams', () => {
   });
 
   it('reads every field from a fully populated query string', () => {
-    expect(parse('scope=user&categories=Puns,Dad%20Jokes&funnyRate=4&usageStatus=used&search=spaghetti')).toEqual({
+    expect(
+      parse('scope=user&categories=Puns&categories=Dad%20Jokes&funnyRate=4&usageStatus=used&search=spaghetti')
+    ).toEqual({
       scope: 'user',
       selectedCategories: ['Puns', 'Dad Jokes'],
       filterFunnyRate: 4,
@@ -41,12 +43,31 @@ describe('parseFiltersFromParams', () => {
     });
   });
 
-  it('splits categories on commas and drops blank entries', () => {
-    expect(parse('categories=Puns,,%20Wordplay%20,').selectedCategories).toEqual(['Puns', 'Wordplay']);
+  it('reads one repeated param per category, in the order they appear', () => {
+    expect(parse('categories=Puns&categories=Dad').selectedCategories).toEqual(['Puns', 'Dad']);
+  });
+
+  it('trims whitespace around a repeated value', () => {
+    expect(parse('categories=%20Puns%20&categories=%09Dad%20Jokes').selectedCategories).toEqual([
+      'Puns',
+      'Dad Jokes',
+    ]);
+  });
+
+  it('drops an empty repeated value rather than filtering by nothing', () => {
+    expect(parse('categories=&categories=Puns').selectedCategories).toEqual(['Puns']);
+  });
+
+  it('de-duplicates a hand-edited URL, so the chip row cannot show one category twice', () => {
+    expect(parse('categories=Puns&categories=Puns').selectedCategories).toEqual(['Puns']);
   });
 
   it('falls back to no categories when the parameter is empty', () => {
     expect(parse('categories=').selectedCategories).toEqual([]);
+  });
+
+  it('keeps a comma inside a category name, which the old joined form split in two', () => {
+    expect(parse('categories=Dad%2C+jokes').selectedCategories).toEqual(['Dad, jokes']);
   });
 
   it('falls back to the public scope for anything but scope=user', () => {
@@ -93,10 +114,17 @@ describe('filtersToSearchParams', () => {
       })
     );
     expect(params.get('scope')).toBe('user');
-    expect(params.get('categories')).toBe('Puns,Dad Jokes');
+    expect(params.getAll('categories')).toEqual(['Puns', 'Dad Jokes']);
     expect(params.get('funnyRate')).toBe('3');
     expect(params.get('usageStatus')).toBe('unused');
     expect(params.get('search')).toBe('cheese');
+  });
+
+  it('emits one categories param per category, and none at all for none', () => {
+    expect(filtersToSearchParams(filters({ selectedCategories: ['Puns', 'Dad'] })).toString()).toBe(
+      'categories=Puns&categories=Dad'
+    );
+    expect(filtersToSearchParams(filters({ selectedCategories: [] })).has('categories')).toBe(false);
   });
 
   it('serializes the 0 ("Unrated") funny rate rather than treating it as absent', () => {
@@ -112,6 +140,24 @@ describe('filtersToSearchParams', () => {
       search: 'spaghetti',
     });
     expect(parseFiltersFromParams(filtersToSearchParams(original))).toEqual(original);
+  });
+
+  /** Serialize, go through the query string as a browser would, and parse back. */
+  function roundTripCategories(selectedCategories: string[]): string[] {
+    const query = filtersToSearchParams(filters({ selectedCategories })).toString();
+    return parseFiltersFromParams(new URLSearchParams(query)).selectedCategories;
+  }
+
+  it('round-trips a category name containing a comma', () => {
+    expect(roundTripCategories(['Dad, jokes'])).toEqual(['Dad, jokes']);
+  });
+
+  it('round-trips a category name containing an ampersand', () => {
+    expect(roundTripCategories(['Cats & dogs'])).toEqual(['Cats & dogs']);
+  });
+
+  it('round-trips category names containing spaces, alongside a comma-bearing one', () => {
+    expect(roundTripCategories(['Dad Jokes', 'Dad, jokes'])).toEqual(['Dad Jokes', 'Dad, jokes']);
   });
 
   it('round-trips the defaults', () => {
