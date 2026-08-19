@@ -11,6 +11,7 @@ import { ratingDocId } from '@/services/ratingService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import BackToFeedButton from '@/components/joke/BackToFeedButton';
+import CopyLinkButton from '@/components/joke/CopyLinkButton';
 import JokeHeader from '@/components/joke/JokeHeader';
 import ExplanationCard from '@/components/joke/ExplanationCard';
 import RatingForm from '@/components/joke/RatingForm';
@@ -337,8 +338,9 @@ export default function JokeShowPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 max-w-3xl">
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <BackToFeedButton />
+        <CopyLinkButton jokeId={joke.id} />
       </div>
 
       {/* Joke Display Area */}
