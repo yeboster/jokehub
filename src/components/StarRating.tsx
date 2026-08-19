@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type FC } from 'react';
+import { useRef, useState, type FC } from 'react';
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ratingFromKey, tabbableStarIndex } from '@/lib/starRating';
 import { Button } from '@/components/ui/button';
 
 interface StarRatingProps {
@@ -14,6 +15,15 @@ interface StarRatingProps {
   starClassName?: string;
   disabled?: boolean;
   readOnly?: boolean;
+  /** Accessible name. Required in practice for the interactive widget — the
+   *  group is otherwise "radio group" with no subject. Overrides the computed
+   *  label in read-only mode too, for callers that know more than the value
+   *  (the joke cards, which also know the rating count). */
+  label?: string;
+  /** Id of an element describing the widget, e.g. the "choose a star" hint.
+   *  Pass `undefined` when that element is not rendered — a dangling idref is
+   *  announced as nothing. */
+  describedBy?: string;
 }
 
 interface StarGlyphProps {
@@ -54,6 +64,8 @@ const StarRating: FC<StarRatingProps> = ({
   starClassName = 'text-primary',
   disabled = false,
   readOnly = false,
+  label,
+  describedBy,
 }) => {
   // The value under the cursor or keyboard focus, or `null` for "no preview,
   // show the committed rating". Held unconditionally — hooks cannot sit below
@@ -61,6 +73,8 @@ const StarRating: FC<StarRatingProps> = ({
   const [hoverRating, setHoverRating] = useState<number | null>(null);
 
   const isInteractive = !readOnly && !disabled;
+
+  const starRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const handleStarClick = (index: number) => {
     if (!readOnly && onRatingChange && !disabled) {
@@ -93,7 +107,7 @@ const StarRating: FC<StarRatingProps> = ({
     return (
       <div
         role="img"
-        aria-label={`${displayRating} out of ${maxStars} stars`}
+        aria-label={label ?? `${displayRating} out of ${maxStars} stars`}
         className={cn('flex items-center space-x-0.5', className)}
       >
         {fillPercents.map((fillPercent, i) => (
@@ -103,15 +117,43 @@ const StarRating: FC<StarRatingProps> = ({
     );
   }
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const next = ratingFromKey(event.key, rating, maxStars);
+    if (next === null) return;
+    // Arrow keys otherwise scroll the page out from under the widget.
+    event.preventDefault();
+    if (!isInteractive) return;
+    onRatingChange?.(next);
+    // The preview follows focus, and focus is about to move; clearing it here
+    // stops the outgoing star's preview painting for one frame.
+    setHoverRating(null);
+    starRefs.current[next - 1]?.focus();
+  };
+
+  const tabbableIndex = tabbableStarIndex(rating, maxStars);
+
   return (
+    // One control, not five: five buttons meant five tab stops and no announced
+    // value — nothing said what the rating was, or that it had changed. A radio
+    // group is one tab stop, arrow keys, and a checked state per option.
     <div
+      role="radiogroup"
+      aria-label={label ?? 'Rating'}
+      aria-describedby={describedBy}
       className={cn('flex items-center space-x-0.5', className)}
       onMouseLeave={() => previewStar(null)}
     >
       {fillPercents.map((fillPercent, i) => (
         <Button
           key={i}
+          ref={(node) => { starRefs.current[i] = node; }}
           type="button" // ensure it does not submit forms if nested
+          role="radio"
+          aria-checked={rating === i + 1}
+          // Roving tabindex: the group is one stop, and Tab out of it goes to
+          // the next control rather than to the next star.
+          tabIndex={i === tabbableIndex ? 0 : -1}
+          onKeyDown={handleKeyDown}
           variant="ghost"
           size="icon"
           className={cn(
@@ -132,7 +174,9 @@ const StarRating: FC<StarRatingProps> = ({
           onFocus={() => previewStar(i + 1)}
           onBlur={() => previewStar(null)}
           disabled={disabled}
-          aria-label={`Set rating to ${i + 1} stars`}
+          // The group's label carries the verb; each option is just its value,
+          // announced as "3 stars, radio button, 3 of 5, not checked".
+          aria-label={`${i + 1} star${i === 0 ? '' : 's'}`}
         >
           <StarGlyph fillPercent={fillPercent} size={size} starClassName={starClassName} />
         </Button>

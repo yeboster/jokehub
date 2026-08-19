@@ -99,6 +99,7 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
                                     readOnly
                                     size={14}
                                     starClassName="text-primary"
+                                    label={`Average rating ${(joke.averageRating || 0).toFixed(1)} out of 5, from ${joke.ratingCount} rating${joke.ratingCount === 1 ? '' : 's'}`}
                                 />
                             </div>
                         </TooltipTrigger>

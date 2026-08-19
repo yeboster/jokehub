@@ -61,8 +61,16 @@ export default function RatingForm({
                   disabled={isSubmittingRating}
                   starClassName="text-primary" // Mockup uses yellow/orange, we use primary for consistency
                   className="mb-1"
+                  label="Your rating for this joke"
+                  // Only while the hint is on the page: a dangling idref is
+                  // announced as nothing.
+                  describedBy={ratingInputValue === 0 ? 'rating-input-hint' : undefined}
                 />
-                 {ratingInputValue === 0 && <p className="text-xs text-muted-foreground">Click a star to rate.</p>}
+                 {ratingInputValue === 0 && (
+                   <p id="rating-input-hint" className="text-xs text-muted-foreground">
+                     Choose a star to rate, or use the arrow keys.
+                   </p>
+                 )}
               </div>
               <div>
                 <Label htmlFor="user-rating-comment" className="block text-sm font-medium text-foreground mb-1">Add a comment (optional)</Label>
