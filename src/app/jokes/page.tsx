@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Loader2, PlusCircle, RotateCcw, Search, X as XIcon } from 'lucide-react';
 
@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
+import { describeFeedAppend, type FeedCountSnapshot } from '@/lib/feedAnnounce';
 import { describeEmptyFeed } from '@/lib/feedEmptyState';
 import { FEED_PATH, rememberFeedUrl } from '@/lib/feedReturn';
 import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters } from '@/lib/jokeFilters';
@@ -123,6 +124,25 @@ function JokesPageComponent() {
   // set. Skeletons until the held list is the one this page asked for.
   const isReloadingResults =
     loadingInitialJokes || loadedFilters === null || !filtersEqual(loadedFilters, filters);
+
+  // The feed's own serialization, so the key is exactly the one the URL would
+  // carry — the same string `rememberFeedUrl` records above.
+  const feedKey = useMemo(() => filtersToSearchParams(filters).toString(), [filters]);
+  const [appendNotice, setAppendNotice] = useState('');
+  const feedSnapshotRef = useRef<FeedCountSnapshot | null>(null);
+
+  useEffect(() => {
+    // Skeletons are up: the list on screen is not an answer yet, and comparing
+    // against it would announce the outgoing page's count.
+    if (isReloadingResults) return;
+    const next: FeedCountSnapshot = { key: feedKey, count: jokesToDisplay.length };
+    const notice = describeFeedAppend(feedSnapshotRef.current, next);
+    feedSnapshotRef.current = next;
+    // State set from an effect, deliberately: the announcement is derived from
+    // a *transition* between two committed renders, which is not expressible
+    // during render; the ref holds the previous side of it.
+    if (notice) setAppendNotice(notice);
+  }, [feedKey, jokesToDisplay.length, isReloadingResults]);
 
   if (authLoading) {
     return <PageLoading label="Loading jokes…" />;
@@ -258,6 +278,14 @@ function JokesPageComponent() {
           onRetry={() => loadJokesWithFilters(filters)}
         />
       )}
+
+      {/*
+        Polite and visually hidden. Not `aria-live` on the grid: that would read
+        ten whole joke cards aloud. Not a focus move either — the button the
+        user pressed is where they want to stay, and jumping them ten cards up
+        would undo the reason they pressed it.
+      */}
+      <p role="status" className="sr-only">{appendNotice}</p>
 
       <div className="mt-8 text-center">
         {/* Hidden while the list reloads: "load more" pages from the *new*
