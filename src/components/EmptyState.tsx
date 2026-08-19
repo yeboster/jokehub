@@ -38,11 +38,12 @@ const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, clas
   const TitleTag = titleAs as ElementType;
 
   return (
-    // `role="status"` because every call site swaps this block in for content
-    // that was, or was about to be, there: an empty result set is a result and
-    // has to be announced. The role is on the wrapper so the headline and the
-    // hint are read as one message; the render is unchanged.
-    <div role="status" className={cn('text-center', isSmall ? 'py-6' : 'py-12', className)}>
+    // No status role here: this block mounts with its headline already inside
+    // it, and a live region only announces text that changes *after* it is in
+    // the DOM (round 6). It claimed to announce an empty result for two rounds
+    // and never did. Announcing is the page's job — `/jokes` has a permanently
+    // mounted region that speaks this exact `title`.
+    <div className={cn('text-center', isSmall ? 'py-6' : 'py-12', className)}>
       <div
         className={cn(
           // The disc is a pale purple tint on a white card in light mode

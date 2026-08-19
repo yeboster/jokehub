@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import { useJokeFilters } from '@/hooks/useJokeFilters';
 import type { FilterParams } from '@/services/jokeService';
-import { describeFeedAppend, type FeedCountSnapshot } from '@/lib/feedAnnounce';
+import { describeFeedStatus, type FeedSnapshot } from '@/lib/feedAnnounce';
 import { describeEmptyFeed } from '@/lib/feedEmptyState';
 import { FEED_PATH, rememberFeedUrl } from '@/lib/feedReturn';
 import { activeFilterChips, filtersEqual, filtersToSearchParams, hasActiveFilters, nextChipFocusKey } from '@/lib/jokeFilters';
@@ -30,14 +30,10 @@ const SKELETON_CARD_COUNT = 8;
  */
 function JokeGridSkeleton() {
   return (
-    // ARIA has no author-supplied name for a role-less <div> (role=generic), so
-    // the announcement rides on role="status" plus visually hidden text.
-    <div
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-6"
-      role="status"
-      aria-busy="true"
-    >
-      <span className="sr-only">Loading jokes…</span>
+    // No status role and no `aria-busy` here: this element mounts with its
+    // message already inside it, which does not announce (round 6). The page's
+    // permanently mounted status region says "Loading jokes…" instead.
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-6">
       {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
         // The card chrome here mirrors `JokeListItem` exactly so the swap from
         // skeleton to content does not shift anything. The shimmer lives on
@@ -125,29 +121,40 @@ function JokesPageComponent() {
   const isReloadingResults =
     loadingInitialJokes || loadedFilters === null || !filtersEqual(loadedFilters, filters);
 
+  // Hoisted out of the `JokeList` prop: the status region below announces this
+  // same sentence when the result is empty, and two copies of it would drift.
+  const emptyCopy = useMemo(
+    () =>
+      describeEmptyFeed({
+        search: filters.search,
+        hasMoreJokes,
+        hasActiveFilters: hasActiveFilters(filters),
+        error: jokesError,
+      }),
+    [filters, hasMoreJokes, jokesError]
+  );
+
   // The feed's own serialization, so the key is exactly the one the URL would
   // carry — the same string `rememberFeedUrl` records above.
   const feedKey = useMemo(() => filtersToSearchParams(filters).toString(), [filters]);
-  const [appendNotice, setAppendNotice] = useState('');
-  const feedSnapshotRef = useRef<FeedCountSnapshot | null>(null);
+  const [feedStatus, setFeedStatus] = useState('');
+  const feedSnapshotRef = useRef<FeedSnapshot | null>(null);
 
   useEffect(() => {
-    // Skeletons are up: the list on screen is not an answer yet, and comparing
-    // against it would announce the outgoing page's count.
-    if (isReloadingResults) return;
-    const next: FeedCountSnapshot = { key: feedKey, count: jokesToDisplay.length };
-    const notice = describeFeedAppend(feedSnapshotRef.current, next);
-    feedSnapshotRef.current = next;
+    // Skeletons are up. The snapshot ref is deliberately NOT advanced here: the
+    // next result has to be compared against the last real one, or an append
+    // would look like a fresh result set.
+    if (isReloadingResults) {
+      setFeedStatus(describeFeedStatus(feedSnapshotRef.current, { key: feedKey, count: null }, emptyCopy.title));
+      return;
+    }
+    const next: FeedSnapshot = { key: feedKey, count: jokesToDisplay.length };
     // State set from an effect, deliberately: the announcement is derived from
     // a *transition* between two committed renders, which is not expressible
     // during render; the ref holds the previous side of it.
-    //
-    // Set unconditionally, including the empty string: a filter change has no
-    // append to announce, and it must clear the region. If the previous
-    // sentence stayed, the next append with the same wording would not be a
-    // text change and no screen reader would announce it again.
-    setAppendNotice(notice);
-  }, [feedKey, jokesToDisplay.length, isReloadingResults]);
+    setFeedStatus(describeFeedStatus(feedSnapshotRef.current, next, emptyCopy.title));
+    feedSnapshotRef.current = next;
+  }, [feedKey, jokesToDisplay.length, isReloadingResults, emptyCopy.title]);
 
   // Hoisted out of the JSX: the click handler needs the list as it stands
   // *before* the removal to work out which chip takes the removed one's place.
@@ -311,12 +318,7 @@ function JokesPageComponent() {
       ) : (
         <JokeList
           jokes={jokesToDisplay}
-          emptyCopy={describeEmptyFeed({
-            search: filters.search,
-            hasMoreJokes,
-            hasActiveFilters: hasActiveFilters(filters),
-            error: jokesError,
-          })}
+          emptyCopy={emptyCopy}
           onClearFilters={clearFilters}
           // The page's fetch effect is guarded by value against `filters`, so
           // it will not re-fire on its own — a retry has to ask directly.
@@ -325,12 +327,18 @@ function JokesPageComponent() {
       )}
 
       {/*
+        The feed's one live region: loading, the size of a result set, an
+        append, or the empty-state sentence. Permanently mounted and only its
+        text changes — a status region that mounts *with* its message does not
+        announce, which is why `EmptyState` and the skeleton grid no longer
+        pretend to be live regions and this does the work for all of them.
+
         Polite and visually hidden. Not `aria-live` on the grid: that would read
         ten whole joke cards aloud. Not a focus move either — the button the
         user pressed is where they want to stay, and jumping them ten cards up
         would undo the reason they pressed it.
       */}
-      <p role="status" className="sr-only">{appendNotice}</p>
+      <p role="status" className="sr-only">{feedStatus}</p>
 
       <div className="mt-8 text-center">
         {/* Hidden while the list reloads: "load more" pages from the *new*

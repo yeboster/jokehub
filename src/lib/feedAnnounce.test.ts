@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-import { describeFeedAppend, type FeedCountSnapshot } from '@/lib/feedAnnounce';
+import {
+  describeFeedAppend,
+  describeFeedStatus,
+  type FeedCountSnapshot,
+  type FeedSnapshot,
+} from '@/lib/feedAnnounce';
 
 /** A snapshot of `count` jokes answering the filter set `key`. */
 function snapshot(count: number, key = 'scope=user'): FeedCountSnapshot {
@@ -54,5 +59,75 @@ describe('describeFeedAppend', () => {
     expect(describeFeedAppend(snapshot(8, ''), snapshot(16, ''))).toBe(
       '8 more jokes loaded. 16 now showing.'
     );
+  });
+});
+
+/** A reading of `count` jokes — or a fetch in flight — for the filter set `key`. */
+function reading(count: number | null, key = 'scope=user'): FeedSnapshot {
+  return { key, count };
+}
+
+/** What the empty state on screen says, which the region has to repeat verbatim. */
+const EMPTY_TITLE = 'No jokes matched “penguin”.';
+
+describe('describeFeedStatus', () => {
+  it('reports the fetch while a count is unknown, with no previous reading', () => {
+    expect(describeFeedStatus(null, reading(null), EMPTY_TITLE)).toBe('Loading jokes…');
+  });
+
+  it('reports the fetch while a count is unknown, over a previous result set', () => {
+    expect(describeFeedStatus(reading(20), reading(null), EMPTY_TITLE)).toBe('Loading jokes…');
+  });
+
+  it('says exactly what the empty state says, so the two cannot contradict each other', () => {
+    expect(describeFeedStatus(null, reading(0), EMPTY_TITLE)).toBe(EMPTY_TITLE);
+    expect(describeFeedStatus(reading(12), reading(0), EMPTY_TITLE)).toBe(EMPTY_TITLE);
+  });
+
+  it('states the size of a first result set', () => {
+    expect(describeFeedStatus(null, reading(12), EMPTY_TITLE)).toBe('12 jokes shown.');
+  });
+
+  it('says "joke" in the singular for a result set of one', () => {
+    expect(describeFeedStatus(null, reading(1), EMPTY_TITLE)).toBe('1 joke shown.');
+  });
+
+  it('delegates an append on the same filter set to describeFeedAppend', () => {
+    expect(describeFeedStatus(reading(10), reading(20), EMPTY_TITLE)).toBe(
+      '10 more jokes loaded. 20 now showing.'
+    );
+  });
+
+  it('states the size, not an append, when the filter set changed', () => {
+    expect(describeFeedStatus(reading(10, 'scope=user'), reading(20, 'search=cat'), EMPTY_TITLE)).toBe(
+      '20 jokes shown.'
+    );
+  });
+
+  it('states the size when the previous reading was a fetch in flight', () => {
+    expect(describeFeedStatus(reading(null), reading(12), EMPTY_TITLE)).toBe('12 jokes shown.');
+  });
+
+  it('states the size when the count shrank on the same filter set', () => {
+    expect(describeFeedStatus(reading(20), reading(5), EMPTY_TITLE)).toBe('5 jokes shown.');
+  });
+
+  it('never returns an empty string, which the region could not announce', () => {
+    const transitions: Array<[FeedSnapshot | null, FeedSnapshot]> = [
+      [null, reading(null)],
+      [reading(20), reading(null)],
+      [null, reading(0)],
+      [reading(12), reading(0)],
+      [null, reading(1)],
+      [null, reading(12)],
+      [reading(10), reading(20)],
+      [reading(10, 'scope=user'), reading(20, 'search=cat')],
+      [reading(null), reading(12)],
+      [reading(20), reading(5)],
+      [reading(12), reading(12)],
+    ];
+    for (const [previous, next] of transitions) {
+      expect(describeFeedStatus(previous, next, EMPTY_TITLE)).not.toBe('');
+    }
   });
 });

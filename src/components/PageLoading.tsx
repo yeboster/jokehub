@@ -26,9 +26,10 @@ interface PageLoadingProps {
  * a hung request.
  */
 const PageLoading: FC<PageLoadingProps> = ({ label, inline = false, className }) => (
-  // `role="status"` with the label as its only content: the announcement is
-  // the label, and it fires when this mounts and again when it unmounts to
-  // whatever replaced it.
+  // `role="status"` with the label as its only content. Note this does not
+  // announce — a live region mounted with its text never does (round 6) — and
+  // that is accepted here: this block appears on a navigation, which the
+  // per-route titles already announce through Next's route announcer.
   <div
     role="status"
     className={cn(
