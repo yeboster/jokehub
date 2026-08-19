@@ -44,6 +44,21 @@ export default function ExplanationCard({
         </div>
       </CardHeader>
       <CardContent>
+        {/*
+          The explanation streams in chunk by chunk; making the paragraph itself
+          a live region would announce it a few words at a time. This announces
+          the two transitions instead. Its initial content is not announced —
+          a live region only speaks changes made after it is in the DOM — so a
+          joke that already has a stored explanation is silent on load, which is
+          correct.
+        */}
+        <p role="status" className="sr-only">
+          {isExplanationLoading
+            ? 'Writing the explanation…'
+            : hasExplanation
+              ? 'The explanation is ready.'
+              : ''}
+        </p>
         {isExplanationLoading && !hasExplanation ? (
           <div className="flex items-center text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

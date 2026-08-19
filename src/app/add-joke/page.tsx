@@ -308,6 +308,7 @@ export default function AddJokePage() {
                         {isGeneratingJoke && (
                             <motion.div
                                 key="loading"
+                                role="status"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}

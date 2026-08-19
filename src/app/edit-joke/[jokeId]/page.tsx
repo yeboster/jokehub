@@ -292,7 +292,7 @@ export default function EditJokePage() {
                         <Trash2 className="mr-2 h-4 w-4" /> Delete Joke
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent aria-busy={isDeleting}>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete this joke?</AlertDialogTitle>
                       <AlertDialogDescription>
@@ -317,6 +317,12 @@ export default function EditJokePage() {
                          {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                          {isDeleting ? 'Deleting…' : 'Delete joke'}
                       </AlertDialogAction>
+                      {/* The action button's label changes to "Deleting…"
+                          while it holds focus, and a label change on the
+                          focused element is not reliably announced. This is. */}
+                      <p role="status" className="sr-only">
+                        {isDeleting ? 'Deleting the joke…' : ''}
+                      </p>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
