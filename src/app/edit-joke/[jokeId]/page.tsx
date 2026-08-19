@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { CategoryCombobox } from '@/components/CategoryCombobox';
+import StarRating from '@/components/StarRating';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,11 @@ const editJokeFormSchema = z.object({
   text: z.string().min(1, 'Joke text cannot be empty.'),
   category: z.string().trim().min(1, 'Category cannot be empty. Type a new one or select from suggestions.'),
   source: z.string().optional(),
+  // Mirrors the `funnyRate >= 0 && funnyRate <= 5` create rule in
+  // `firestore.rules`. 0 means unrated, which is also the value every joke
+  // added through the app has carried until now — the field was filterable from
+  // the moment it existed and settable from no screen in the app.
+  funnyRate: z.number().min(0).max(5).default(0),
   used: z.boolean().optional().default(false),
 });
 
@@ -59,7 +65,7 @@ export default function EditJokePage() {
 
   const form = useForm<EditJokeFormValues>({
     resolver: zodResolver(editJokeFormSchema),
-    defaultValues: { text: '', category: '', source: '', used: false },
+    defaultValues: { text: '', category: '', source: '', funnyRate: 0, used: false },
   });
 
   useEffect(() => {
@@ -84,6 +90,7 @@ export default function EditJokePage() {
               text: fetchedJoke.text,
               category: fetchedJoke.category,
               source: fetchedJoke.source || '',
+              funnyRate: fetchedJoke.funnyRate ?? 0,
               used: fetchedJoke.used,
             });
           }
@@ -115,7 +122,13 @@ export default function EditJokePage() {
         return;
     }
 
-     if (data.text === joke.text && data.category === joke.category && data.source === joke.source && data.used === joke.used) {
+     if (
+       data.text === joke.text &&
+       data.category === joke.category &&
+       data.source === joke.source &&
+       data.funnyRate === (joke.funnyRate ?? 0) &&
+       data.used === joke.used
+     ) {
          toast({ title: 'Nothing to save', description: "You haven't changed anything." });
          router.push('/jokes');
          return;
@@ -240,6 +253,50 @@ export default function EditJokePage() {
                   <FormControl>
                     <Input placeholder="e.g., A friend, a book" {...field} disabled={isFormDisabled} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="funnyRate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Your own rating (Optional)</FormLabel>
+                  <FormDescription>
+                    Your score for this joke. It is what the &quot;Own rating&quot; filter on the
+                    feed searches — not the community average.
+                  </FormDescription>
+                  <FormControl>
+                    {/* The same widget the community rating uses: one radio
+                        group, one tab stop, arrow keys (round 6, Task 14).
+                        `size={28}` matches `RatingForm`, so the two rating
+                        controls in the app are the same size and shape. */}
+                    <StarRating
+                      rating={field.value}
+                      onRatingChange={field.onChange}
+                      maxStars={5}
+                      size={28}
+                      disabled={isFormDisabled}
+                      starClassName="text-primary"
+                      label="Your own rating for this joke"
+                      // Only while the field is unset, and only while the hint
+                      // below is rendered: a dangling idref announces nothing.
+                      describedBy={field.value === 0 ? 'own-rating-hint' : undefined}
+                    />
+                  </FormControl>
+                  {field.value === 0 ? (
+                    <p id="own-rating-hint" className="text-xs text-muted-foreground">
+                      Unrated. Choose a star, or use the arrow keys.
+                    </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      disabled={isFormDisabled}
+                      onClick={() => form.setValue('funnyRate', 0, { shouldValidate: true, shouldDirty: true })}
+                    >
+                      Clear rating
+                    </Button>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />
