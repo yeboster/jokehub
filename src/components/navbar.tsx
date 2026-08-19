@@ -82,7 +82,20 @@ const Navbar = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center text-muted-foreground hover:text-primary hover:bg-accent/50">
                   <UserCircle className="mr-0 h-5 w-5 sm:mr-2 text-primary" />
-                  <span className="sr-only sm:not-sr-only">{user.email || 'Account'}</span>
+                  {/* `sr-only` up to `lg`, not `sm` like the three nav links:
+                      the visible string here is an email address, and at
+                      640–768px it shared one row with the wordmark, three
+                      icon-and-label links and the theme toggle. The name stays
+                      in the accessibility tree at every width — that is what
+                      round 6 fixed and this must not undo — and `max-w`/
+                      `truncate` cap it once it is visible, because an address
+                      can be far longer than the space a nav can spare.
+                      `min-w-0` is what lets a flex item shrink below its
+                      content width so the ellipsis can appear at all.
+                      The full address is in the menu this button opens. */}
+                  <span className="sr-only lg:not-sr-only lg:ml-0 lg:min-w-0 lg:max-w-[16ch] lg:truncate">
+                    {user.email || 'Account'}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
