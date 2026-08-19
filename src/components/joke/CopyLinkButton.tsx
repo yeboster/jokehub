@@ -74,8 +74,12 @@ export default function CopyLinkButton({ jokeId }: CopyLinkButtonProps) {
     });
   };
 
+  // Outline, matching `BackToFeedButton` in the same row. Ghost has no border
+  // and no background until hover, and there is no hover on a phone, so the
+  // page's own sharing control read as plain text next to a real button. Peers,
+  // not a hierarchy: one control leaves the page, the other takes it with you.
   return (
-    <Button variant="ghost" size="sm" onClick={handleCopy}>
+    <Button variant="outline" size="sm" onClick={handleCopy}>
       {justCopied ? (
         <Check className="mr-2 h-4 w-4" aria-hidden="true" />
       ) : (
