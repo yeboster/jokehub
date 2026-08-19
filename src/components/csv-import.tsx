@@ -38,6 +38,11 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
 
   // Handles the CSV file selection and processing
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    // Every new attempt starts from an empty status line. The early returns
+    // below report through a toast only, and a held "Import finished…" from the
+    // last run would sit next to that toast and contradict it.
+    setStatusMessage('');
+
     // Check if user is logged in
     if (!user) {
       toast({

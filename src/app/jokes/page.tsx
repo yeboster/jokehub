@@ -141,7 +141,12 @@ function JokesPageComponent() {
     // State set from an effect, deliberately: the announcement is derived from
     // a *transition* between two committed renders, which is not expressible
     // during render; the ref holds the previous side of it.
-    if (notice) setAppendNotice(notice);
+    //
+    // Set unconditionally, including the empty string: a filter change has no
+    // append to announce, and it must clear the region. If the previous
+    // sentence stayed, the next append with the same wording would not be a
+    // text change and no screen reader would announce it again.
+    setAppendNotice(notice);
   }, [feedKey, jokesToDisplay.length, isReloadingResults]);
 
   // Hoisted out of the JSX: the click handler needs the list as it stands
