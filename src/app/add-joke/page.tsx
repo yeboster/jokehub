@@ -344,7 +344,7 @@ export default function AddJokePage() {
                               >
                                   <Card className={`overflow-hidden transition-all duration-300 ${selectedJoke === joke ? 'border-primary shadow-primary/20 shadow-lg' : 'border-border'}`}>
                                       <CardContent className="p-5">
-                                          <p className="text-base text-foreground leading-relaxed">{joke.jokeText}</p>
+                                          <p className="whitespace-pre-line text-base leading-relaxed text-foreground">{joke.jokeText}</p>
                                       </CardContent>
                                       <CardFooter className="bg-muted/40 p-3 flex justify-between items-center">
                                           <Badge variant="secondary">{joke.category}</Badge>

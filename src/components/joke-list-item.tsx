@@ -66,16 +66,44 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
     )}>
       <Link href={`/joke/${joke.id}`}
             className="block flex-grow flex flex-col hover:bg-accent/20 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-t-lg">
-        <CardContent className="p-5 flex-grow cursor-pointer">
-          <div className="relative h-full">
-            <p className="text-sm text-foreground leading-relaxed pb-8">{joke.text}</p>
-            <Badge
-              variant="secondary"
-              className="absolute bottom-0 left-0 bg-accent text-accent-foreground py-0.5 px-2 text-[11px] font-semibold rounded-md"
-            >
-              {joke.category}
-            </Badge>
-          </div>
+        <CardContent className="flex flex-grow cursor-pointer flex-col gap-4 p-5">
+          {/*
+            `whitespace-pre-line`: a joke is written with its punchline on its
+            own line, and every surface in this app collapsed that into one
+            paragraph — while the AI's explanation and other users' comments
+            both kept theirs (`whitespace-pre-wrap`). `pre-line` rather than
+            `pre-wrap` because runs of spaces from a paste are noise, whereas
+            the line breaks are the joke.
+
+            `line-clamp-6`: a grid row is as tall as its tallest card, so one
+            400-word bit left up to three neighbours as mostly whitespace. The
+            full text is one click away, on a page built for it.
+
+            `break-words`: a URL or a hashtag with no spaces in it cannot be
+            broken by the normal rules and ran straight past the content box.
+          */}
+          <p className="line-clamp-6 whitespace-pre-line break-words text-sm leading-relaxed text-foreground">
+            {joke.text}
+          </p>
+          {/*
+            In the flow with `mt-auto`, not `absolute bottom-0 left-0`: the card
+            is `overflow-hidden`, so a long category name was clipped mid-word
+            with no ellipsis and no way to tell it had been. `mt-auto` pins it to
+            the bottom, which is all the absolute positioning was for — and the
+            `pb-8` that reserved space for it above is gone with it.
+
+            `text-xs` replaces `text-[11px]`, which was the only arbitrary font
+            size left in the app: the undocumented fifth type scale round 4 set
+            out to delete. The truncating span is the pattern
+            `CategoryCombobox` already uses; `min-w-0` is what lets a flex item
+            shrink below its content width so the ellipsis can appear at all.
+          */}
+          <Badge
+            variant="secondary"
+            className="mt-auto max-w-full self-start rounded-md bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground"
+          >
+            <span className="min-w-0 truncate">{joke.category}</span>
+          </Badge>
         </CardContent>
       </Link>
       <CardFooter className="p-4 border-t border-border/50 flex items-center justify-between">

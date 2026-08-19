@@ -24,8 +24,10 @@ export default function JokeHeader({ joke, isOwner, isSourceUrl, onToggleUsed }:
   return (
     <section className="mb-8">
       {/* This h1 is the joke itself, which can run to several sentences —
-          smaller than a page title on purpose, with tighter leading. */}
-      <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 leading-snug">
+          smaller than a page title on purpose, with tighter leading.
+          `whitespace-pre-line` because a setup and a punchline on two lines are
+          two lines; this heading rendered them as one. */}
+      <h1 className="mb-4 whitespace-pre-line text-2xl font-bold leading-snug text-foreground sm:text-3xl">
         {joke.text}
       </h1>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm text-muted-foreground mb-6">
