@@ -17,7 +17,15 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
-          <Toast key={id} {...props}>
+          <Toast
+            key={id}
+            // Radix defaults to `foreground`, i.e. aria-live="assertive", for
+            // every toast. Assertive is correct for a failure the user has to
+            // act on and wrong for a confirmation: "Joke added" was
+            // interrupting whatever was being read. Successes wait their turn.
+            type={props.variant === 'destructive' ? 'foreground' : 'background'}
+            {...props}
+          >
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
