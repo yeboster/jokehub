@@ -49,23 +49,35 @@ const DialogContent = React.forwardRef<
         // variant because a bare `duration-200` loses to `.animate-in`'s own
         // 150ms on specificity.
         //
-        // `max-h`/`overflow-y-auto`: the panel is vertically centred with no
-        // height bound, so on a short viewport — a phone in landscape, or a
-        // small window — the footer went off-screen with nothing to scroll, and
-        // "Apply Filters" was simply unreachable. `dvh` and not `vh` because
-        // mobile Safari's `vh` counts retracted browser chrome, which is the
-        // case this is for. The 2rem leaves a 1rem gutter top and bottom.
+        // The max-height bound: the panel is vertically centred with no height
+        // limit, so on a short viewport — a phone in landscape, or a small
+        // window — the footer went off-screen with nothing to scroll, and
+        // "Apply Filters" was simply unreachable. Dynamic viewport units and not
+        // percentage-of-viewport units, because mobile Safari's version of the
+        // latter counts retracted browser chrome, which is the case this is for.
+        // The subtracted 2rem leaves a 1rem gutter top and bottom.
+        //
+        // The panel is a flex column and does NOT scroll: the wrapper below
+        // does. When the panel itself scrolled, the close button — positioned
+        // against it — scrolled away with the content and left the screen.
+        // Sticky is not an alternative: an auto-placed grid item sticks inside
+        // its own grid area, which for the last child is the bottom of the
+        // scrolled content.
         //
         // Known limit (deferred, see the plan): this handles a short *layout*
         // viewport. It does not reposition when the on-screen keyboard shrinks
         // the *visual* viewport — that needs a `visualViewport` listener.
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg data-[state=open]:duration-200 data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        "fixed left-[50%] top-[50%] z-50 flex w-full max-w-lg max-h-[calc(100dvh-2rem)] flex-col translate-x-[-50%] translate-y-[-50%] border bg-background p-6 shadow-lg data-[state=open]:duration-200 data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
         className
       )}
       {...props}
     >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      {/* The header/body/footer grid and its gap moved off the panel and onto
+          this wrapper, unchanged, so nothing shifts. The minimum-height reset is
+          required: a flex item will not shrink below its content height without
+          it, and the panel's height bound would do nothing. */}
+      <div className="grid min-h-0 gap-4 overflow-y-auto">{children}</div>
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm bg-background opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
