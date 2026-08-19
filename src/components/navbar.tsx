@@ -69,7 +69,10 @@ const Navbar = () => {
             >
               <Link href={item.href}>
                 <item.icon className={cn("mr-0 h-4 w-4 sm:mr-2", pathname === item.href ? "text-accent-foreground" : "text-primary")} />
-                <span className="hidden sm:inline">{item.label}</span>
+                {/* `sr-only`, not `hidden`: `display:none` takes the label out
+                    of the accessible name too, and the icon is aria-hidden, so
+                    below `sm` these were buttons with no name at all. */}
+                <span className="sr-only sm:not-sr-only">{item.label}</span>
               </Link>
             </Button>
           ))}
@@ -79,7 +82,7 @@ const Navbar = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center text-muted-foreground hover:text-primary hover:bg-accent/50">
                   <UserCircle className="mr-0 h-5 w-5 sm:mr-2 text-primary" />
-                  <span className="hidden sm:inline">{user.email || 'Account'}</span>
+                  <span className="sr-only sm:not-sr-only">{user.email || 'Account'}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -97,7 +100,7 @@ const Navbar = () => {
               <Button variant="ghost" size="sm" asChild className="hover:bg-accent/50">
                 <Link href="/auth?redirect=/jokes" className="flex items-center text-muted-foreground hover:text-primary">
                   <LogIn className="mr-0 h-4 w-4 sm:mr-2 text-primary" />
-                  <span className="hidden sm:inline">Login</span>
+                  <span className="sr-only sm:not-sr-only">Login</span>
                 </Link>
               </Button>
             )
