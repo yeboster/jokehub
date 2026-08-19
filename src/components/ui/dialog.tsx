@@ -77,7 +77,22 @@ const DialogContent = React.forwardRef<
           required: a flex item will not shrink below its content height without
           it, and the panel's height bound would do nothing. */}
       <div className="grid min-h-0 gap-4 overflow-y-auto">{children}</div>
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm bg-background opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      {/* The opacity rides the glyph, not the button. The button needs an opaque
+          background of its own — it sits over the wrapper above, which scrolls
+          underneath it — and a partial opacity on the element composites the
+          background along with the icon, so joke text slid visibly through the
+          button's fill. Applied to the svg child instead, the fill stays solid
+          while the icon keeps the same resting weight and the same lift to full
+          strength on hover; the transition moves with it, since there is nothing
+          left on the element for it to animate.
+
+          Variant order is load-bearing on the hover rule and reads backwards:
+          the leftmost variant is applied last, so putting the child selector
+          first and hover second is what lands the hover state on the button and
+          the opacity on the glyph. The other way round compiles the hover onto
+          the svg itself, which only fires over the sixteen pixels of the icon
+          rather than anywhere on the control. */}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&>svg]:opacity-70 [&>svg]:transition-opacity [&>svg]:hover:opacity-100">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

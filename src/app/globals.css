@@ -284,15 +284,41 @@
  * and buttons nobody can press on paper — and in dark mode it prints a
  * near-black page.
  *
- * Unlayered and last in the file, for the same reason the reduced-motion block
- * above is: it has to outrank the utilities it overrides, and at equal
- * specificity source order decides.
+ * What makes this block outrank the utilities it overrides is the !important on
+ * every declaration in it — not its position. It is last in *this file*, but
+ * not in the compiled sheet: Tailwind emits the responsive variant groups and
+ * the print-hidden utility after it, so source order alone would lose. The two
+ * page-break rules at the end are the deliberate exception, and they carry no
+ * !important because nothing in the app sets a break-inside through a utility —
+ * there is no competing declaration for them to lose to.
  *
- * Colours are pinned rather than left to the tokens. Browsers drop background
- * colours when printing but keep foreground ones, so a dark-mode page would
- * print pale grey text on the paper's white with nothing behind it.
+ * Colour takes two moves, not one. Browsers drop background colours when
+ * printing but keep foreground ones, so a dark-mode page would print pale grey
+ * text on the paper's white with nothing behind it. Pinning the page itself is
+ * the first move and it is not sufficient: the dark-mode class stays on the
+ * html element while printing, and the joke text colours itself through
+ * token-backed utilities rather than inheriting, so it would still come out
+ * near-white on white. Hence the second move — the colour tokens are
+ * redeclared below for both themes at once, so every utility reading them
+ * resolves to something legible on paper.
  */
 @media print {
+  /* Same specificity as the definitions in the base layer above and later in the
+     compiled sheet, so these win for both themes on source order alone. Listing
+     both selectors is what makes the theme irrelevant: whichever one is on the
+     html element, the tokens under it are the print ones. Only the tokens a text
+     or surface utility can still reach are here — the rest stop mattering once
+     backgrounds are dropped and every interactive control is hidden. */
+  :root,
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover-foreground: 0 0% 0%;
+    --muted-foreground: 0 0% 30%;
+  }
+
   html,
   body {
     background: #fff !important;
@@ -317,6 +343,20 @@
   /* Elevation is a screen idea. */
   * {
     box-shadow: none !important;
+  }
+
+  /* The feed card's six-line clamp exists so a grid row is not sized by its
+     longest joke. On paper there is no row to keep even, and the clamp sits
+     inside a card that hides its overflow — so the printed set list ended a long
+     joke mid-sentence with no way to read the rest. Unset all three parts of the
+     clamp (it is a line count, a box orientation and a hidden overflow acting
+     together) and let the card grow. The only other clamp in the app is a
+     one-line one on the select trigger, which is a button and already hidden. */
+  .line-clamp-6 {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    overflow: visible !important;
   }
 
   /* A joke card is one unit: a page break through the middle of one puts the
