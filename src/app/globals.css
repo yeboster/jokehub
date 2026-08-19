@@ -78,12 +78,15 @@
     --popover: 0 0% 16%;
     --popover-foreground: 0 0% 98%;
 
-    /* 65% put in-card links at 4.22:1 — `text-primary` on `--card` (16%) —
-       and at 4.14:1 inside a `bg-primary/10` alert. 70% takes those to 5.14:1
-       and 5.02:1. `--primary-foreground` (10%) on it is still 6.07:1, so the
-       filled button is unaffected, and `--ring` stays at 65% (a focus
-       indicator needs 3:1, and it has 4.98:1). */
-    --primary: 270 60% 70%; /* Brighter Purple for dark mode */
+    /* 65% put in-card links at 4.22:1 — `text-primary` on `--card` (16%) — and
+       70% still left the `bg-primary/10` alert composite at 4.36:1, under 4.5.
+       The tint lightens the surface the text sits on, so the alert is always
+       the binding case, not the plain card. 72% clears both: 5.51:1 on
+       `--card`, and 4.67:1 on the `bg-primary/10` tint over that card.
+       `--primary-foreground` (10%) on it stays above 6:1, so the filled button
+       is unaffected, and `--ring` stays at 65% (a focus indicator needs 3:1,
+       and it has 4.98:1). */
+    --primary: 270 60% 72%; /* Brighter Purple for dark mode */
     --primary-foreground: 0 0% 10%; /* Dark text on brighter purple */
 
     --secondary: 0 0% 25%;

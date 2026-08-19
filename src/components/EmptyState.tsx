@@ -1,4 +1,4 @@
-import type { FC, ReactNode } from 'react';
+import type { ElementType, FC, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -35,6 +35,7 @@ interface EmptyStateProps {
  */
 const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, className, size = 'default', titleAs = 'p' }) => {
   const isSmall = size === 'sm';
+  const TitleTag = titleAs as ElementType;
 
   return (
     // `role="status"` because every call site swaps this block in for content
@@ -56,14 +57,9 @@ const EmptyState: FC<EmptyStateProps> = ({ icon: Icon, title, hint, action, clas
       >
         <Icon className={isSmall ? 'h-5 w-5' : 'h-7 w-7'} aria-hidden="true" />
       </div>
-      {(() => {
-        const TitleTag = titleAs as React.ElementType;
-        return (
-          <TitleTag className={cn('font-medium text-foreground', isSmall ? 'text-sm' : 'text-lg')}>
-            {title}
-          </TitleTag>
-        );
-      })()}
+      <TitleTag className={cn('font-medium text-foreground', isSmall ? 'text-sm' : 'text-lg')}>
+        {title}
+      </TitleTag>
       {hint && <p className="mt-1.5 text-sm text-muted-foreground max-w-md mx-auto">{hint}</p>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
