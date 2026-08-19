@@ -54,7 +54,13 @@ export default function LandingPage() {
   return (
     <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12 text-center">
       <header className="mb-12 sm:mb-16">
-        <Logo width={400} className="mx-auto mb-5" />
+        {/* The wordmark is the page's title, so it is the h1 — the page used to
+            open at h2 ("A Taste of Humor") with level 1 skipped entirely. The
+            image's alt text is the heading's text; `mb-5` moves to the heading
+            so the spacing is unchanged. */}
+        <h1 className="mb-5">
+          <Logo width={400} className="mx-auto" />
+        </h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
           Your personal space to collect, create, and cherish every chuckle. Dive in and let the laughter begin!
         </p>
