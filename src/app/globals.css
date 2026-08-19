@@ -317,6 +317,10 @@
     --card-foreground: 0 0% 0%;
     --popover-foreground: 0 0% 0%;
     --muted-foreground: 0 0% 30%;
+    /* Star glyphs, metadata icons and the category badge text read these two;
+       dark-mode purple is about two-and-a-half to one on white paper. */
+    --primary: 0 0% 0%;
+    --accent-foreground: 0 0% 0%;
   }
 
   html,
