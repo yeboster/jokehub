@@ -1,17 +1,8 @@
 import type {NextConfig} from 'next';
 
-const nextConfig: NextConfig = {
-  /* config options here */
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
-};
+// The app renders exactly one image (`src/components/logo.tsx`, a local file),
+// so there is no remote host to allow. The `picsum.photos` pattern this used to
+// carry predated the placeholder jokes that round 3 deleted.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
