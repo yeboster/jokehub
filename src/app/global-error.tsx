@@ -21,6 +21,11 @@ import './globals.css';
  *     stylesheet above still supplies the colour tokens and the type scale.
  *
  * `Button` is safe here: it is a plain forwardRef with no hooks and no context.
+ *
+ * `EmptyState` was passed over deliberately rather than for safety: this is a
+ * full-viewport centred treatment with its own type scale, which is the point —
+ * the whole app is gone — where `EmptyState` is an inline block sized to sit
+ * inside a page that still exists.
  */
 export default function GlobalError({
   error,

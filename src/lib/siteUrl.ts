@@ -17,6 +17,9 @@
  *      when you are checking a link card before shipping it.
  *   4. The dev server's origin.
  *
+ * A candidate that is blank, or that does not parse as a URL, is skipped as if
+ * it had never been set — see `isUsableOrigin` below.
+ *
  * Strings only: `src/lib/` is outside Tailwind's content globs
  * (`tailwind.config.ts`), so nothing here may return a class name.
  */
@@ -43,6 +46,25 @@ function normalizeOrigin(value: string): string {
 }
 
 /**
+ * Whether a normalized candidate is something `new URL` will accept.
+ *
+ * The root layout hands the resolved string straight to `new URL` for
+ * `metadataBase`. A variable that is set but unusable — a bare scheme, a stray
+ * run of slashes, a host with a space in it — would throw a TypeError there,
+ * during rendering, with a stack that names the layout and never names the
+ * environment variable that actually caused it. Checking here turns that into a
+ * fall-through to the next candidate.
+ */
+function isUsableOrigin(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The absolute origin for this deployment, never with a trailing slash.
  *
  * Takes its environment as an argument so it is testable without touching the
@@ -60,7 +82,13 @@ export function resolveSiteUrl(env: SiteUrlEnv = {}): string {
     const trimmed = candidate?.trim();
     // A Vercel environment variable that was declared and left blank arrives as
     // an empty string, not as undefined.
-    if (trimmed) return normalizeOrigin(trimmed);
+    if (!trimmed) continue;
+
+    const origin = normalizeOrigin(trimmed);
+    // A malformed value is treated exactly like an unset one: skip it and let a
+    // less specific source answer, rather than propagating garbage into every
+    // absolute URL the site emits.
+    if (isUsableOrigin(origin)) return origin;
   }
 
   return DEV_SITE_URL;

@@ -42,17 +42,24 @@ export const metadata: Metadata = {
     title: 'Joke Hub',
     description: SITE_DESCRIPTION,
     url: '/',
-    images: [{ url: '/logo.png', width: 1395, height: 312, alt: 'Joke Hub' }],
+    // The dimensions are the file's real ones, read from the PNG header. An
+    // unfurler that trusts them and gets them wrong reserves the wrong box and
+    // reflows the card once the bytes arrive.
+    images: [{ url: '/logo.png', width: 1449, height: 324, alt: 'Joke Hub' }],
   },
   twitter: {
-    card: 'summary_large_image',
+    // Not a large card. X crops one to roughly 1.91:1 and the wordmark is
+    // 4.47:1, so a large card would slice the top and bottom off the only thing
+    // in the image. The small square thumbnail letterboxes it instead, which
+    // keeps the whole wordmark legible next to the title.
+    card: 'summary',
     title: 'Joke Hub',
     description: SITE_DESCRIPTION,
     images: ['/logo.png'],
   },
   icons: {
     // Not `/logo.png`: a <link rel="icon"> is fetched raw, so the wordmark put
-    // 209KB on every page load to render a 1395×312 image into a 16px square,
+    // 209KB on every page load to render a 1449×324 image into a 16px square,
     // where it was an illegible sliver. An SVG mark is ~300 bytes and sharp at
     // every size. Swap in a designed 32×32/180×180 PNG pair here if one is ever
     // made; nothing else needs to change.
