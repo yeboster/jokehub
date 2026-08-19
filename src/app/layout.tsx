@@ -19,7 +19,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Joke Hub',
+  title: {
+    // Every route below sets its own title through this template. That is not
+    // only 2.4.2: Next's App Router announcer speaks `document.title` on each
+    // client-side navigation and skips it when the string has not changed, so
+    // with one static title across seven routes it never announced anything.
+    default: 'Joke Hub',
+    template: '%s · Joke Hub',
+  },
   description: 'Manage and filter your jokes',
   icons: {
     icon: '/logo.png',
