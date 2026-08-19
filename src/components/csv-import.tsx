@@ -75,6 +75,10 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         return;
       }
 
+      // Distinguishes "the file is bad" from "the write failed", which need
+      // different reporting and used to get the same toast.
+      let writeStarted = false;
+
       try {
         // Drop empty lines but keep each remaining line's original position, so
         // a skipped row is reported by the number the user sees in their editor.
@@ -147,6 +151,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
 
         const summary = summarizeImport(importedJokes.length, skippedRows);
         if (importedJokes.length > 0) {
+          writeStarted = true;
           await onImport(importedJokes);
         }
         setStatusMessage(`${summary.title}. ${summary.description}`);
@@ -156,15 +161,28 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           variant: 'default',
         });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PapaParse error objects have a dynamic shape.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore and parse errors have different dynamic shapes.
       } catch (error: any) {
-        toast({
-          title: "Couldn't import that file",
-          description: error.message || 'Failed to parse or process the CSV file.',
-          variant: 'destructive',
-        });
-        // The destructive toast is the report for this path.
-        setStatusMessage('');
+        const message = error?.message || 'Failed to parse or process the CSV file.';
+        if (writeStarted) {
+          // The write failed, not the file. `handleApiCall` has already
+          // announced it, and with TOAST_LIMIT at 1 a second toast here would
+          // *evict* that one and blame the user's file for a permission or
+          // network failure. The page carries the detail instead — including
+          // `jokeService.importJokes`'s partial count ("Imported 40 of 120
+          // jokes before the import failed: …"), which says what state the
+          // collection is now in and exists nowhere else in the UI.
+          setStatusMessage(`Import failed. ${message.replace(/[.!?]?$/, '.')}`);
+        } else {
+          // Nothing was written, so nothing else has reported this: the file
+          // never got past parsing.
+          toast({
+            title: "Couldn't import that file",
+            description: message,
+            variant: 'destructive',
+          });
+          setStatusMessage('');
+        }
       } finally {
         setIsLoading(false);
         // Reset file input so the same file can be selected again if needed
@@ -235,7 +253,9 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
           {/* Always in the DOM so it is a live region *before* the text
               changes — a role="status" mounted with its message already in
               it does not announce. `min-h` keeps the card from jumping as
-              the sentence appears. */}
+              the sentence appears. Carries the outcome either way: a
+              successful or partial import, or a failed write with however
+              many rows made it in before it failed. */}
           <p role="status" className="mt-2 min-h-[1.25rem] text-center text-sm text-muted-foreground">
             {statusMessage}
           </p>
