@@ -89,15 +89,15 @@ const JokeListItem: FC<JokeListItemProps> = ({ joke, index }) => {
             {joke.text}
           </p>
           {/*
-            In the flow with `mt-auto`, not `absolute bottom-0 left-0`: the card
+            In the flow with `mt-auto`, not absolutely positioned: the card
             is `overflow-hidden`, so a long category name was clipped mid-word
             with no ellipsis and no way to tell it had been. `mt-auto` pins it to
             the bottom, which is all the absolute positioning was for — and the
-            `pb-8` that reserved space for it above is gone with it.
+            padding that reserved space for it above is gone with it.
 
-            `text-xs` replaces `text-[11px]`, which was the only arbitrary font
-            size left in the app: the undocumented fifth type scale round 4 set
-            out to delete. The truncating span is the pattern
+            `text-xs` replaces the old arbitrary eleven-pixel size, the only
+            arbitrary font size left in the app: the undocumented fifth type
+            scale round 4 set out to delete. The truncating span is the pattern
             `CategoryCombobox` already uses; `min-w-0` is what lets a flex item
             shrink below its content width so the ellipsis can appear at all.
           */}
