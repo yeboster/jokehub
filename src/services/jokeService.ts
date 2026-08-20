@@ -20,7 +20,13 @@ import type { Joke } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
 import { generateKeywords, generateSearchTokens } from '@/lib/text';
 import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
-import { communityRatingBucket, isUnratedBucket } from '@/lib/ratingBuckets';
+import {
+  ANY_RATING,
+  communityRatingBucket,
+  isUnratedBucket,
+  matchesCommunityRatingBucket,
+} from '@/lib/ratingBuckets';
+import { shouldDegradeRatingFilter } from '@/lib/ratingFilterDegrade';
 import { toDate, toMillis } from '@/lib/firestoreTimestamps';
 
 const JOKES_COLLECTION = 'jokes';
@@ -148,6 +154,51 @@ export function buildJokesQuery(
   return query(collection(db, JOKES_COLLECTION), ...queryConstraints);
 }
 
+/**
+ * The page a missing index leaves us able to fetch, in order of preference.
+ *
+ * `dropRatingConstraint` is the rating-band degrade: the band goes out of the
+ * query and the date ordering stays, because the remaining constraints are the
+ * combinations the feed has always used and their indexes exist. If even that
+ * finds no index, the ordering goes too — the fallback this path has always
+ * had, since equality-only filters need no composite index — and the caller
+ * sorts client-side. `null` means the query could not be built at all (user
+ * scope with no signed-in user), which is an empty page and not an error.
+ */
+async function fetchFallbackPage(
+  filters: FilterParams,
+  dropRatingConstraint: boolean,
+  userId?: string,
+  lastVisibleJokeDoc?: QueryDocumentSnapshot | null
+): Promise<{ docs: QueryDocumentSnapshot[]; sortClientSide: boolean } | null> {
+  const fallbackFilters = dropRatingConstraint
+    ? { ...filters, filterFunnyRate: ANY_RATING }
+    : filters;
+  const orderings = dropRatingConstraint ? [true, false] : [false];
+
+  for (let attempt = 0; attempt < orderings.length; attempt++) {
+    const orderByDateAdded = orderings[attempt];
+    const fallbackQuery = buildJokesQuery(fallbackFilters, userId, lastVisibleJokeDoc, {
+      orderByDateAdded,
+    });
+    if (!fallbackQuery) {
+      return null;
+    }
+    try {
+      return { docs: (await getDocs(fallbackQuery)).docs, sortClientSide: !orderByDateAdded };
+    } catch (error) {
+      // The last attempt's failure is the caller's, and so is anything that is
+      // not a missing index.
+      if (attempt === orderings.length - 1 || !isMissingIndexError(error)) {
+        throw error;
+      }
+      warnMissingIndex('fetchJokes', error);
+    }
+  }
+
+  return null;
+}
+
 /** One page of the query built by `buildJokesQuery`, narrowed by the tokens the query itself couldn't express. */
 async function fetchJokesPage(
   filters: FilterParams,
@@ -155,13 +206,15 @@ async function fetchJokesPage(
   userId?: string,
   lastVisibleJokeDoc?: QueryDocumentSnapshot | null
 ) {
+  const emptyPage = { jokes: [], lastVisible: null, hasMore: false, ratingFilterDegraded: false };
   const q = buildJokesQuery(filters, userId, lastVisibleJokeDoc);
   if (!q) {
-    return { jokes: [], lastVisible: null, hasMore: false };
+    return emptyPage;
   }
 
   let docs: QueryDocumentSnapshot[];
   let sortClientSide = false;
+  let ratingFilterDegraded = false;
   try {
     docs = (await getDocs(q)).docs;
   } catch (error) {
@@ -169,19 +222,25 @@ async function fetchJokesPage(
       throw error;
     }
     warnMissingIndex('fetchJokes', error);
-    // The composite index for this filter combination is missing/building —
-    // drop the orderBy (equality-only filters need no composite index) and
-    // sort client-side instead. Pagination still works: without an orderBy the
-    // query is implicitly ordered by document id, so the startAfter cursor
-    // keeps pages disjoint, but the global date ordering is only per page.
-    const fallbackQuery = buildJokesQuery(filters, userId, lastVisibleJokeDoc, {
-      orderByDateAdded: false,
-    });
-    if (!fallbackQuery) {
-      return { jokes: [], lastVisible: null, hasMore: false };
+    // The composite index for this filter combination is missing/building.
+    // Either the rating band comes out of the query and is applied below to
+    // whatever this page returned, or — for every other combination — the
+    // orderBy is dropped and the page is sorted client-side. Pagination
+    // survives both: without an orderBy the query is implicitly ordered by
+    // document id, so the startAfter cursor still keeps pages disjoint, and
+    // the global date ordering is the only casualty.
+    ratingFilterDegraded = shouldDegradeRatingFilter(error, filters);
+    const fallback = await fetchFallbackPage(
+      filters,
+      ratingFilterDegraded,
+      userId,
+      lastVisibleJokeDoc
+    );
+    if (!fallback) {
+      return { ...emptyPage, ratingFilterDegraded };
     }
-    docs = (await getDocs(fallbackQuery)).docs;
-    sortClientSide = true;
+    docs = fallback.docs;
+    sortClientSide = fallback.sortClientSide;
   }
 
   let jokes = docs.map(
@@ -201,6 +260,20 @@ async function fetchJokesPage(
     jokes = jokes.filter((joke) => searchTokens.every((token) => joke.keywords?.includes(token)));
   }
 
+  if (ratingFilterDegraded) {
+    // The band the query could not carry, applied to the documents this page
+    // did return. Pagination here is APPROXIMATE and deliberately so: the
+    // cursor and `hasMore` below stay based on the raw docs — they have to, or
+    // pages would overlap — so a page can come back short, or empty with more
+    // behind it. `fetchJokes` pages on through a bounded number of empty pages
+    // for exactly this reason. A feed that shows fewer jokes per press beats a
+    // feed that shows an error until somebody deploys an index.
+    const bucket = communityRatingBucket(filters.filterFunnyRate);
+    if (bucket) {
+      jokes = jokes.filter((joke) => matchesCommunityRatingBucket(bucket, joke));
+    }
+  }
+
   if (sortClientSide) {
     jokes.sort((a, b) => b.dateAdded.getTime() - a.dateAdded.getTime());
   }
@@ -210,7 +283,7 @@ async function fetchJokesPage(
   const lastVisible = docs[docs.length - 1] ?? null;
   const hasMore = docs.length === (filters.limit ?? PAGE_SIZE);
 
-  return { jokes, lastVisible, hasMore };
+  return { jokes, lastVisible, hasMore, ratingFilterDegraded };
 }
 
 export async function fetchJokes(
@@ -222,7 +295,7 @@ export async function fetchJokes(
   if (filters.search.trim() !== '' && searchTokens.length === 0) {
     // Every word in the term was punctuation or shorter than three characters,
     // so no stored keyword can match it. Skip the round trip.
-    return { jokes: [], lastVisible: null, hasMore: false };
+    return { jokes: [], lastVisible: null, hasMore: false, ratingFilterDegraded: false };
   }
 
   // Only the first token constrains the query, so for a multi-word term the
@@ -233,16 +306,24 @@ export async function fetchJokes(
   // page fetched is the whole answer — and its cursor/`hasMore` are the ones
   // "load more" must continue from. A single-token (or no) search never loops:
   // an empty page there already means the query itself was exhausted.
+  //
+  // A page whose rating band was applied client-side can empty the same way,
+  // and pages on for the same reason and under the same bound.
   let page = await fetchJokesPage(filters, searchTokens, userId, lastVisibleJokeDoc);
+  let ratingFilterDegraded = page.ratingFilterDegraded;
   for (
     let extraPages = 0;
     page.jokes.length === 0 && page.hasMore && extraPages < MAX_SEARCH_PAGES;
     extraPages++
   ) {
     page = await fetchJokesPage(filters, searchTokens, userId, page.lastVisible);
+    // Sticky across the pages this call pulled through: the notice is about
+    // the fetch as a whole, and a later page that happened not to degrade does
+    // not undo an earlier one that did.
+    ratingFilterDegraded = ratingFilterDegraded || page.ratingFilterDegraded;
   }
 
-  return page;
+  return { ...page, ratingFilterDegraded };
 }
 
 export async function addJoke(

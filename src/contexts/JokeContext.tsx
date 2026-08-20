@@ -81,6 +81,13 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * superseded fetch can leave its spinner stuck on forever.
    */
   const newestRequestByKindRef = useRef<{ initial: number; more: number }>({ initial: 0, more: 0 });
+  /**
+   * Whether the "the rating filter is running on the client" notice has been
+   * given. Once per provider lifetime: the condition holds for every page of
+   * every rating-filtered fetch until the index is deployed, and a toast per
+   * page would be noise about something the user cannot act on.
+   */
+  const ratingDegradeNoticeShownRef = useRef(false);
 
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
@@ -160,6 +167,7 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         jokes: newJokes,
         lastVisible,
         hasMore: newHasMore,
+        ratingFilterDegraded,
       } = await jokeService.fetchJokes(
         filters,
         user?.uid,
@@ -169,6 +177,19 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // A newer fetch started while this one was in flight — drop the result
       // rather than clobbering the newer filter set's jokes/cursor.
       if (isStale()) return;
+
+      // Not a failure — the jokes below are real and the band was applied, so
+      // this stays out of `jokesError`, which the feed reads as "we could not
+      // load anything". A polite toast (the variant decides sensitivity; see
+      // the conventions block in use-toast) says the one thing the user would
+      // otherwise find puzzling: pages that come back short.
+      if (ratingFilterDegraded && !ratingDegradeNoticeShownRef.current) {
+        ratingDegradeNoticeShownRef.current = true;
+        toast({
+          title: 'Rating filter limited',
+          description: 'Pages may come back short while this filter runs without its index.',
+        });
+      }
 
       if (isLoadMore) {
         setJokes((prevJokes) => (prevJokes ? [...prevJokes, ...newJokes] : newJokes));

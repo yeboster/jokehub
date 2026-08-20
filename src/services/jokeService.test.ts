@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import type { FilterParams } from '@/services/jokeService';
 
@@ -6,6 +6,20 @@ import type { FilterParams } from '@/services/jokeService';
 // the mocks below just record what it asked for: each factory returns a plain
 // descriptor and `query()` collects them in order.
 vi.mock('@/lib/firebase', () => ({ db: {} }));
+
+const { MockTimestamp } = vi.hoisted(() => {
+  class MockTimestamp {
+    constructor(private readonly value: Date) {}
+    static now = vi.fn(() => 'MOCK_NOW');
+    toDate() {
+      return this.value;
+    }
+    toMillis() {
+      return this.value.getTime();
+    }
+  }
+  return { MockTimestamp };
+});
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db: unknown, name: string) => ({ type: 'collection', name })),
@@ -20,10 +34,15 @@ vi.mock('firebase/firestore', () => ({
   getDoc: vi.fn(),
   getDocs: vi.fn(),
   writeBatch: vi.fn(),
-  Timestamp: { now: vi.fn(() => 'MOCK_NOW') },
+  // A real class, not a bare object: `firestoreTimestamps` narrows with
+  // `instanceof`, which throws outright when the right-hand side is not
+  // callable — so every joke that carries a date has to come back through one
+  // of these.
+  Timestamp: MockTimestamp,
 }));
 
-import { buildJokesQuery } from '@/services/jokeService';
+import { buildJokesQuery, fetchJokes } from '@/services/jokeService';
+import { getDocs, query as queryFactory } from 'firebase/firestore';
 
 /** The default page size baked into `jokeService`. */
 const PAGE_SIZE = 12;
@@ -224,5 +243,141 @@ describe('buildJokesQuery', () => {
       { field: 'used', op: '==', value: false },
     ]);
     expect(constraints.at(-1)).toEqual({ type: 'limit', count: 7 });
+  });
+});
+
+describe('fetchJokes — the rating filter without its index', () => {
+  const getDocsMock = vi.mocked(getDocs);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // `warnMissingIndex` logs on every fallback; the test asserts the
+    // behaviour, not the console.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  /** A Firestore error as the SDK reports a missing composite index. */
+  function missingIndexError() {
+    return Object.assign(new Error('The query requires an index.'), { code: 'failed-precondition' });
+  }
+
+  /** A snapshot of joke docs, in the shape `fetchJokesPage` reads. */
+  function snapshotOf(jokes: Array<{ id: string; averageRating?: number; ratingCount?: number }>) {
+    return {
+      docs: jokes.map(({ id, ...data }) => ({
+        id,
+        data: () => ({ ...data, text: id, dateAdded: new MockTimestamp(new Date('2026-08-01')) }),
+      })),
+    };
+  }
+
+  /** The `where` clauses of the nth query the service built. */
+  function clausesOfCall(callIndex: number) {
+    const built = vi.mocked(queryFactory).mock.results[callIndex].value as {
+      constraints: Constraint[];
+    };
+    return whereClauses(built.constraints);
+  }
+
+  it('applies the band on the client and keeps the date ordering', async () => {
+    getDocsMock.mockRejectedValueOnce(missingIndexError()).mockResolvedValueOnce(
+      snapshotOf([
+        { id: 'loved', averageRating: 4.8, ratingCount: 5 },
+        { id: 'liked', averageRating: 4.1, ratingCount: 5 },
+        { id: 'unrated' },
+      ]) as never
+    );
+
+    const page = await fetchJokes({ ...DEFAULTS, filterFunnyRate: 5 });
+
+    expect(page.jokes.map((joke) => joke.id)).toEqual(['loved']);
+    expect(page.ratingFilterDegraded).toBe(true);
+    // The retry gives up the band and nothing else — the ordering stays, and
+    // so does the cursor's meaning.
+    expect(clausesOfCall(1)).toEqual([]);
+    const retry = vi.mocked(queryFactory).mock.results[1].value as { constraints: Constraint[] };
+    expect(retry.constraints).toContainEqual({ type: 'orderBy', field: 'dateAdded', direction: 'desc' });
+  });
+
+  it('reports the page as short rather than claiming the collection is empty', async () => {
+    // Twelve documents came back, so there is more behind them; none is in the
+    // band, so this page shows nothing. `hasMore` follows the raw docs.
+    const docs = Array.from({ length: 12 }, (_unused, index) => ({
+      id: `joke-${index}`,
+      averageRating: 2.5,
+      ratingCount: 4,
+    }));
+    // Every query carrying the band fails, page after page, the way a missing
+    // index does — `fetchJokes` pages on through the empty results it gets.
+    getDocsMock.mockImplementation((async (built: unknown) => {
+      const { constraints } = built as { constraints: Constraint[] };
+      if (whereClauses(constraints).some((clause) => clause.field === 'averageRating')) {
+        throw missingIndexError();
+      }
+      return snapshotOf(docs);
+    }) as unknown as typeof getDocs);
+
+    const page = await fetchJokes({ ...DEFAULTS, filterFunnyRate: 5 });
+
+    expect(page.jokes).toEqual([]);
+    expect(page.hasMore).toBe(true);
+    expect(page.ratingFilterDegraded).toBe(true);
+  });
+
+  it('leaves any other failure to the caller, exactly as before', async () => {
+    const permissionDenied = Object.assign(new Error('Missing or insufficient permissions.'), {
+      code: 'permission-denied',
+    });
+    getDocsMock.mockRejectedValueOnce(permissionDenied);
+
+    await expect(fetchJokes({ ...DEFAULTS, filterFunnyRate: 5 })).rejects.toThrow(
+      'Missing or insufficient permissions.'
+    );
+    expect(getDocsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the unrated constraint on the server and drops the ordering instead', async () => {
+    getDocsMock
+      .mockRejectedValueOnce(missingIndexError())
+      .mockResolvedValueOnce(snapshotOf([{ id: 'nobody-rated-me' }]) as never);
+
+    const page = await fetchJokes({ ...DEFAULTS, filterFunnyRate: 0 });
+
+    expect(page.jokes.map((joke) => joke.id)).toEqual(['nobody-rated-me']);
+    expect(page.ratingFilterDegraded).toBe(false);
+    expect(clausesOfCall(1)).toEqual([{ field: 'ratingCount', op: '==', value: 0 }]);
+    const retry = vi.mocked(queryFactory).mock.results[1].value as { constraints: Constraint[] };
+    expect(retry.constraints.some((constraint) => constraint.type === 'orderBy')).toBe(false);
+  });
+
+  it('does not degrade an unfiltered feed, and reports it', async () => {
+    getDocsMock
+      .mockRejectedValueOnce(missingIndexError())
+      .mockResolvedValueOnce(snapshotOf([{ id: 'anything' }]) as never);
+
+    const page = await fetchJokes(DEFAULTS);
+
+    expect(page.jokes.map((joke) => joke.id)).toEqual(['anything']);
+    expect(page.ratingFilterDegraded).toBe(false);
+  });
+
+  it('gives up the ordering too when the band-free retry has no index either', async () => {
+    getDocsMock
+      .mockRejectedValueOnce(missingIndexError())
+      .mockRejectedValueOnce(missingIndexError())
+      .mockResolvedValueOnce(snapshotOf([{ id: 'loved', averageRating: 5, ratingCount: 3 }]) as never);
+
+    const page = await fetchJokes({ ...DEFAULTS, filterFunnyRate: 5 });
+
+    expect(page.jokes.map((joke) => joke.id)).toEqual(['loved']);
+    expect(page.ratingFilterDegraded).toBe(true);
+    expect(getDocsMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('reports no degrade on a fetch that never reached Firestore', async () => {
+    const page = await fetchJokes({ ...DEFAULTS, search: 'an', filterFunnyRate: 5 });
+
+    expect(page.ratingFilterDegraded).toBe(false);
+    expect(getDocsMock).not.toHaveBeenCalled();
   });
 });
