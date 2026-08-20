@@ -259,9 +259,14 @@ export default function EditJokePage() {
               <FormField control={form.control} name="funnyRate" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Your own rating (Optional)</FormLabel>
+                  {/* Round 7 pointed this at the feed's rating filter, which
+                      read this field at the time. That filter follows the
+                      community average now, so the description says where the
+                      score does and does not show up instead of naming a
+                      control that would send the user somewhere unrelated. */}
                   <FormDescription>
-                    Your score for this joke. It is what the &quot;Own rating&quot; filter on the
-                    feed searches — not the community average.
+                    Your own score for this joke, kept for your reference. The stars on the
+                    feed are the community average, which this does not affect.
                   </FormDescription>
                   <FormControl>
                     {/* The same widget the community rating uses: one radio
