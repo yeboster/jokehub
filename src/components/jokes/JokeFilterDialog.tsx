@@ -7,6 +7,7 @@ import type { FilterParams } from '@/services/jokeService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserCategories } from '@/hooks/useUserCategories';
 import { hasActiveFilters } from '@/lib/jokeFilters';
+import { ANY_RATING, ratingBucketLabel, UNRATED } from '@/lib/ratingBuckets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -217,7 +218,7 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
           )}
 
           <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="modal-funny-rate-filter" className="text-right pt-2">Own rating</Label>
+            <Label htmlFor="modal-funny-rate-filter" className="text-right pt-2">Rating</Label>
             <div className="col-span-3 space-y-1.5">
               <Select
                 value={draft.filterFunnyRate.toString()}
@@ -229,22 +230,22 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
                   <SelectValue placeholder="Select rating" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="-1">Any Rating</SelectItem>
-                  <SelectItem value="0">Unrated</SelectItem>
-                  {[1, 2, 3, 4, 5].map((rate) => (
+                  {/* One label source with the feed's filter chip, so the two
+                      cannot describe the same choice differently. The ids and
+                      the values are unchanged: they are URL state. */}
+                  {[ANY_RATING, UNRATED, 1, 2, 3, 4, 5].map((rate) => (
                     <SelectItem key={rate} value={rate.toString()}>
-                      {rate} Star{rate > 1 ? 's' : ''}
+                      {ratingBucketLabel(rate)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {/* This filters `funnyRate` — the score the joke's own author gave
-                  it — not the community average shown on every card. Labelled
-                  "Rating", it read as a filter on the number the user was
-                  looking at, and returned nothing for every joke added through
-                  the app. */}
+              {/* The filter reads the average this app shows on every card. It
+                  used to read the author's own score, which is why round 7
+                  qualified this row's label and wrote a hint disowning the
+                  number the user was looking at. */}
               <p id="modal-funny-rate-hint" className="text-xs text-muted-foreground">
-                The score a joke&apos;s author gave it, not the community average.
+                The community average shown on each card.
               </p>
             </div>
           </div>
