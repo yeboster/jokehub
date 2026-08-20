@@ -135,17 +135,42 @@ describe('buildJokesQuery', () => {
     expect(categoryClause.value).toEqual(many.slice(0, 30));
   });
 
-  it('adds no funny-rate constraint for the -1 "any" sentinel', () => {
+  it('adds no rating constraint for the -1 "any" sentinel', () => {
     expect(whereClauses(constraintsOf({ filterFunnyRate: -1 }))).toEqual([]);
   });
 
-  it('filters on funnyRate for a concrete rate, including 0', () => {
+  it('filters the unrated bucket on the rating count, not on an average', () => {
     expect(whereClauses(constraintsOf({ filterFunnyRate: 0 }))).toEqual([
-      { field: 'funnyRate', op: '==', value: 0 },
+      { field: 'ratingCount', op: '==', value: 0 },
     ]);
+  });
+
+  it('filters a rating band as a range over the community average', () => {
     expect(whereClauses(constraintsOf({ filterFunnyRate: 4 }))).toEqual([
-      { field: 'funnyRate', op: '==', value: 4 },
+      { field: 'averageRating', op: '>=', value: 4 },
+      { field: 'averageRating', op: '<', value: 4.5 },
     ]);
+    expect(whereClauses(constraintsOf({ filterFunnyRate: 2 }))).toEqual([
+      { field: 'averageRating', op: '>=', value: 2 },
+      { field: 'averageRating', op: '<', value: 3 },
+    ]);
+  });
+
+  // Marco's case: a joke the community rates 5 averages 4.8 or 4.9 as often as
+  // it averages exactly 5, and the old equality clause on the author's own
+  // score matched none of them.
+  it('leaves the 5-star band open at the top, so a 4.8 average is in it', () => {
+    expect(whereClauses(constraintsOf({ filterFunnyRate: 5 }))).toEqual([
+      { field: 'averageRating', op: '>=', value: 4.5 },
+    ]);
+  });
+
+  it('never constrains the author-owned funnyRate field', () => {
+    for (const filterFunnyRate of [-1, 0, 1, 2, 3, 4, 5]) {
+      expect(whereClauses(constraintsOf({ filterFunnyRate })).map((clause) => clause.field)).not.toContain(
+        'funnyRate'
+      );
+    }
   });
 
   it('maps the usage status to a boolean `used` constraint', () => {
@@ -195,7 +220,7 @@ describe('buildJokesQuery', () => {
       { field: 'userId', op: '==', value: 'uid-1' },
       { field: 'keywords', op: 'array-contains', value: 'cheese' },
       { field: 'category', op: 'in', value: ['Puns'] },
-      { field: 'funnyRate', op: '==', value: 5 },
+      { field: 'averageRating', op: '>=', value: 4.5 },
       { field: 'used', op: '==', value: false },
     ]);
     expect(constraints.at(-1)).toEqual({ type: 'limit', count: 7 });

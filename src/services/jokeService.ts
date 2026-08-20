@@ -20,6 +20,7 @@ import type { Joke } from '@/lib/types';
 import { ensureCategoryExists } from './categoryService';
 import { generateKeywords, generateSearchTokens } from '@/lib/text';
 import { isMissingIndexError, warnMissingIndex } from '@/lib/firestoreErrors';
+import { communityRatingBucket, isUnratedBucket } from '@/lib/ratingBuckets';
 import { toDate, toMillis } from '@/lib/firestoreTimestamps';
 
 const JOKES_COLLECTION = 'jokes';
@@ -43,6 +44,12 @@ const MAX_SEARCH_PAGES = 5;
 
 export interface FilterParams {
   selectedCategories: string[];
+  /**
+   * The community-rating band: -1 for any, 0 for unrated, 1-5 for a band of
+   * the joke's `averageRating`. The name and the `funnyRate` query parameter
+   * predate the fix that moved it off the author's own score; the URL form is
+   * kept so existing feed links keep working.
+   */
   filterFunnyRate: number;
   usageStatus: 'all' | 'used' | 'unused';
   scope: 'public' | 'user';
@@ -93,8 +100,33 @@ export function buildJokesQuery(
     queryConstraints.push(where('category', 'in', filters.selectedCategories.slice(0, 30)));
   }
 
-  if (filters.filterFunnyRate !== -1) {
-    queryConstraints.push(where('funnyRate', '==', filters.filterFunnyRate));
+  // The rating filter reads the community average the cards display, which
+  // `submitUserRating` maintains on the joke doc, and not `funnyRate` — the
+  // author's own score, which nothing but the edit form writes. A picker value
+  // becomes a band (see `ratingBuckets.ts`): the average is a mean rounded to
+  // one decimal, so equality would miss the 4.8s and 4.9s that are exactly
+  // what a user asking for five stars wants.
+  //
+  // Two consequences worth knowing about, both accepted here:
+  //   - a range filter makes Firestore order by that field before the explicit
+  //     ordering, so inside a band the page is grouped by average and only
+  //     then by date. The band's contents are right; "newest first" holds
+  //     within one average, not across the whole band.
+  //   - the composite index for a band plus the date ordering is a new
+  //     combination and is not deployed yet, which is what `fetchJokesPage`'s
+  //     degrade path exists for.
+  const ratingBucket = communityRatingBucket(filters.filterFunnyRate);
+  if (ratingBucket) {
+    if (isUnratedBucket(ratingBucket)) {
+      // Nobody has rated it. A count of zero, never a range: an unrated joke
+      // has no average to compare against.
+      queryConstraints.push(where('ratingCount', '==', 0));
+    } else {
+      queryConstraints.push(where('averageRating', '>=', ratingBucket.gte));
+      if (ratingBucket.lt !== undefined) {
+        queryConstraints.push(where('averageRating', '<', ratingBucket.lt));
+      }
+    }
   }
 
   if (filters.usageStatus === 'used') {
