@@ -116,8 +116,8 @@ export function buildJokesQuery(
   // Two consequences worth knowing about, both accepted here:
   //   - a range filter makes Firestore order by that field before the explicit
   //     ordering, so inside a band the page is grouped by average and only
-  //     then by date. The band's contents are right; "newest first" holds
-  //     within one average, not across the whole band.
+  //     then by date. The ordering block below makes that grouping explicit
+  //     and descending; see the note there.
   //   - the composite index for a band plus the date ordering is a new
   //     combination and is not deployed yet, which is what `fetchJokesPage`'s
   //     degrade path exists for.
@@ -142,6 +142,19 @@ export function buildJokesQuery(
   }
 
   if (orderByDateAdded) {
+    // The band's ordering comes first, and it is descending on purpose.
+    //
+    // Firestore orders by a range-filtered field ahead of every other ordering
+    // whether we ask for it or not, and the direction it picks when we don't
+    // ask is ascending — which puts the jokes at the top of the band on the
+    // LAST page. That is the shape Marco reported: a five-star joke he had
+    // just rated sat behind every 4.5 in the collection. Asking for descending
+    // reverses the group order, so the page reads highest average first and
+    // newest first inside one average. The index has to match the direction
+    // (see `firestore.indexes.json`).
+    if (ratingBucket && !isUnratedBucket(ratingBucket)) {
+      queryConstraints.push(orderBy('averageRating', 'desc'));
+    }
     queryConstraints.push(orderBy('dateAdded', 'desc'));
   }
 

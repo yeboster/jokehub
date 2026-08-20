@@ -97,6 +97,13 @@ function whereClauses(constraints: Constraint[]) {
     .map(({ field, op, value }) => ({ field, op, value }));
 }
 
+/** The orderings a query asked for, in the order it asked for them. */
+function orderings(constraints: Constraint[]) {
+  return constraints
+    .filter((constraint) => constraint.type === 'orderBy')
+    .map(({ field, direction }) => ({ field, direction }));
+}
+
 describe('buildJokesQuery', () => {
   it('targets the jokes collection', () => {
     expect(build()?.collectionRef.name).toBe('jokes');
@@ -184,6 +191,35 @@ describe('buildJokesQuery', () => {
     ]);
   });
 
+  // Marco's second report: with a band active Firestore orders by the banded
+  // field first, and its unasked-for direction is ascending — so his freshly
+  // rated 5.0 sat behind every 4.5 in the collection. Descending puts the top
+  // of the band on the first page.
+  it('orders a band by the average, descending, ahead of the date ordering', () => {
+    for (const filterFunnyRate of [1, 2, 3, 4, 5]) {
+      expect(orderings(constraintsOf({ filterFunnyRate }))).toEqual([
+        { field: 'averageRating', direction: 'desc' },
+        { field: 'dateAdded', direction: 'desc' },
+      ]);
+    }
+  });
+
+  it('orders by date alone when no band is active', () => {
+    expect(orderings(constraintsOf())).toEqual([{ field: 'dateAdded', direction: 'desc' }]);
+  });
+
+  it('leaves the unrated bucket ordered by date alone — a count clause is not a range', () => {
+    expect(orderings(constraintsOf({ filterFunnyRate: 0 }))).toEqual([
+      { field: 'dateAdded', direction: 'desc' },
+    ]);
+  });
+
+  it('drops the average ordering along with the date one on the no-ordering fallback', () => {
+    expect(orderings(constraintsOf({ filterFunnyRate: 5 }, undefined, null, { orderByDateAdded: false }))).toEqual(
+      []
+    );
+  });
+
   it('never constrains the author-owned funnyRate field', () => {
     for (const filterFunnyRate of [-1, 0, 1, 2, 3, 4, 5]) {
       expect(whereClauses(constraintsOf({ filterFunnyRate })).map((clause) => clause.field)).not.toContain(
@@ -242,6 +278,10 @@ describe('buildJokesQuery', () => {
       { field: 'averageRating', op: '>=', value: 4.5 },
       { field: 'used', op: '==', value: false },
     ]);
+    expect(orderings(constraints)).toEqual([
+      { field: 'averageRating', direction: 'desc' },
+      { field: 'dateAdded', direction: 'desc' },
+    ]);
     expect(constraints.at(-1)).toEqual({ type: 'limit', count: 7 });
   });
 });
@@ -296,7 +336,9 @@ describe('fetchJokes — the rating filter without its index', () => {
     // so does the cursor's meaning.
     expect(clausesOfCall(1)).toEqual([]);
     const retry = vi.mocked(queryFactory).mock.results[1].value as { constraints: Constraint[] };
-    expect(retry.constraints).toContainEqual({ type: 'orderBy', field: 'dateAdded', direction: 'desc' });
+    // Band gone, so the average ordering that belonged to it goes too: this
+    // page is plain newest-first, which is the ordering its index exists for.
+    expect(orderings(retry.constraints)).toEqual([{ field: 'dateAdded', direction: 'desc' }]);
   });
 
   it('reports the page as short rather than claiming the collection is empty', async () => {

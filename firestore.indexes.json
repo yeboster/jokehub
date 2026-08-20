@@ -70,7 +70,7 @@
       "collectionGroup": "jokes",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "averageRating", "order": "ASCENDING" },
+        { "fieldPath": "averageRating", "order": "DESCENDING" },
         { "fieldPath": "dateAdded", "order": "DESCENDING" }
       ]
     },
@@ -79,7 +79,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "averageRating", "order": "ASCENDING" },
+        { "fieldPath": "averageRating", "order": "DESCENDING" },
         { "fieldPath": "dateAdded", "order": "DESCENDING" }
       ]
     },
@@ -88,7 +88,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "category", "order": "ASCENDING" },
-        { "fieldPath": "averageRating", "order": "ASCENDING" },
+        { "fieldPath": "averageRating", "order": "DESCENDING" },
         { "fieldPath": "dateAdded", "order": "DESCENDING" }
       ]
     },
@@ -97,7 +97,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "used", "order": "ASCENDING" },
-        { "fieldPath": "averageRating", "order": "ASCENDING" },
+        { "fieldPath": "averageRating", "order": "DESCENDING" },
         { "fieldPath": "dateAdded", "order": "DESCENDING" }
       ]
     }
