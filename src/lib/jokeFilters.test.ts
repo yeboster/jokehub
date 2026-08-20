@@ -320,11 +320,11 @@ describe('activeFilterChips', () => {
 
   // Round 7 read "Own rating: …" here, because the filter was the author's own
   // score. It is the community average now, so the chip is the plain "Rating:"
-  // again and the values are bands rather than exact stars.
+  // again and the values are "and up" thresholds rather than exact stars.
   it('labels the rating chip with the shared bucket label', () => {
     expect(activeFilterChips(filters({ filterFunnyRate: 0 }))[0].label).toBe('Rating: Unrated');
     expect(activeFilterChips(filters({ filterFunnyRate: 1 }))[0].label).toBe('Rating: 1 star and up');
-    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Rating: 3–4 stars');
+    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Rating: 3 stars and up');
     expect(activeFilterChips(filters({ filterFunnyRate: 5 }))[0].label).toBe('Rating: 5 stars');
     expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].next.filterFunnyRate).toBe(-1);
   });

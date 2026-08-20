@@ -171,21 +171,29 @@ describe('buildJokesQuery', () => {
     ]);
   });
 
-  it('filters a rating band as a range over the community average', () => {
+  it('filters a rating band as a floor under the community average', () => {
     expect(whereClauses(constraintsOf({ filterFunnyRate: 4 }))).toEqual([
       { field: 'averageRating', op: '>=', value: 4 },
-      { field: 'averageRating', op: '<', value: 4.5 },
     ]);
     expect(whereClauses(constraintsOf({ filterFunnyRate: 2 }))).toEqual([
       { field: 'averageRating', op: '>=', value: 2 },
-      { field: 'averageRating', op: '<', value: 3 },
     ]);
+  });
+
+  // "3 stars and up" is one clause, not two: nothing is excluded from above,
+  // so a joke averaging 5 answers every choice from 1 to 5.
+  it('never puts a ceiling on a band', () => {
+    for (const filterFunnyRate of [1, 2, 3, 4, 5]) {
+      const clauses = whereClauses(constraintsOf({ filterFunnyRate }));
+      expect(clauses).toHaveLength(1);
+      expect(clauses[0].op).toBe('>=');
+    }
   });
 
   // Marco's case: a joke the community rates 5 averages 4.8 or 4.9 as often as
   // it averages exactly 5, and the old equality clause on the author's own
   // score matched none of them.
-  it('leaves the 5-star band open at the top, so a 4.8 average is in it', () => {
+  it('floors the 5-star band at 4.5, so a 4.8 average is in it', () => {
     expect(whereClauses(constraintsOf({ filterFunnyRate: 5 }))).toEqual([
       { field: 'averageRating', op: '>=', value: 4.5 },
     ]);
@@ -339,6 +347,23 @@ describe('fetchJokes — the rating filter without its index', () => {
     // Band gone, so the average ordering that belonged to it goes too: this
     // page is plain newest-first, which is the ordering its index exists for.
     expect(orderings(retry.constraints)).toEqual([{ field: 'dateAdded', direction: 'desc' }]);
+  });
+
+  it('keeps everything above the floor when the band is applied client-side', async () => {
+    getDocsMock.mockRejectedValueOnce(missingIndexError()).mockResolvedValueOnce(
+      snapshotOf([
+        { id: 'adored', averageRating: 5, ratingCount: 9 },
+        { id: 'liked', averageRating: 3.2, ratingCount: 5 },
+        { id: 'tolerated', averageRating: 2.9, ratingCount: 5 },
+      ]) as never
+    );
+
+    const page = await fetchJokes({ ...DEFAULTS, filterFunnyRate: 3 });
+
+    // "3 stars and up" — the 5 stays in, which is the whole point of the
+    // cumulative floors; only the 2.9 is below the line.
+    expect(page.jokes.map((joke) => joke.id)).toEqual(['adored', 'liked']);
+    expect(page.ratingFilterDegraded).toBe(true);
   });
 
   it('reports the page as short rather than claiming the collection is empty', async () => {

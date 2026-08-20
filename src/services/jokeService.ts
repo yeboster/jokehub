@@ -109,9 +109,10 @@ export function buildJokesQuery(
   // The rating filter reads the community average the cards display, which
   // `submitUserRating` maintains on the joke doc, and not `funnyRate` — the
   // author's own score, which nothing but the edit form writes. A picker value
-  // becomes a band (see `ratingBuckets.ts`): the average is a mean rounded to
+  // becomes a floor (see `ratingBuckets.ts`): the average is a mean rounded to
   // one decimal, so equality would miss the 4.8s and 4.9s that are exactly
-  // what a user asking for five stars wants.
+  // what a user asking for five stars wants. The floors are cumulative — "3
+  // stars and up" includes the 5s — so there is one clause, never two.
   //
   // Two consequences worth knowing about, both accepted here:
   //   - a range filter makes Firestore order by that field before the explicit
@@ -124,14 +125,11 @@ export function buildJokesQuery(
   const ratingBucket = communityRatingBucket(filters.filterFunnyRate);
   if (ratingBucket) {
     if (isUnratedBucket(ratingBucket)) {
-      // Nobody has rated it. A count of zero, never a range: an unrated joke
-      // has no average to compare against.
+      // Nobody has rated it. A count of zero, never a bound on the average: an
+      // unrated joke has no average to compare against.
       queryConstraints.push(where('ratingCount', '==', 0));
     } else {
       queryConstraints.push(where('averageRating', '>=', ratingBucket.gte));
-      if (ratingBucket.lt !== undefined) {
-        queryConstraints.push(where('averageRating', '<', ratingBucket.lt));
-      }
     }
   }
 
