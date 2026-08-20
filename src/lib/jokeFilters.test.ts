@@ -6,7 +6,6 @@ import {
   DEFAULT_FILTERS,
   filtersEqual,
   filtersToSearchParams,
-  getFunnyRateLabel,
   hasActiveFilters,
   nextChipFocusKey,
   parseFiltersFromParams,
@@ -127,6 +126,15 @@ describe('filtersToSearchParams', () => {
     expect(filtersToSearchParams(filters({ selectedCategories: [] })).has('categories')).toBe(false);
   });
 
+  // The filter's meaning moved to the community average; its URL form did not,
+  // so every bookmarked and shared feed link still resolves.
+  it('keeps the funnyRate parameter name and its -1..5 values', () => {
+    for (const rate of [0, 1, 2, 3, 4, 5]) {
+      expect(filtersToSearchParams(filters({ filterFunnyRate: rate })).toString()).toBe(`funnyRate=${rate}`);
+    }
+    expect(filtersToSearchParams(filters({ filterFunnyRate: -1 })).has('funnyRate')).toBe(false);
+  });
+
   it('serializes the 0 ("Unrated") funny rate rather than treating it as absent', () => {
     expect(filtersToSearchParams(filters({ filterFunnyRate: 0 })).get('funnyRate')).toBe('0');
   });
@@ -244,19 +252,6 @@ describe('hasActiveFilters', () => {
   });
 });
 
-describe('getFunnyRateLabel', () => {
-  it('labels the sentinel values', () => {
-    expect(getFunnyRateLabel(-1)).toBe('Any Rating');
-    expect(getFunnyRateLabel(0)).toBe('Unrated');
-  });
-
-  it('singularizes one star and pluralizes the rest', () => {
-    expect(getFunnyRateLabel(1)).toBe('1 Star');
-    expect(getFunnyRateLabel(2)).toBe('2 Stars');
-    expect(getFunnyRateLabel(5)).toBe('5 Stars');
-  });
-});
-
 describe('activeFilterChips', () => {
   /** The fields that differ between two filter sets — a chip must change one. */
   function changedFields(before: FilterParams, after: FilterParams): string[] {
@@ -323,11 +318,21 @@ describe('activeFilterChips', () => {
     expect(input.selectedCategories).toEqual(['Puns', 'Dad Jokes', 'Observational']);
   });
 
-  it('labels the rating chip with the shared rate label', () => {
-    expect(activeFilterChips(filters({ filterFunnyRate: 0 }))[0].label).toBe('Own rating: Unrated');
-    expect(activeFilterChips(filters({ filterFunnyRate: 1 }))[0].label).toBe('Own rating: 1 Star');
-    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Own rating: 3 Stars');
+  // Round 7 read "Own rating: …" here, because the filter was the author's own
+  // score. It is the community average now, so the chip is the plain "Rating:"
+  // again and the values are bands rather than exact stars.
+  it('labels the rating chip with the shared bucket label', () => {
+    expect(activeFilterChips(filters({ filterFunnyRate: 0 }))[0].label).toBe('Rating: Unrated');
+    expect(activeFilterChips(filters({ filterFunnyRate: 1 }))[0].label).toBe('Rating: 1 star and up');
+    expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].label).toBe('Rating: 3–4 stars');
+    expect(activeFilterChips(filters({ filterFunnyRate: 5 }))[0].label).toBe('Rating: 5 stars');
     expect(activeFilterChips(filters({ filterFunnyRate: 3 }))[0].next.filterFunnyRate).toBe(-1);
+  });
+
+  it('never labels the rating chip as the author’s own score', () => {
+    for (const rate of [0, 1, 2, 3, 4, 5]) {
+      expect(activeFilterChips(filters({ filterFunnyRate: rate }))[0].label).not.toContain('Own rating');
+    }
   });
 
   it('labels both usage statuses and resets them to "all"', () => {

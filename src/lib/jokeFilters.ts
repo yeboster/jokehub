@@ -1,4 +1,5 @@
 import type { FilterParams } from '@/services/jokeService';
+import { ANY_RATING, ratingBucketLabel } from '@/lib/ratingBuckets';
 
 /**
  * The single canonical filter state for the joke feed.
@@ -6,11 +7,17 @@ import type { FilterParams } from '@/services/jokeService';
  * Defaults are also the serializer's "absent" marker: a field equal to its
  * default never appears in the query string, so `/jokes` and
  * `/jokes?scope=public&usageStatus=all` are the same URL.
+ *
+ * `filterFunnyRate` keeps its name and its `funnyRate` query parameter, but it
+ * now selects a band of the *community average* (see `ratingBuckets.ts`), not
+ * the author's own score. The values are unchanged — -1 for any, 0 for
+ * unrated, 1-5 for a band — so every bookmarked and shared feed URL still
+ * resolves; what changes is which jokes come back, which is the point.
  */
 export const DEFAULT_FILTERS: FilterParams = {
   scope: 'public',
   selectedCategories: [],
-  filterFunnyRate: -1,
+  filterFunnyRate: ANY_RATING,
   usageStatus: 'all',
   search: '',
 };
@@ -124,13 +131,6 @@ export function hasActiveFilters(filters: FilterParams): boolean {
   return filtersToSearchParams(filters).toString() !== '';
 }
 
-/** Human-readable label for the `filterFunnyRate` value, for badges and selects. */
-export function getFunnyRateLabel(rate: number): string {
-  if (rate === -1) return 'Any Rating';
-  if (rate === 0) return 'Unrated';
-  return `${rate} Star${rate > 1 ? 's' : ''}`;
-}
-
 /** One removable active filter, as rendered in the `/jokes` badge row. */
 export interface FilterChip {
   /** Stable identity for React keys and for tests. */
@@ -186,9 +186,11 @@ export function activeFilterChips(filters: FilterParams): FilterChip[] {
   if (filters.filterFunnyRate !== DEFAULT_FILTERS.filterFunnyRate) {
     chips.push({
       key: 'funnyRate',
-      // "Own rating", not "Rating": this filters the author's own score, and
-      // the number on every card is the community average.
-      label: `Own rating: ${getFunnyRateLabel(filters.filterFunnyRate)}`,
+      // Back to "Rating": round 7 qualified this as the author's own score
+      // because that is what it filtered. It now filters the average shown on
+      // every card, so the plain word is the honest one again. The chip key
+      // and the query parameter keep the old name — they are URL state.
+      label: `Rating: ${ratingBucketLabel(filters.filterFunnyRate)}`,
       next: { ...filters, filterFunnyRate: DEFAULT_FILTERS.filterFunnyRate },
     });
   }
