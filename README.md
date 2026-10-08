@@ -21,6 +21,14 @@ Server references require finite average rating4–5 and integer rating count≥
 
 Default successful generation uses two application `ai.generate` invocations. Trusted repair allows at most four (generation, critic, one replacement generation, one replacement critic), with no repeated repair. These ceilings do **not** guarantee provider request counts, SDK retries, token usage, monetary cost or latency.
 
+### Progress and troubleshooting
+
+The add-joke page requests `Accept: application/x-ndjson` from `POST /api/generate-joke`. It shows actual server stages (examples, candidate writing, review, selection, optional repair/review/fallback), elapsed time, and a selectable request ID. Errors stay inline with **Try again**; a lost/truncated stream becomes an error, not a success. No percentage or per-token progress is inferred. Slow-request guidance appears after 30 seconds.
+
+Clients without that Accept value still receive the existing JSON success shape. Authentication, validation and rate-limit failures remain HTTP JSON errors, even for streaming clients. Every response includes `x-request-id`. Streaming responses use newline-delimited `progress`, `heartbeat` (every five seconds while active), and exactly one terminal `result` or `error` frame for connected requests. After streaming starts, HTTP status is 200; inspect the terminal frame for success/failure. `result.output` contains the existing `{ jokes: [...] }` payload. Browser disconnects stop subsequent application model calls; an already-running provider call is **not** guaranteed to stop or avoid charges.
+
+Search runtime logs for `[joke-generation]` and the request ID. Records include event, stage, elapsed/stage duration in milliseconds, selected model, application call count and sanitized error codes. They exclude tokens, prompts, joke/context text, user IDs and raw provider exceptions. Unknown generation failures return a generic retry message; known quality/scarcity errors retain their helpful text. Heartbeats indicate an open connection, not model work or quality guarantees. Hosting/proxy buffering and authenticated live generation require separate deployment verification.
+
 ### Offline evaluation
 
 Frozen synthetic fixtures demonstrate reproducible blind comparisons, failure/tie accounting and honest unknown telemetry. They do not establish humor, safety, originality or repair efficacy. No live quality comparison or paid provider adapter is supplied. See [evaluation workflow](docs/joke-evaluation.md) for preparation, human-rating summaries and explicit trusted-adapter limitations.

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +15,8 @@ const doc = (id: string, data: Record<string, unknown>) => ({ id, data: () => da
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
   mocks.auth.mockResolvedValue({ success: true, via: 'firebase', userId: 'u' });
   mocks.rate.mockReturnValue({ allowed: true });
   mocks.collection.mockReturnValue({ orderBy: mocks.order });
@@ -23,6 +25,110 @@ beforeEach(() => {
   mocks.get.mockResolvedValue({ docs: [] });
   mocks.generate.mockResolvedValue({ jokes: ['one', 'two', 'three'].map(jokeText => ({ jokeText, category: 'Work' })) });
   vi.stubEnv('JOKEHUB_ENABLE_JOKE_REPAIR', 'false');
+});
+
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+
+describe('generation progress transport', () => {
+  it.each(['complete', 'cancel', 'abort'] as const)('sends five-second heartbeats and clears timer on %s', async ending => {
+    vi.useFakeTimers();
+    let finish!: (value: unknown) => void;
+    mocks.generate.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const controller = new AbortController();
+    const res = await POST(new NextRequest('http://localhost/api/generate-joke', {
+      method: 'POST', headers: { Accept: 'application/x-ndjson' }, signal: controller.signal,
+      body: JSON.stringify({ useServerExemplars: false }),
+    }));
+    const reader = res.body!.getReader();
+    const decode = (value: Uint8Array | undefined) => new TextDecoder().decode(value);
+    expect(decode((await reader.read()).value)).toContain('"type":"progress"');
+    await vi.advanceTimersByTimeAsync(4999);
+    let received = false;
+    const next = reader.read().then(chunk => { received = true; return chunk; });
+    await Promise.resolve();
+    expect(received).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(JSON.parse(decode((await next).value))).toMatchObject({ type: 'heartbeat', elapsedMs: 5000 });
+    if (ending === 'cancel') await reader.cancel();
+    if (ending === 'abort') controller.abort();
+    finish({ jokes: [] });
+    if (ending !== 'cancel') { while (!(await reader.read()).done) { /* drain terminal */ } }
+    expect(vi.getTimerCount()).toBe(0);
+    reader.releaseLock();
+  });
+  it('streams real stage/result frames and correlates sanitized logs', async () => {
+    let finish!: (value: unknown) => void;
+    mocks.generate.mockImplementationOnce((_input, options) => {
+      options.onProgress({ stage: 'generating', callCount: 1 });
+      return new Promise(resolve => { finish = resolve; });
+    });
+    const req = new NextRequest('http://localhost/api/generate-joke', {
+      method: 'POST', headers: { Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ useServerExemplars: false, topicHint: 'PRIVATE_TOPIC', prefilledJokes: ['PRIVATE_JOKE'] }),
+    });
+    const res = await POST(req);
+    expect(res.headers.get('content-type')).toContain('application/x-ndjson');
+    expect(res.headers.get('x-request-id')).toBeTruthy();
+    const reader = res.body!.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    expect(first).toContain('"stage":"examples"');
+    finish({ jokes: ['one', 'two', 'three'].map(jokeText => ({ jokeText, category: 'Work' })) });
+    let rest = ''; while (true) { const chunk = await reader.read(); if (chunk.done) break; rest += new TextDecoder().decode(chunk.value); }
+    expect(first + rest).toContain('"stage":"generating"');
+    expect(first + rest).toContain('"type":"result"');
+    const logs = JSON.stringify(vi.mocked(console.info).mock.calls);
+    expect(logs).toContain(res.headers.get('x-request-id'));
+    expect(logs).toContain('callCount');
+    expect(logs).not.toMatch(/PRIVATE_TOPIC|PRIVATE_JOKE/);
+  });
+  it('keeps request ID on early HTTP errors and never starts streaming or AI before auth', async () => {
+    mocks.auth.mockResolvedValueOnce({ success: false, error: 'Unauthorized' });
+    const res = await POST(new NextRequest('http://localhost/api/generate-joke', { method: 'POST', headers: { Accept: 'application/x-ndjson' }, body: '{}' }));
+    expect(res.status).toBe(401);
+    expect(res.headers.get('x-request-id')).toBeTruthy();
+    expect(res.headers.get('content-type')).toContain('application/json');
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+  it('stream cancellation revokes flow signal and progress logging also works for JSON callers', async () => {
+    let finish!: (value: unknown) => void;
+    let signal!: AbortSignal;
+    mocks.generate.mockImplementationOnce((_input, options) => {
+      signal = options.signal;
+      return new Promise(resolve => { finish = resolve; });
+    });
+    const res = await POST(new NextRequest('http://localhost/api/generate-joke', { method: 'POST', headers: { Accept: 'application/x-ndjson' }, body: '{"useServerExemplars":false}' }));
+    await res.body!.cancel();
+    expect(signal.aborted).toBe(true);
+    finish({ jokes: [] });
+    mocks.generate.mockImplementationOnce(async (_input, options) => { options.onProgress({ stage: 'reviewing', callCount: 2 }); return { jokes: [] }; });
+    expect((await POST(request({ useServerExemplars: false }))).headers.get('content-type')).toContain('application/json');
+    expect(JSON.stringify(vi.mocked(console.info).mock.calls)).toContain('reviewing');
+  });
+  it.each(['toString', 'constructor', '__proto__'])('sanitizes unknown prototype-property errors %s for JSON and streams', async message => {
+    for (const streaming of [false, true]) {
+      mocks.generate.mockRejectedValueOnce(new Error(message));
+      const res = await POST(new NextRequest('http://localhost/api/generate-joke', {
+        method: 'POST', headers: streaming ? { Accept: 'application/x-ndjson' } : {},
+        body: JSON.stringify({ useServerExemplars: false }),
+      }));
+      if (streaming) {
+        const frames = (await res.text()).trim().split('\n').map(line => JSON.parse(line));
+        expect(frames.at(-1)).toEqual({ type: 'error', requestId: res.headers.get('x-request-id'), error: 'Could not generate jokes. Please try again.', code: 'GENERATION_FAILED' });
+      } else {
+        expect(res.status).toBe(500);
+        expect(await res.json()).toEqual({ error: 'Could not generate jokes. Please try again.' });
+      }
+    }
+  });
+  it('returns persistent safe stream errors, never raw upstream details', async () => {
+    mocks.generate.mockRejectedValueOnce(new Error('SECRET provider prompt and token'));
+    const res = await POST(new NextRequest('http://localhost/api/generate-joke', { method: 'POST', headers: { Accept: 'application/x-ndjson' }, body: JSON.stringify({ useServerExemplars: false }) }));
+    const text = await res.text();
+    expect(text).toContain('"type":"error"');
+    expect(text).toContain('requestId');
+    expect(text).not.toContain('SECRET');
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('SECRET');
+  });
 });
 
 describe('generation route context', () => {
@@ -53,13 +159,13 @@ describe('generation route context', () => {
   it('preserves separate history, client-first normalized references and zero temperature', async () => {
     expect((await POST(request({ useServerExemplars: false, prefilledJokes: ['Hello!', 'hello'], exemplarJokes: ['ＡBC!', 'abc'], recentGeneratedJokes: ['last batch'], temperature: 0 }))).status).toBe(200);
     expect(mocks.get).not.toHaveBeenCalled();
-    expect(mocks.generate).toHaveBeenCalledWith(expect.objectContaining({ prefilledJokes: ['Hello!'], exemplarJokes: ['ＡBC!'], recentGeneratedJokes: ['last batch'], temperature: 0 }), { allowRepair: false });
+    expect(mocks.generate).toHaveBeenCalledWith(expect.objectContaining({ prefilledJokes: ['Hello!'], exemplarJokes: ['ＡBC!'], recentGeneratedJokes: ['last batch'], temperature: 0 }), expect.objectContaining({ allowRepair: false, onProgress: expect.any(Function), signal: expect.any(AbortSignal) }));
   });
   it.each([undefined, 'false', 'TRUE', '1', 'true'])('only literal trusted repair config enables option: %s', async value => {
     if (value === undefined) delete process.env.JOKEHUB_ENABLE_JOKE_REPAIR;
     else vi.stubEnv('JOKEHUB_ENABLE_JOKE_REPAIR', value);
     await POST(request({ useServerExemplars: false, allowRepair: true }));
-    expect(mocks.generate.mock.calls[0][1]).toEqual({ allowRepair: value === 'true' });
+    expect(mocks.generate.mock.calls[0][1]).toEqual(expect.objectContaining({ allowRepair: value === 'true', onProgress: expect.any(Function), signal: expect.any(AbortSignal) }));
     expect(mocks.generate.mock.calls[0][0]).not.toHaveProperty('allowRepair');
   });
   it('auth denial precedes reads, rate limit and AI', async () => {

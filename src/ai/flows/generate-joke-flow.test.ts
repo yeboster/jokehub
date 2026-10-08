@@ -31,6 +31,31 @@ function initial(verdict = rankings(), jokes = candidates) {
 
 beforeEach(() => { aiMock.generate.mockReset(); });
 
+describe('real progress boundaries', () => {
+  it('reports stages before each awaited call and includes repair/fallback without extra calls', async () => {
+    initial();
+    aiMock.generate.mockRejectedValueOnce(new Error('private upstream details'));
+    const events: Array<{ stage: string; callCount: number }> = [];
+    await generateJoke({}, { allowRepair: true, onProgress: (event: { stage: string; callCount: number }) => events.push(event) } as Parameters<typeof generateJoke>[1]);
+    expect(events.map(e => e.stage)).toEqual(['generating', 'reviewing', 'selecting', 'repairing', 'repair-fallback']);
+    expect(events.map(e => e.callCount)).toEqual([1, 2, 2, 3, 3]);
+    expect(aiMock.generate).toHaveBeenCalledTimes(3);
+  });
+  it('disconnect prevents the next model call, without pretending to cancel an in-flight provider request', async () => {
+    const controller = new AbortController();
+    aiMock.generate.mockImplementationOnce(async () => { controller.abort(); return { output: { jokes: candidates } }; });
+    await expect(generateJoke({}, { signal: controller.signal })).rejects.toThrow('disconnected');
+    expect(aiMock.generate).toHaveBeenCalledTimes(1);
+  });
+  it('reports default-off progress and observer failure cannot break generation', async () => {
+    initial(rankings([10, 9, 8, 7, 6, 5]));
+    const stages: string[] = [];
+    await generateJoke({}, { onProgress: (event: { stage: string }) => { stages.push(event.stage); throw new Error('observer'); } } as Parameters<typeof generateJoke>[1]);
+    expect(stages).toEqual(['generating', 'reviewing', 'selecting']);
+    expect(aiMock.generate).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('explicit-index quality selection', () => {
   it('selects explicit indices from shuffled full permutation, independent of verdict order', async () => {
     const verdict = rankings();
@@ -193,7 +218,9 @@ describe('trusted bounded repair', () => {
   });
   it.each(['equal', 'worse'] as const)('keeps baseline when replacement %s', async (kind) => {
     initial(); aiMock.generate.mockResolvedValueOnce({ output: { jokes: replacement } }).mockResolvedValueOnce({ output: rankings(kind === 'equal' ? undefined : [1, 2, 3, 4, 5, 6]) });
-    await expect(generateJoke({}, { allowRepair: true })).resolves.toEqual({ jokes: [candidates[1], candidates[3], candidates[5]] });
+    const stages: string[] = [];
+    await expect(generateJoke({}, { allowRepair: true, onProgress: event => stages.push(event.stage) })).resolves.toEqual({ jokes: [candidates[1], candidates[3], candidates[5]] });
+    expect(stages.at(-1)).toBe('repair-fallback');
     expect(aiMock.generate).toHaveBeenCalledTimes(4);
   });
   it.each(['generator throws', 'generator invalid', 'critic throws', 'critic invalid', 'scarcity'] as const)('preserves usable baseline after repair %s', async (failure) => {
@@ -206,7 +233,9 @@ describe('trusted bounded repair', () => {
       else if (failure === 'critic invalid') aiMock.generate.mockResolvedValueOnce({ output: null });
       else { const verdict = rankings(); verdict.rankings.forEach(r => { r.original = false; }); aiMock.generate.mockResolvedValueOnce({ output: verdict }); }
     }
-    await expect(generateJoke({}, { allowRepair: true })).resolves.toEqual({ jokes: [candidates[1], candidates[3], candidates[5]] });
+    const stages: string[] = [];
+    await expect(generateJoke({}, { allowRepair: true, onProgress: event => stages.push(event.stage) })).resolves.toEqual({ jokes: [candidates[1], candidates[3], candidates[5]] });
+    expect(stages.at(-1)).toBe('repair-fallback');
     expect(aiMock.generate).toHaveBeenCalledTimes(failure.startsWith('generator') ? 3 : 4);
   });
   it.each(['success', 'generator throws', 'generator invalid', 'critic throws', 'critic invalid', 'scarcity'] as const)('no-baseline repair %s obeys scarcity and call bound', async (failure) => {
@@ -218,9 +247,11 @@ describe('trusted bounded repair', () => {
       if (failure === 'critic throws') aiMock.generate.mockRejectedValueOnce(new Error('offline'));
       else aiMock.generate.mockResolvedValueOnce({ output: failure === 'critic invalid' ? null : failure === 'scarcity' ? verdict : rankings() });
     }
-    const result = generateJoke({}, { allowRepair: true });
+    const stages: string[] = [];
+    const result = generateJoke({}, { allowRepair: true, onProgress: event => stages.push(event.stage) });
     if (failure === 'success') await expect(result).resolves.toEqual({ jokes: [replacement[1], replacement[3], replacement[5]] });
     else await expect(result).rejects.toThrow(scarcityError);
+    expect(stages).not.toContain('repair-fallback');
     expect(aiMock.generate).toHaveBeenCalledTimes(failure.startsWith('generator') ? 3 : 4);
   });
   it('concurrent on/off requests never share repair policy', async () => {

@@ -25,6 +25,7 @@ import * as jokeService from '@/services/jokeService';
 import { Separator } from '@/components/ui/separator';
 import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import { z } from 'zod';
+import { GENERATION_STAGE_LABELS, readGenerationStream, type GenerationStage } from '@/lib/generationProgress';
 
 const GenerationResponseSchema = z.object({
   jokes: z.array(z.object({
@@ -59,6 +60,16 @@ function AddJokeSession() {
   const [temperature, setTemperature] = useState([0.8]);
   const [inspirationalJokes, setInspirationalJokes] = useState<string[]>([]);
   const [isLoadingInspirationalJokes, setIsLoadingInspirationalJokes] = useState(false);
+  const [progressStage, setProgressStage] = useState<GenerationStage | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    if (!isGeneratingJoke) return;
+    const started = Date.now();
+    const timer = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [isGeneratingJoke]);
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -132,6 +143,10 @@ function AddJokeSession() {
     const current = () => mounted.current && session.current.uid === owner.uid &&
       session.current.epoch === owner.epoch && generation.current?.id === operation.id;
     setIsGeneratingJoke(true);
+    setProgressStage(null);
+    setRequestId(null);
+    setGenerationError(null);
+    setElapsedSeconds(0);
     setSelectedJoke(null);
     setAiGeneratedJokes([]);
     try {
@@ -140,20 +155,27 @@ function AddJokeSession() {
       const response = await fetch('/api/generate-joke', {
         method: 'POST',
         signal: operation.controller.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           topicHint: aiTopicHint.trim(), prefilledJokes, exemplarJokes, recentGeneratedJokes,
           model: selectedModel, temperature: temperature[0],
         }),
       });
       if (!current()) return;
+      setRequestId(response.headers?.get('x-request-id') ?? null);
       if (!response.ok) {
         let errorData;
         try { errorData = await response.json(); } catch { /* preserve HTTP error */ }
         if (!current()) return;
         throw new Error(errorData?.error || `API request failed with status ${response.status}`);
       }
-      const payload: unknown = await response.json();
+      const payload: unknown = response.headers?.get('content-type')?.includes('application/x-ndjson') && response.body
+        ? await readGenerationStream(response.body, frame => {
+          if (!current()) return;
+          setRequestId(frame.requestId);
+          if (frame.type === 'progress') setProgressStage(frame.stage);
+        })
+        : await response.json();
       if (!current()) return;
       const result = GenerationResponseSchema.parse(payload);
       history.current = mergeUniqueJokeTexts(result.jokes.map(joke => joke.jokeText), history.current, JOKE_GENERATION_LIMITS.recentGeneratedJokes);
@@ -166,8 +188,9 @@ function AddJokeSession() {
       toast({ title: 'Three variations ready', description: 'Pick one to fill the form.' });
     } catch (error) {
       if (!current()) return;
-      console.error('Error generating joke via API:', error);
-      toast({ title: "Couldn't generate jokes", description: error instanceof Error ? error.message : 'Failed to generate jokes.', variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Failed to generate jokes.';
+      setGenerationError(message);
+      toast({ title: "Couldn't generate jokes", description: message, variant: 'destructive' });
     } finally {
       if (current()) {
         generation.current = null;
@@ -356,7 +379,7 @@ function AddJokeSession() {
                               className="w-full"
                           >
                               <Wand2 className="mr-2 h-4 w-4" />
-                              {aiGeneratedJokes.length > 0 ? 'Generate Again' : 'Generate 3 Jokes'}
+                              {isGeneratingJoke ? 'Generating…' : aiGeneratedJokes.length > 0 ? 'Generate Again' : 'Generate 3 Jokes'}
                           </Button>
                       </div>
                     
@@ -364,9 +387,23 @@ function AddJokeSession() {
                           text changes — a role="status" that mounts with its
                           message already inside it does not announce. The
                           placeholder below carries the same words on screen. */}
-                      <p role="status" className="sr-only">
-                        {isGeneratingJoke ? 'Generating witty humor…' : ''}
-                      </p>
+                      <div role="status" aria-live="polite" className="text-sm text-center text-muted-foreground">
+                        {isGeneratingJoke ? progressStage ? `${GENERATION_STAGE_LABELS[progressStage]}…` : 'Connecting securely…' : ''}
+                      </div>
+                      {(isGeneratingJoke || generationError || aiGeneratedJokes.length > 0) && (
+                        <div className="space-y-1 text-center text-xs text-muted-foreground">
+                          <p>Elapsed: {elapsedSeconds}s</p>
+                          {requestId && <p className="break-all">Request ID: <code className="select-all">{requestId}</code></p>}
+                        </div>
+                      )}
+                      {generationError && (
+                        <div role="alert" className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                          <p className="font-medium">Couldn&apos;t generate jokes</p>
+                          <p className="text-sm">{generationError}</p>
+                          {requestId && <p className="text-xs break-all">Request ID: <code className="select-all">{requestId}</code></p>}
+                          <Button variant="outline" onClick={handleGenerateJoke} disabled={isGeneratingJoke}>Try again</Button>
+                        </div>
+                      )}
 
                       <AnimatePresence>
                         {isGeneratingJoke && (
@@ -379,7 +416,7 @@ function AddJokeSession() {
                             >
                                 <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
                                 <p className="text-lg font-medium text-muted-foreground">Generating witty humor…</p>
-                                <p className="text-sm text-muted-foreground">This may take a moment.</p>
+                                <p className="text-sm text-muted-foreground">{elapsedSeconds >= 30 ? 'Still working. Model responses can take time; progress updates appear above.' : 'Live stages appear above as each step starts.'}</p>
                             </motion.div>
                         )}
                       </AnimatePresence>

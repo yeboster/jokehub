@@ -29,6 +29,39 @@ beforeEach(() => {
 });
 afterEach(async () => { await settle(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 
+describe('visible generation progress', () => {
+  it('shows real server stage and request ID while pending, then keeps errors inline with retry', async () => {
+    let enqueue!: (value: unknown) => void; let close!: () => void;
+    mocks.fetch.mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers({ 'Content-Type': 'application/x-ndjson', 'x-request-id': 'req-ui' }), body: new ReadableStream({ start(controller) { enqueue = value => controller.enqueue(new TextEncoder().encode(JSON.stringify(value) + '\n')); close = () => controller.close(); } }) });
+    await render(); await generate();
+    await settle(() => enqueue({ type: 'progress', requestId: 'req-ui', stage: 'reviewing', elapsedMs: 1000, callCount: 2 }));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Reviewing quality');
+    expect(container.textContent).toContain('req-ui');
+    expect(mocks.fetch.mock.calls[0][1].headers.Accept).toBe('application/x-ndjson');
+    await settle(() => { enqueue({ type: 'error', requestId: 'req-ui', error: 'Joke quality check failed. Please try again.', code: 'QUALITY_CHECK_FAILED' }); close(); });
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Joke quality check failed');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('req-ui');
+    expect(button('Try again').disabled).toBe(false);
+  });
+  it('stale streamed progress/error cannot cross an account switch', async () => {
+    let enqueue!: (value: unknown) => void; let close!: () => void;
+    mocks.fetch.mockResolvedValueOnce({ ok: true, headers: new Headers({ 'Content-Type': 'application/x-ndjson' }), body: new ReadableStream({ start(c) { enqueue = value => c.enqueue(new TextEncoder().encode(JSON.stringify(value) + '\n')); close = () => c.close(); } }) });
+    await render(); await generate();
+    mocks.auth.user = user('b'); await render();
+    const count = mocks.toast.mock.calls.length;
+    await settle(() => { enqueue({ type: 'progress', requestId: 'old-request', stage: 'repairing', elapsedMs: 1, callCount: 3 }); enqueue({ type: 'error', requestId: 'old-request', error: 'Old failure', code: 'FAIL' }); close(); });
+    expect(container.textContent).not.toContain('old-request');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(mocks.toast).toHaveBeenCalledTimes(count);
+  });
+  it('turns an interrupted stream into persistent error instead of stuck spinner', async () => {
+    mocks.fetch.mockResolvedValueOnce({ ok: true, headers: new Headers({ 'Content-Type': 'application/x-ndjson' }), body: new ReadableStream({ start(controller) { controller.close(); } }) });
+    await render(); await generate();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('interrupted');
+    expect(button('Generate').disabled).toBe(false);
+  });
+});
+
 describe('recent generation memory', () => {
   it('second request sends prior ranked batch separately, retains latest 12 and excludes failed batch', async () => {
     await render();
@@ -78,7 +111,7 @@ describe('request/session authority', () => {
     await generate(); expect(bodies().at(-1).recentGeneratedJokes).toEqual([]);
     const count = mocks.toast.mock.calls.length;
     await settle(() => { if (boundary === 'token') token.resolve('old-token'); else if (boundary === 'json') json.resolve(batch(99)); else if (boundary === 'reject') fetch.reject(new Error('stale')); else fetch.resolve(response(batch(99))); });
-    expect(container.querySelector('[role="status"]')?.textContent).toBe('Generating witty humor…');
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Connecting securely…');
     expect(container.textContent).not.toContain('batch 99');
     expect(mocks.toast).toHaveBeenCalledTimes(count);
     if (oldSignal) expect(oldSignal.aborted).toBe(true);
