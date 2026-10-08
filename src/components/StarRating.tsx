@@ -49,7 +49,9 @@ const StarGlyph: FC<StarGlyphProps> = ({ fillPercent, size, starClassName }) => 
         className="absolute inset-y-0 left-0 flex overflow-hidden"
         style={{ width: `${fillPercent}%` }}
       >
-        <Star size={size} fill="currentColor" className={cn('text-primary', starClassName)} />
+        {/* Keep the full glyph inside the clip; flex shrinking would squeeze
+            a fractional star instead of revealing only its left portion. */}
+        <Star size={size} fill="currentColor" style={{ flexShrink: 0 }} className={cn('text-primary', starClassName)} />
       </span>
     )}
   </span>

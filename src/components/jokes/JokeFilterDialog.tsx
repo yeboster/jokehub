@@ -101,8 +101,8 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
   };
 
   const visibleCategories = useMemo(() => {
-    if (!categorySearch) return categoryNames;
-    return categoryNames.filter((name) => name.toLowerCase().includes(categorySearch.toLowerCase()));
+    const query = categorySearch.trim().toLowerCase();
+    return categoryNames.filter((name) => name.toLowerCase().includes(query));
   }, [categoryNames, categorySearch]);
 
   return (
@@ -111,7 +111,12 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
         <Button ref={triggerRef} variant="outline" size="sm" onClick={openDialog} className="h-9">
           <FilterIcon className="mr-2 h-4 w-4" />
           Filters
-          {hasActiveFilters(value) && <span className="ml-2 h-2 w-2 rounded-full bg-primary" />}
+          {hasActiveFilters(value) && (
+            <>
+              <span aria-hidden="true" className="ml-2 h-2 w-2 rounded-full bg-primary" />
+              <span className="sr-only"> (active filters)</span>
+            </>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px]">
@@ -159,8 +164,9 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
                   className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-hidden"
                   align="start"
                 >
-                  <Command>
+                  <Command shouldFilter={false} label="Search categories">
                     <CommandInput
+                      aria-label="Search categories"
                       placeholder="Search categories…"
                       value={categorySearch}
                       onValueChange={setCategorySearch}
@@ -255,8 +261,9 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
               filtering strangers' private notes. */}
           {user && (
           <div className="grid grid-cols-4 items-start gap-4">
-            <Label className="text-right pt-2">Usage Status</Label>
+            <Label id="modal-usage-status-label" className="text-right pt-2">Usage Status</Label>
             <RadioGroup
+              aria-labelledby="modal-usage-status-label"
               value={draft.usageStatus}
               onValueChange={(usageStatus: FilterParams['usageStatus']) =>
                 setDraft((prev) => ({ ...prev, usageStatus }))
@@ -280,6 +287,17 @@ export default function JokeFilterDialog({ value, onApply, triggerRef }: JokeFil
           )}
         </div>
         <DialogFooter className="pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={() => setDraft((prev) => ({
+              ...prev,
+              selectedCategories: [],
+              filterFunnyRate: ANY_RATING,
+              usageStatus: 'all',
+            }))}
+          >
+            Clear filters
+          </Button>
           <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
           <Button onClick={handleApply}>Apply Filters</Button>
         </DialogFooter>
