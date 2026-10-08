@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "variantId": "new",
+  "sourceCommit": null,
+  "fixtureHash": "1e3d1b3f7d6004773ed80a8c6c92be08555a8763cb10c8c1564eeb052cde914c",
+  "model": "googleai/gemini-3.6-flash",
+  "temperature": 1.1,
+  "captureKind": "synthetic",
+  "adapterVersion": "synthetic-demonstration-v1",
+  "telemetryDefinition": {
+    "tokenSource": null,
+    "latencySource": null
+  },
+  "records": [
+    {
+      "caseId": "no-topic",
+      "inputHash": "ff99c3a81113eb006c4569d977b345358fd5702f4e23cf26618122b687a71fe1",
+      "status": "success",
+      "output": {
+        "jokes": [
+          {
+            "jokeText": "Synthetic setup no-topic number 1. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup no-topic number 2. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup no-topic number 3. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          }
+        ]
+      },
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "narrow-topic",
+      "inputHash": "07fc7cad1232771e51a6f0904b3133f5b2f69f4a9c8e018512b1820a27560956",
+      "status": "success",
+      "output": {
+        "jokes": [
+          {
+            "jokeText": "Synthetic setup narrow-topic number 1. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup narrow-topic number 2. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup narrow-topic number 3. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          }
+        ]
+      },
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "context-overlap",
+      "inputHash": "02026a1ecd3db1b76218e57fb1372091fa47242a63d2fde198a383910f0883ca",
+      "status": "success",
+      "output": {
+        "jokes": [
+          {
+            "jokeText": "Synthetic setup context-overlap number 1. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup context-overlap number 2. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup context-overlap number 3. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          }
+        ]
+      },
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "italian",
+      "inputHash": "b53d649ad377d44bddf05943408b5c97b83d003455296c7989c05ef263b2d147",
+      "status": "success",
+      "output": {
+        "jokes": [
+          {
+            "jokeText": "Synthetic setup italian number 1. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup italian number 2. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup italian number 3. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          }
+        ]
+      },
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "spanish",
+      "inputHash": "70f0e4d070c96af73dc1bf88dbbb61b0a4eedb8b1173603cad8ae6b35b32432d",
+      "status": "failure",
+      "errorCode": "SYNTHETIC_FAILURE",
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "format",
+      "inputHash": "9c00378fc1d2ffa1ff51dc1f3d4ef70fed2384ae0104aea3ee599e0522cae2b6",
+      "status": "success",
+      "output": {
+        "jokes": [
+          {
+            "jokeText": "Synthetic setup format number 1. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup format number 2. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup format number 3. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          }
+        ]
+      },
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "regeneration",
+      "inputHash": "240c92fe8e33ca5de39b573f15e1def53ead8a0803250baf66bff0476c7b6f85",
+      "status": "success",
+      "output": {
+        "jokes": [
+          {
+            "jokeText": "Synthetic setup regeneration number 1. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup regeneration number 2. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          },
+          {
+            "jokeText": "Synthetic setup regeneration number 3. Not quality evidence.",
+            "category": "Synthetic demonstration"
+          }
+        ]
+      },
+      "telemetry": {
+        "modelCalls": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    },
+    {
+      "caseId": "failure-pair",
+      "inputHash": "11e8445036404d092792fc2014cb474318754091a09cc66bdb587518d04258dd",
+      "status": "failure",
+      "errorCode": "SYNTHETIC_FAILURE",
+      "telemetry": {
+        "modelCalls": 2,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "latencyMs": null
+      }
+    }
+  ]
+}

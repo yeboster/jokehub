@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "caseId": "no-topic",
+      "dimensions": [
+        "no-topic"
+      ],
+      "input": {}
+    },
+    {
+      "caseId": "narrow-topic",
+      "dimensions": [
+        "narrow-topic"
+      ],
+      "input": {
+        "topicHint": "A librarian repairing a squeaky book cart"
+      }
+    },
+    {
+      "caseId": "context-overlap",
+      "dimensions": [
+        "context-overlap"
+      ],
+      "input": {
+        "topicHint": "Coffee at work",
+        "prefilledJokes": [
+          "My coffee requested overtime."
+        ],
+        "exemplarJokes": [
+          "The espresso filed a tiny complaint."
+        ]
+      }
+    },
+    {
+      "caseId": "italian",
+      "dimensions": [
+        "explicit-language"
+      ],
+      "input": {
+        "topicHint": "Scrivi in italiano: un gatto al supermercato."
+      }
+    },
+    {
+      "caseId": "spanish",
+      "dimensions": [
+        "explicit-language"
+      ],
+      "input": {
+        "topicHint": "En español: un robot aprende a cocinar."
+      }
+    },
+    {
+      "caseId": "format",
+      "dimensions": [
+        "explicit-format"
+      ],
+      "input": {
+        "topicHint": "Three knock-knock jokes about gardening; keep knock-knock format."
+      }
+    },
+    {
+      "caseId": "regeneration",
+      "dimensions": [
+        "regeneration",
+        "fixed-avoidance"
+      ],
+      "regenerationOf": "narrow-topic",
+      "input": {
+        "topicHint": "A librarian repairing a squeaky book cart",
+        "prefilledJokes": [
+          "The book cart squeaked because it needed a quiet chapter."
+        ]
+      }
+    },
+    {
+      "caseId": "failure-pair",
+      "dimensions": [
+        "failure-accounting"
+      ],
+      "input": {
+        "topicHint": "A bus stop in the rain"
+      }
+    }
+  ]
+}

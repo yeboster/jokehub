@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, CheckCircle, Star } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
-import type { GenerateJokeOutput, JokeVariation } from '@/ai/flows/generate-joke-flow';
+import type { JokeVariation } from '@/ai/flows/generate-joke-flow';
 import { DEFAULT_GENERATE_MODEL, GEMINI_MODEL_LABELS, GEMINI_MODELS } from '@/ai/models';
 import Header from '@/components/header';
 import AddJokeForm, { type JokeFormValues } from '@/components/add-joke-form';
@@ -23,8 +23,29 @@ import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { Slider } from '@/components/ui/slider';
 import * as jokeService from '@/services/jokeService';
 import { Separator } from '@/components/ui/separator';
+import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
+import { z } from 'zod';
+
+const GenerationResponseSchema = z.object({
+  jokes: z.array(z.object({
+    jokeText: z.string().max(JOKE_GENERATION_LIMITS.contextTextChars).refine(text => !!normalizeJokeKey(text)),
+    category: z.string().refine(category => !!category.trim()),
+  })).length(3),
+});
+
+function boundedInspirations(values: unknown[]): string[] {
+  return mergeUniqueJokeTexts(values.filter((value): value is string =>
+    typeof value === 'string' && value.length <= JOKE_GENERATION_LIMITS.contextTextChars && !!normalizeJokeKey(value)), [], JOKE_GENERATION_LIMITS.prefilledJokes);
+}
 
 export default function AddJokePage() {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoading label="Checking your sign-in…" />;
+  // UID-keyed lifecycle keeps request authority and memory local to one session.
+  return <AddJokeSession key={user ? `uid:${user.uid}` : 'signed-out'} />;
+}
+
+function AddJokeSession() {
   const { user, loading: authLoading } = useAuth();
   const { addJoke } = useJokes();
   const router = useRouter();
@@ -45,79 +66,113 @@ export default function AddJokePage() {
     }
   }, [user, authLoading, router]);
 
+  const uid = user?.uid ?? null;
+  const session = useRef({ uid, epoch: 0 });
+  const mounted = useRef(true);
+  const requestSequence = useRef(0);
+  const generation = useRef<{ id: number; controller: AbortController } | null>(null);
+  const inspirationSequence = useRef(0);
+  const inspirationVersion = useRef(0);
+  const history = useRef<string[]>([]);
+
+  useLayoutEffect(() => {
+    mounted.current = true;
+    const authority = session.current;
+    return () => {
+      mounted.current = false;
+      authority.epoch++;
+      generation.current?.controller.abort();
+      generation.current = null;
+    };
+  }, []);
+
   const handleLoadInspirationalJokes = async () => {
     if (!user) {
       toast({ title: 'Sign in required', description: 'Log in to load your 5-star jokes.', variant: 'destructive' });
       return;
     }
+    const owner = { uid: user.uid, epoch: session.current.epoch, id: ++inspirationSequence.current };
+    inspirationVersion.current++;
+    const current = () => mounted.current && session.current.uid === owner.uid &&
+      session.current.epoch === owner.epoch && inspirationSequence.current === owner.id;
     setIsLoadingInspirationalJokes(true);
     try {
-      const jokes = await jokeService.fetchUserFiveStarJokes(user.uid);
+      const loaded = await jokeService.fetchUserFiveStarJokes(owner.uid);
+      if (!current()) return;
+      const jokes = boundedInspirations(loaded);
+      inspirationVersion.current++;
+      setInspirationalJokes(jokes);
       if (jokes.length > 0) {
-        setInspirationalJokes(jokes);
         toast({ title: 'Inspiration loaded', description: `${jokes.length} of your 5-star jokes will guide the next batch.` });
       } else {
-        setInspirationalJokes([]);
         toast({ title: 'No 5-star jokes yet', description: 'Rate a few jokes five stars and try again.', variant: 'default' });
       }
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore fetchUserFiveStarJokes errors expose `.message`; unknown narrows too aggressively for the toast description string.
-      const err = error as any;
-      console.error("Error loading 5-star jokes:", err);
-      toast({ title: "Couldn't load your jokes", description: err.message || 'Failed to load inspirational jokes.', variant: 'destructive' });
+      if (!current()) return;
+      console.error('Error loading 5-star jokes:', error);
+      toast({ title: "Couldn't load your jokes", description: error instanceof Error ? error.message : 'Failed to load inspirational jokes.', variant: 'destructive' });
     } finally {
-      setIsLoadingInspirationalJokes(false);
+      if (current()) setIsLoadingInspirationalJokes(false);
     }
   };
-
 
   const handleGenerateJoke = async () => {
     if (!user) {
       toast({ title: 'Sign in required', description: 'Log in to generate jokes.', variant: 'destructive' });
       return;
     }
+    // State updates are batched: ref ownership blocks same-render double clicks.
+    if (generation.current) return;
+    const operation = { id: ++requestSequence.current, controller: new AbortController() };
+    generation.current = operation;
+    const owner = { uid: user.uid, epoch: session.current.epoch, inspirationVersion: inspirationVersion.current };
+    const recentGeneratedJokes = [...history.current];
+    const prefilledJokes = boundedInspirations(inspirationalJokes);
+    const exemplarJokes = prefilledJokes.slice(0, JOKE_GENERATION_LIMITS.exemplarJokes);
+    const current = () => mounted.current && session.current.uid === owner.uid &&
+      session.current.epoch === owner.epoch && generation.current?.id === operation.id;
     setIsGeneratingJoke(true);
     setSelectedJoke(null);
-    setAiGeneratedJokes([]); // Clear previous jokes before generating new ones
+    setAiGeneratedJokes([]);
     try {
-      const trimmedTopicHint = aiTopicHint.trim();
-      // Only include already generated jokes if we are NOT clearing them on re-generation.
-      // Since we are, prefilledJokes will primarily be from the inspirational set.
-      const prefilledJokes = [...inspirationalJokes];
-      // The flow caps exemplarJokes at 10 — slice defensively in case the
-      // service returns more (or future changes loosen the cap).
-      const exemplarJokes = inspirationalJokes.slice(0, 10);
-
-      // The route requires a Firebase ID token (it spends Gemini calls).
       const idToken = await user.getIdToken();
+      if (!current()) return;
       const response = await fetch('/api/generate-joke', {
         method: 'POST',
+        signal: operation.controller.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
-          topicHint: trimmedTopicHint,
-          prefilledJokes,
-          exemplarJokes,
-          model: selectedModel,
-          temperature: temperature[0],
+          topicHint: aiTopicHint.trim(), prefilledJokes, exemplarJokes, recentGeneratedJokes,
+          model: selectedModel, temperature: temperature[0],
         }),
       });
-
+      if (!current()) return;
       if (!response.ok) {
         let errorData;
-        try { errorData = await response.json(); } catch { /* ignore */ }
+        try { errorData = await response.json(); } catch { /* preserve HTTP error */ }
+        if (!current()) return;
         throw new Error(errorData?.error || `API request failed with status ${response.status}`);
       }
-      const result: GenerateJokeOutput = await response.json();
+      const payload: unknown = await response.json();
+      if (!current()) return;
+      const result = GenerationResponseSchema.parse(payload);
+      history.current = mergeUniqueJokeTexts(result.jokes.map(joke => joke.jokeText), history.current, JOKE_GENERATION_LIMITS.recentGeneratedJokes);
       setAiGeneratedJokes(result.jokes);
-      setInspirationalJokes([]); // Clear inspiration after use to avoid re-using them unintentionally
+      // A newer load (including a pending one) owns its inspiration version.
+      if (inspirationVersion.current === owner.inspirationVersion) {
+        setInspirationalJokes([]);
+        inspirationVersion.current++;
+      }
       toast({ title: 'Three variations ready', description: 'Pick one to fill the form.' });
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fetch + genkit AI errors expose heterogeneous shapes; unknown narrows too aggressively for the toast description string.
-      const err = error as any;
-      console.error("Error generating joke via API:", err);
-      toast({ title: "Couldn't generate jokes", description: err.message || 'Failed to generate jokes.', variant: 'destructive' });
+      if (!current()) return;
+      console.error('Error generating joke via API:', error);
+      toast({ title: "Couldn't generate jokes", description: error instanceof Error ? error.message : 'Failed to generate jokes.', variant: 'destructive' });
     } finally {
-      setIsGeneratingJoke(false);
+      if (current()) {
+        generation.current = null;
+        setIsGeneratingJoke(false);
+      }
     }
   };
 

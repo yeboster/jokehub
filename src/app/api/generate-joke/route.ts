@@ -1,123 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateJoke, type GenerateJokeInput, type GenerateJokeOutput } from '@/ai/flows/generate-joke-flow';
 import { GEMINI_MODELS } from '@/ai/models';
-import { adminDb } from '@/lib/admin';
+import { fetchJokeExemplars } from '@/services/server/jokeExemplars';
+import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import { verifyRequestAuth } from '@/lib/auth';
 import { rateLimit, rateLimitKeyFor } from '@/lib/rateLimit';
 import { z } from 'zod';
 
 /**
- * Rate limit for joke generation. Each request costs two Gemini calls (6
- * candidates + critic), so the window is deliberately tight. Keyed by uid for
+ * Rate limit for joke generation. Default requests cost two application AI calls (6
+ * candidates + critic); trusted opt-in repair costs at most four, so the window is deliberately tight. Keyed by uid for
  * signed-in users, by IP otherwise; see the single-instance caveat in
  * `@/lib/rateLimit`.
  */
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60_000 };
 
-/**
- * Number of top-rated jokes the server fetches by default to use as style
- * exemplars. Caller-supplied exemplars (e.g. the user's 5-star jokes) take
- * priority and fill the remaining slots up to this cap.
- */
-const DEFAULT_EXEMPLAR_COUNT = 10;
-
-/** Cap on the combined prefilledJokes list (client + server-side top jokes). */
-const PREFILLED_JOKES_CAP = 25;
-
-// Define the expected input schema for the API request body.
-// `exemplarJokes` mirrors the flow's input (max 10, optional) so the
-// caller can't smuggle in arbitrary-length arrays. `useServerExemplars`
-// lets callers opt out of the default top-10 fetch (default: enabled).
+const ContextTextSchema = z.string().max(JOKE_GENERATION_LIMITS.contextTextChars)
+  .refine(text => !!normalizeJokeKey(text), 'Context text must not be empty.');
 const ApiInputSchema = z.object({
-  topicHint: z.string().optional(),
-  prefilledJokes: z.array(z.string()).optional(),
-  exemplarJokes: z.array(z.string()).max(10).optional(),
+  topicHint: z.string().max(JOKE_GENERATION_LIMITS.topicHintChars).optional(),
+  prefilledJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.prefilledJokes).optional(),
+  exemplarJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.exemplarJokes).optional(),
+  recentGeneratedJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.recentGeneratedJokes).optional(),
   model: z.enum(GEMINI_MODELS).optional(),
-  temperature: z.number().min(0).max(2).optional(),
+  temperature: z.number().finite().min(0).max(2).optional(),
   useServerExemplars: z.boolean().optional(),
 });
-
-/**
- * Fetch the top-rated existing jokes from Firestore to use as style
- * exemplars. Primary path: orderBy averageRating desc. Fallback path: order
- * by dateAdded desc (covers missing index or unrated-only corpora). Any
- * error is swallowed so generation never fails because of the exemplar
- * fetch.
- *
- * Caching: results are memoised at module scope for 60s keyed by the
- * requested limit. This cache is per-process (per serverless instance),
- * which is acceptable here: exemplars drift slowly, we already swallow
- * fetch errors, and a cold start simply refetches. Do NOT introduce
- * stale-while-revalidate logic without also invalidating on joke
- * create/update/delete.
- */
-type ExemplarCacheEntry = { data: string[]; expiresAt: number };
-const EXEMPLAR_CACHE_TTL_MS = 60_000;
-// Module-scope cache. Survives across requests on the same serverless
-// instance; rebuilt on cold start or after TTL expiry.
-const exemplarCache: Map<number, ExemplarCacheEntry> = new Map();
-
-async function fetchTopExemplars(limitCount: number): Promise<string[]> {
-  const now = Date.now();
-  const cached = exemplarCache.get(limitCount);
-  if (cached && cached.expiresAt > now) {
-    return cached.data;
-  }
-
-  try {
-    let snap;
-    try {
-      snap = await adminDb
-        .collection('jokes')
-        .orderBy('averageRating', 'desc')
-        .limit(limitCount)
-        .get();
-    } catch (primaryErr) {
-      console.warn(
-        '[generate-joke] averageRating-sorted exemplar query failed; falling back to dateAdded. Error:',
-        primaryErr,
-      );
-      snap = await adminDb
-        .collection('jokes')
-        .orderBy('dateAdded', 'desc')
-        .limit(limitCount)
-        .get();
-    }
-
-    const texts: string[] = [];
-    for (const docSnap of snap.docs) {
-      const data = docSnap.data() as { text?: unknown; jokeText?: unknown };
-      const candidate = typeof data.text === 'string' ? data.text : typeof data.jokeText === 'string' ? data.jokeText : null;
-      if (candidate && candidate.trim().length > 0) {
-        texts.push(candidate);
-      }
-    }
-    exemplarCache.set(limitCount, { data: texts, expiresAt: now + EXEMPLAR_CACHE_TTL_MS });
-    return texts;
-  } catch (err) {
-    // Last-ditch: never let exemplar fetch kill generation. Could be no
-    // credentials in local dev, network error, missing index, etc.
-    console.warn('[generate-joke] Failed to fetch server-side exemplars; continuing without them.', err);
-    return [];
-  }
-}
-
-/**
- * Merge two ordered string lists while preserving order and deduplicating
- * exact matches. Returns up to `cap` entries.
- */
-function mergeOrderedUnique(primary: string[], secondary: string[], cap: number): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of [...primary, ...secondary]) {
-    if (!item) continue;
-    if (seen.has(item)) continue;
-    seen.add(item);
-    out.push(item);
-    if (out.length >= cap) break;
-  }
-  return out;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -158,6 +66,7 @@ export async function POST(request: NextRequest) {
       model,
       temperature,
       useServerExemplars,
+      recentGeneratedJokes,
     } = parsedInput.data;
 
     // Default ON: pull top-rated jokes from Firestore so generation is
@@ -165,31 +74,31 @@ export async function POST(request: NextRequest) {
     // `useServerExemplars: false`.
     const shouldFetchServerExemplars = useServerExemplars !== false;
     const serverExemplars = shouldFetchServerExemplars
-      ? await fetchTopExemplars(DEFAULT_EXEMPLAR_COUNT)
+      ? await fetchJokeExemplars()
       : [];
 
     // Client exemplars take priority (these are often the user's own
     // 5-star picks); fill the rest from the server-fetched top jokes.
-    const exemplarJokes = mergeOrderedUnique(
+    const exemplarJokes = mergeUniqueJokeTexts(
       clientExemplars ?? [],
       serverExemplars,
-      DEFAULT_EXEMPLAR_COUNT,
+      JOKE_GENERATION_LIMITS.exemplarJokes,
     );
 
-    // Combined prefilled list — dedup exact matches against both client
+    // Combined prefilled list — dedup normalized matches against both client
     // and server-fetched jokes so the critic's "originality" criterion
     // has the broadest possible context.
-    const prefilledJokes = mergeOrderedUnique(
+    const prefilledJokes = mergeUniqueJokeTexts(
       clientPrefilled ?? [],
       serverExemplars,
-      PREFILLED_JOKES_CAP,
+      JOKE_GENERATION_LIMITS.prefilledJokes,
     );
 
     // Prepare the input for the Genkit flow
-    const aiInput: GenerateJokeInput = { topicHint, prefilledJokes, exemplarJokes, model, temperature };
+    const aiInput: GenerateJokeInput = { topicHint, prefilledJokes, exemplarJokes, recentGeneratedJokes, model, temperature };
 
     // Call the server-side Genkit flow
-    const aiOutput: GenerateJokeOutput = await generateJoke(aiInput);
+    const aiOutput: GenerateJokeOutput = await generateJoke(aiInput, { allowRepair: process.env.JOKEHUB_ENABLE_JOKE_REPAIR === 'true' });
 
     // Return the successful response
     return NextResponse.json(aiOutput, { status: 200 });

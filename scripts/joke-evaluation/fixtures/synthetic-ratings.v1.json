@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "packetId": "4f0455a0d0be01d35c344716ad0a36722d4ab997c2d011ed3dc8ead5a8782f72",
+  "ratingKind": "synthetic",
+  "rows": [
+    {
+      "caseId": "context-overlap",
+      "raterId": "synthetic-rater",
+      "preference": "unrateable",
+      "B": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "reason": "Synthetic demonstration only; no human judgment."
+    },
+    {
+      "caseId": "failure-pair",
+      "raterId": "synthetic-rater",
+      "preference": "unrateable",
+      "reason": "Synthetic demonstration only; no human judgment."
+    },
+    {
+      "caseId": "format",
+      "raterId": "synthetic-rater",
+      "preference": "B",
+      "A": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "B": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "reason": "Synthetic demonstration only; no human judgment."
+    },
+    {
+      "caseId": "no-topic",
+      "raterId": "synthetic-rater",
+      "preference": "tie",
+      "A": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "B": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "reason": "Synthetic demonstration only; no human judgment."
+    },
+    {
+      "caseId": "italian",
+      "raterId": "synthetic-rater",
+      "preference": "A",
+      "A": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "B": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "reason": "Synthetic demonstration only; no human judgment."
+    },
+    {
+      "caseId": "regeneration",
+      "raterId": "synthetic-rater",
+      "preference": "B",
+      "A": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "B": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "reason": "Synthetic demonstration only; no human judgment."
+    },
+    {
+      "caseId": "narrow-topic",
+      "raterId": "synthetic-rater",
+      "preference": "tie",
+      "A": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "B": {
+        "requestFit": 3,
+        "clarity": 3,
+        "earnedSurprise": 2,
+        "naturalWording": 3,
+        "originality": 3,
+        "diversity": 2,
+        "safeForGeneralAudience": null
+      },
+      "reason": "Synthetic demonstration only; no human judgment."
+    }
+  ]
+}
