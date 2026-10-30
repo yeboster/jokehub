@@ -8,11 +8,6 @@ To get started, take a look at src/app/page.tsx.
 
 - `JOKEHUB_JARVIS_USER_ID` — Firebase UID that jokes added via `POST /api/jokes/add` are attributed to. Required; the endpoint returns a 500 if unset.
 - `JOKEHUB_ENABLE_JOKE_REPAIR` — optional, server-only repair opt-in. Only literal `true` enables one repair attempt; unset/other values disable it. Client fields cannot authorize repair.
-- `OPENCODE_API_KEY` — optional, server-only [OpenCode Zen](https://opencode.ai/docs/zen/) key. When set, the add-joke page loads extra models in the background from `GET /api/models` and adds them to the model picker; Gemini stays available while they load or if discovery fails.
-
-## OpenCode models
-
-`GET /api/models` reads OpenCode's public catalog (cached 10 minutes, failures for one minute) and offers chat-completions models with structured output and temperature that cost at most $0.50 / $2 per million input/output tokens — roughly under a cent per generated batch. OpenCode's free-tier models are deliberately excluded: OpenCode reserves them for its own client ("Free-tier chat models require OpenCode; use paid models or Go from other clients"). `POST /api/generate-joke` accepts an `opencode/<id>` model only while that filtered catalog offers it. The key is only sent to `https://opencode.ai/inference/openai/v1`.
 
 ## Joke generation
 

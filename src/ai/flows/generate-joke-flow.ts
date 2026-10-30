@@ -5,7 +5,6 @@
 import { ai } from '@/ai/ai-instance';
 import { jokeGenerationPrompt, systemInstruction, CRAFT_PRINCIPLES, CLICHE_BLACKLIST } from '@/ai/prompts/generate-joke-prompt';
 import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
-import { isOpenCodeModelId } from '@/ai/opencode';
 import { JOKE_GENERATION_LIMITS, JOKE_MODES, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import { CriticOutputSchema, JokeVariationSchema, compareSelections, hasRepairTrigger, repairFeedback, selectJokes } from './joke-selection';
 import type { GenerationProgress } from '@/lib/generationProgress';
@@ -20,8 +19,7 @@ const GenerateJokeInputSchema = z.object({
   avoidJokes: z.array(contextText).max(JOKE_GENERATION_LIMITS.avoidJokes).optional(),
   mode: z.enum(JOKE_MODES).optional(),
   libraryJokes: z.array(contextText).max(JOKE_GENERATION_LIMITS.libraryJokes).optional(),
-  // OpenCode IDs are checked against the live catalog by the API route.
-  model: z.union([z.enum(GEMINI_MODELS), z.string().refine(isOpenCodeModelId)]).optional(),
+  model: z.enum(GEMINI_MODELS).optional(),
   temperature: z.number().finite().min(0).max(2).optional(),
 });
 export type GenerateJokeInput = z.infer<typeof GenerateJokeInputSchema>;

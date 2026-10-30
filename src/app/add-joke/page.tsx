@@ -9,7 +9,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import type { JokeVariation } from '@/ai/flows/generate-joke-flow';
 import { DEFAULT_GENERATE_MODEL, GEMINI_MODEL_LABELS, GEMINI_MODELS } from '@/ai/models';
-import { fetchExtraModels, type ModelOption } from '@/lib/availableModels';
 import Header from '@/components/header';
 import AddJokeForm, { type JokeFormValues } from '@/components/add-joke-form';
 import PageLoading from '@/components/PageLoading';
@@ -64,7 +63,6 @@ function AddJokeSession() {
   const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
   const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GENERATE_MODEL);
-  const [extraModels, setExtraModels] = useState<ModelOption[]>([]);
   const [temperature, setTemperature] = useState([0.8]);
   const [inspirationalJokes, setInspirationalJokes] = useState<string[]>([]);
   const [isLoadingInspirationalJokes, setIsLoadingInspirationalJokes] = useState(false);
@@ -79,13 +77,6 @@ function AddJokeSession() {
     return () => clearInterval(timer);
   }, [isGeneratingJoke]);
   
-  // Discovered models are appended when they arrive; the Gemini list works meanwhile.
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchExtraModels(controller.signal).then(models => { if (!controller.signal.aborted) setExtraModels(models); });
-    return () => controller.abort();
-  }, []);
-
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth?redirect=/add-joke');
@@ -361,11 +352,6 @@ function AddJokeSession() {
                                   {GEMINI_MODELS.map((model) => (
                                     <SelectItem key={model} value={model}>
                                       {GEMINI_MODEL_LABELS[model]}
-                                    </SelectItem>
-                                  ))}
-                                  {extraModels.map((model) => (
-                                    <SelectItem key={model.id} value={model.id}>
-                                      {model.label}
                                     </SelectItem>
                                   ))}
                               </SelectContent>

@@ -1,13 +1,12 @@
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ auth: { user: null as null | { uid: string; getIdToken: () => Promise<string> }, loading: false }, fetch: vi.fn(), inspiration: vi.fn(), toast: vi.fn(), push: vi.fn(), add: vi.fn(), models: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: { user: null as null | { uid: string; getIdToken: () => Promise<string> }, loading: false }, fetch: vi.fn(), inspiration: vi.fn(), toast: vi.fn(), push: vi.fn(), add: vi.fn() }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
 vi.mock('@/contexts/JokeContext', () => ({ useJokes: () => ({ addJoke: mocks.add }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('@/services/jokeService', () => ({ fetchUserFiveStarJokes: mocks.inspiration }));
-vi.mock('@/lib/availableModels', () => ({ fetchExtraModels: mocks.models }));
 vi.mock('@/components/add-joke-form', () => ({ default: ({ aiGeneratedText }: { aiGeneratedText?: string }) => <div data-selected>{aiGeneratedText}</div> }));
 import AddJokePage from './page';
 import { DEFAULT_GENERATE_MODEL } from '@/ai/models';
@@ -25,7 +24,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.resetAllMocks(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.stubGlobal('fetch', mocks.fetch);
   mocks.auth.user = user('a'); mocks.auth.loading = false;
-  mocks.inspiration.mockResolvedValue([]); mocks.models.mockResolvedValue([]); mocks.fetch.mockResolvedValue(response(batch(1)));
+  mocks.inspiration.mockResolvedValue([]); mocks.fetch.mockResolvedValue(response(batch(1)));
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await settle(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
@@ -60,44 +59,6 @@ describe('visible generation progress', () => {
     await render(); await generate();
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('interrupted');
     expect(button('Generate').disabled).toBe(false);
-  });
-});
-
-describe('background model discovery', () => {
-  beforeEach(() => { Element.prototype.scrollIntoView ??= () => {}; });
-  const trigger = () => container.querySelector<HTMLButtonElement>('#ai-model-select')!;
-  async function choose(label: string) {
-    await settle(() => trigger().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(el => el.textContent === label);
-    if (!option) throw new Error(`Missing option ${label}`);
-    await settle(() => option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  }
-  it('lets the user generate with the default model while discovery is still pending', async () => {
-    mocks.models.mockReturnValue(new Promise(() => {}));
-    await render();
-    expect(mocks.models).toHaveBeenCalledTimes(1);
-    expect(trigger().textContent).toContain('Gemini 3.6 Flash');
-    await generate();
-    expect(bodies()[0].model).toBe(DEFAULT_GENERATE_MODEL);
-  });
-  it('adds discovered models to the picker once they arrive and sends the chosen one', async () => {
-    const found = deferred<{ id: string; label: string }[]>();
-    mocks.models.mockReturnValue(found.promise);
-    await render();
-    await settle(() => found.resolve([{ id: 'opencode/glm-5.3-flash', label: 'GLM-5.3-Flash (OpenCode)' }]));
-    await choose('GLM-5.3-Flash (OpenCode)');
-    expect(trigger().textContent).toContain('GLM-5.3-Flash (OpenCode)');
-    await generate();
-    expect(bodies()[0].model).toBe('opencode/glm-5.3-flash');
-  });
-  it('aborts discovery when the page unmounts', async () => {
-    mocks.models.mockReturnValue(new Promise(() => {}));
-    await render();
-    const signal: AbortSignal = mocks.models.mock.calls[0][0];
-    expect(signal.aborted).toBe(false);
-    await settle(() => root.unmount());
-    expect(signal.aborted).toBe(true);
-    root = createRoot(container);
   });
 });
 

@@ -3,9 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
-  generate: vi.fn(), auth: vi.fn(), rate: vi.fn(), key: vi.fn(), get: vi.fn(), order: vi.fn(), limit: vi.fn(), collection: vi.fn(), openCodeModels: vi.fn(),
+  generate: vi.fn(), auth: vi.fn(), rate: vi.fn(), key: vi.fn(), get: vi.fn(), order: vi.fn(), limit: vi.fn(), collection: vi.fn(),
 }));
-vi.mock('@/ai/opencode', async importOriginal => ({ ...await importOriginal<typeof import('@/ai/opencode')>(), fetchOpenCodeModels: mocks.openCodeModels }));
 vi.mock('@/ai/flows/generate-joke-flow', () => ({ generateJoke: mocks.generate }));
 vi.mock('@/lib/auth', () => ({ verifyRequestAuth: mocks.auth }));
 vi.mock('@/lib/rateLimit', () => ({ rateLimit: mocks.rate, rateLimitKeyFor: mocks.key }));
@@ -25,7 +24,6 @@ beforeEach(() => {
   mocks.limit.mockReturnValue({ get: mocks.get });
   mocks.get.mockResolvedValue({ docs: [] });
   mocks.generate.mockResolvedValue({ jokes: ['one', 'two', 'three'].map(jokeText => ({ jokeText, category: 'Work' })) });
-  mocks.openCodeModels.mockResolvedValue([{ id: 'opencode/glm-5.3-flash', label: 'GLM-5.3-Flash (OpenCode)' }]);
   vi.stubEnv('JOKEHUB_ENABLE_JOKE_REPAIR', 'false');
 });
 
@@ -168,22 +166,11 @@ describe('generation route context', () => {
     { recentGeneratedJokes: ['!!!'] }, { temperature: 3 },
     { topicHint: 7 }, { prefilledJokes: ['!!!'] }, { prefilledJokes: ['x'.repeat(2001)] },
     { exemplarJokes: Array(26).fill('valid') }, { recentGeneratedJokes: ['x'.repeat(2001)] },
-    { recentGeneratedJokes: [null] }, { useServerExemplars: 'false' }, { model: 'unknown' }, { model: 'opencode/gpt-5.5-pro' }, { model: 'opencode/../x' }, { mode: 'remix' },
+    { recentGeneratedJokes: [null] }, { useServerExemplars: 'false' }, { model: 'unknown' }, { mode: 'remix' },
   ])('rejects oversized/invalid client context %j before reads or AI', async body => {
     expect((await POST(request(body))).status).toBe(400);
     expect(mocks.get).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
-  });
-  it('accepts OpenCode models only when the live catalog offers them', async () => {
-    expect((await POST(request({ model: 'opencode/glm-5.3-flash', useServerExemplars: false }))).status).toBe(200);
-    expect(mocks.generate.mock.calls[0][0].model).toBe('opencode/glm-5.3-flash');
-    mocks.openCodeModels.mockResolvedValue([]);
-    expect((await POST(request({ model: 'opencode/glm-5.3-flash', useServerExemplars: false }))).status).toBe(400);
-    expect(mocks.generate).toHaveBeenCalledTimes(1);
-  });
-  it('validates Gemini models without consulting the OpenCode catalog', async () => {
-    expect((await POST(request({ model: 'googleai/gemini-3.6-flash', useServerExemplars: false }))).status).toBe(200);
-    expect(mocks.openCodeModels).not.toHaveBeenCalled();
   });
   it('accepts exact caps and bounded text while preserving caller intent', async () => {
     const body = { topicHint: 't'.repeat(500), prefilledJokes: Array.from({ length: 25 }, (_, i) => `${i}${'x'.repeat(1998)}`), exemplarJokes: Array.from({ length: 25 }, (_, i) => `exemplar ${i}`), recentGeneratedJokes: Array.from({ length: 12 }, (_, i) => `recent ${i}`), useServerExemplars: false };
