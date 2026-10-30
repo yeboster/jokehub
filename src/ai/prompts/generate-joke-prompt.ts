@@ -1,3 +1,5 @@
+import type { JokeMode } from '@/lib/jokeGenerationContract';
+
 /**
  * Craft principles + cliché blacklist for the joke generator.
  *
@@ -33,6 +35,10 @@ ${CLICHE_BLACKLIST}
 
 Avoid offensive, discriminatory, or inappropriate content; jokes must be suitable for a general audience.`;
 
+const LIBRARY_ENTRY_CHARS = 160;
+/** Library entries only need to be recognizable, and the whole library is listed. */
+const clip = (text: string) => text.length > LIBRARY_ENTRY_CHARS ? `${text.slice(0, LIBRARY_ENTRY_CHARS)}…` : text;
+
 /**
  * Build the user prompt for a single candidate-generation pass.
  *
@@ -48,11 +54,16 @@ export const jokeGenerationPrompt = (
   count: number = 3,
   recentGeneratedJokes?: string[],
   avoidJokes?: string[],
+  { mode = 'original', libraryJokes = [] }: { mode?: JokeMode; libraryJokes?: string[] } = {},
 ): string => {
   const n = Math.max(1, Math.floor(count));
   const noun = n === 1 ? 'joke' : 'jokes';
+  const classic = mode === 'classic';
 
-  let prompt = `Generate ${n} different, original ${noun}.`;
+  let prompt = `Generate ${n} different, ${classic ? 'proven' : 'original'} ${noun}.`;
+  if (classic) {
+    prompt += ` Recall real, existing jokes that people have actually laughed at — from joke sites, books or comedians — rather than inventing new ones. Prefer lesser-known gems over the most famous jokes, reproduce each in its tightest form, and keep the original punchline.`;
+  }
 
   if (topic) {
     prompt += ` The ${noun} should be about: ${topic}. Within that topic, vary the specific situations, comic mechanisms, and punchline shapes.`;
@@ -84,9 +95,13 @@ export const jokeGenerationPrompt = (
     prompt += `\n\nJokes this user rated 1–2 stars — avoid what makes them weak (length, explained or forced punchlines, stale premises):\n${avoidJokes.map(j => `- "${j}"`).join('\n')}`;
   }
 
+  if (classic && libraryJokes.length > 0) {
+    prompt += `\n\nAlready in the user's library — do not return these or retellings of them:\n${libraryJokes.map(j => `- "${clip(j)}"`).join('\n')}`;
+  }
+
   prompt += `\n\nFor each of the ${n} ${noun}:
 1. Put the hinge word or phrase in the hinge field, then write the joke so it ends on that hinge.
-2. Make sure the joke is original — not a well-known classic or a recycled riff.
+2. ${classic ? 'It must be a real, existing joke, not a new invention, and not one already in the library.' : 'Make sure the joke is original — not a well-known classic or a recycled riff.'}
 3. It must be suitable for a general audience.
 4. Provide a single, most-fitting category (e.g. Food, Animals, Science, One-liner, Wordplay, Observational).
 

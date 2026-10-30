@@ -146,6 +146,15 @@ describe('generation route context', () => {
     expect(mocks.limit).toHaveBeenCalledWith(200);
     expect(mocks.order).toHaveBeenCalledWith('averageRating', 'asc');
   });
+  it('forwards classics mode and the library for near-duplicate filtering', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() + 120_000); // Past earlier tests' 60s caches.
+    mocks.get.mockResolvedValue({ docs: [doc('lib', { text: 'Library joke' })] });
+    expect((await POST(request({ mode: 'classic' }))).status).toBe(200);
+    const input = mocks.generate.mock.calls[0][0];
+    expect(input.mode).toBe('classic');
+    expect(input.libraryJokes).toEqual(['Library joke']);
+    expect(mocks.limit).toHaveBeenCalledWith(1000);
+  });
   it('skips every server read when the caller opts out; clients cannot supply avoid examples', async () => {
     expect((await POST(request({ useServerExemplars: false, avoidJokes: ['client cannot inject'] }))).status).toBe(200);
     expect(mocks.get).not.toHaveBeenCalled();
@@ -157,7 +166,7 @@ describe('generation route context', () => {
     { recentGeneratedJokes: ['!!!'] }, { temperature: 3 },
     { topicHint: 7 }, { prefilledJokes: ['!!!'] }, { prefilledJokes: ['x'.repeat(2001)] },
     { exemplarJokes: Array(26).fill('valid') }, { recentGeneratedJokes: ['x'.repeat(2001)] },
-    { recentGeneratedJokes: [null] }, { useServerExemplars: 'false' }, { model: 'unknown' },
+    { recentGeneratedJokes: [null] }, { useServerExemplars: 'false' }, { model: 'unknown' }, { mode: 'remix' },
   ])('rejects oversized/invalid client context %j before reads or AI', async body => {
     expect((await POST(request(body))).status).toBe(400);
     expect(mocks.get).not.toHaveBeenCalled();

@@ -62,6 +62,20 @@ describe('visible generation progress', () => {
   });
 });
 
+describe('joke style', () => {
+  it('defaults to new jokes and sends proven classics once chosen', async () => {
+    await render(); await generate();
+    expect(bodies()[0].mode).toBe('original');
+    const classic = container.querySelector<HTMLButtonElement>('[role="radio"][value="classic"]')!;
+    expect(classic.getAttribute('aria-checked')).toBe('false');
+    expect(container.querySelector('[role="radiogroup"]')?.getAttribute('aria-labelledby')).toBeTruthy();
+    await settle(() => classic.click());
+    expect(classic.getAttribute('aria-checked')).toBe('true');
+    await generate();
+    expect(bodies()[1].mode).toBe('classic');
+  });
+});
+
 describe('recent generation memory', () => {
   it('second request sends prior ranked batch separately, retains latest 12 and excludes failed batch', async () => {
     await render();

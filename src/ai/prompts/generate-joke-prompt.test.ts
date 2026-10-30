@@ -57,6 +57,21 @@ describe('jokeGenerationPrompt', () => {
     expect(jokeGenerationPrompt('trains', undefined, undefined, 6, undefined, [])).not.toContain('rated 1–2 stars');
   });
 
+  it('classic mode asks for real proven jokes and lists the library to skip; original mode does not', () => {
+    const long = `Long library joke ${'x'.repeat(300)}`;
+    const classic = jokeGenerationPrompt(undefined, undefined, undefined, 6, undefined, undefined, { mode: 'classic', libraryJokes: ['Library joke', long] });
+    expect(classic).toContain('Generate 6 different, proven jokes.');
+    expect(classic).toContain('real, existing jokes');
+    expect(classic).toContain("Already in the user's library");
+    expect(classic).toContain('- "Library joke"');
+    expect(classic).toContain(`- "${long.slice(0, 160)}…"`);
+    expect(classic).not.toContain('Make sure the joke is original');
+    const original = jokeGenerationPrompt(undefined, undefined, undefined, 6, undefined, undefined, { mode: 'original', libraryJokes: ['Library joke'] });
+    expect(original).toContain('Generate 6 different, original jokes.');
+    expect(original).not.toContain("Already in the user's library");
+    expect(original).toContain('Make sure the joke is original');
+  });
+
   it('asks for distinct premises and mechanisms within a requested topic', () => {
     expect(jokeGenerationPrompt('trains', undefined, undefined, 6)).toContain(
       'Within that topic, vary the specific situations, comic mechanisms, and punchline shapes',

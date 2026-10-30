@@ -21,9 +21,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { Slider } from '@/components/ui/slider';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import * as jokeService from '@/services/jokeService';
 import { Separator } from '@/components/ui/separator';
-import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
+import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey, type JokeMode } from '@/lib/jokeGenerationContract';
 import { z } from 'zod';
 import { GENERATION_STAGE_LABELS, readGenerationStream, type GenerationStage } from '@/lib/generationProgress';
 
@@ -54,6 +55,7 @@ function AddJokeSession() {
 
   const [isGeneratingJoke, setIsGeneratingJoke] = useState(false);
   const [aiTopicHint, setAiTopicHint] = useState<string>('');
+  const [jokeMode, setJokeMode] = useState<JokeMode>('original');
   const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
   const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GENERATE_MODEL);
@@ -158,7 +160,7 @@ function AddJokeSession() {
         headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           topicHint: aiTopicHint.trim(), prefilledJokes, exemplarJokes, recentGeneratedJokes,
-          model: selectedModel, temperature: temperature[0],
+          model: selectedModel, temperature: temperature[0], mode: jokeMode,
         }),
       });
       if (!current()) return;
@@ -354,6 +356,26 @@ function AddJokeSession() {
                               disabled={isGeneratingJoke}
                               className="mt-1"
                               />
+                          </div>
+
+                          <div>
+                              <Label id="ai-joke-mode-label" className="text-sm font-medium">Joke Style</Label>
+                              <RadioGroup
+                                  aria-labelledby="ai-joke-mode-label"
+                                  value={jokeMode}
+                                  onValueChange={(value: JokeMode) => setJokeMode(value)}
+                                  disabled={isGeneratingJoke}
+                                  className="mt-2 space-y-1"
+                              >
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="original" id="ai-joke-mode-original" />
+                                      <Label htmlFor="ai-joke-mode-original" className="font-normal">New jokes</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="classic" id="ai-joke-mode-classic" />
+                                      <Label htmlFor="ai-joke-mode-classic" className="font-normal">Proven classics not in your library</Label>
+                                  </div>
+                              </RadioGroup>
                           </div>
 
                           <div className="space-y-2">

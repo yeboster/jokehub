@@ -6,6 +6,7 @@ type Document = { id: string; data(): Record<string, unknown> };
 type Band = { min: number; max: number };
 const cache = new Map<number, { texts: string[]; expiresAt: number }>();
 const avoidCache: { texts: string[]; expiresAt: number } = { texts: [], expiresAt: 0 };
+const libraryCache: { texts: string[]; expiresAt: number } = { texts: [], expiresAt: 0 };
 const TTL_MS = 60_000;
 const POOL_SIZE = 200;
 const AVOID_POOL_SIZE = 100;
@@ -106,5 +107,23 @@ export async function fetchAvoidExamples(): Promise<string[]> {
     .slice(0, AVOID_LIMIT)
     .map(item => item.text);
   Object.assign(avoidCache, { texts, expiresAt: now + TTL_MS });
+  return [...texts];
+}
+
+/** Every saved joke, newest first, so generated jokes can be checked against the library. */
+export async function fetchLibraryJokeTexts(): Promise<string[]> {
+  const now = Date.now();
+  if (libraryCache.expiresAt > now) return [...libraryCache.texts];
+  let texts: string[] = [];
+  try {
+    const snapshot = await adminDb.collection('jokes').orderBy('dateAdded', 'desc').limit(JOKE_GENERATION_LIMITS.libraryJokes).get();
+    texts = snapshot.docs.flatMap((doc: Document) => {
+      const data = doc.data();
+      return validText(data.text) ? [data.text] : validText(data.jokeText) ? [data.jokeText] : [];
+    });
+  } catch {
+    return []; // Library filtering is best-effort; do not cache a failed read.
+  }
+  Object.assign(libraryCache, { texts, expiresAt: now + TTL_MS });
   return [...texts];
 }

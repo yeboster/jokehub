@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { JOKE_GENERATION_LIMITS, normalizeJokeKey } from '@/lib/jokeGenerationContract';
+import { JOKE_GENERATION_LIMITS, isNearDuplicateJoke, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import { lintJoke } from './joke-lint';
 
 export const JokeVariationSchema = z.object({
@@ -60,13 +60,15 @@ export function selectJokes(
   candidates: readonly Candidate[],
   verdict: CriticOutput,
   referenceTexts: readonly string[],
+  libraryTexts: readonly string[] = [],
 ): JokeSelection | null {
   const referenceKeys = new Set(referenceTexts.map(normalizeJokeKey));
   const eligible = verdict.rankings.filter(r => {
     const candidate = candidates[r.index];
     return r.safeForGeneralAudience && r.fitsRequest && r.original
       && JokeVariationSchema.safeParse(candidate).success
-      && !referenceKeys.has(normalizeJokeKey(candidate.jokeText));
+      && !referenceKeys.has(normalizeJokeKey(candidate.jokeText))
+      && !libraryTexts.some(text => isNearDuplicateJoke(candidate.jokeText, text));
   });
   const score = new Map(eligible.map(r => [r.index, adjustedScore(r, candidates[r.index])]));
   let best: JokeSelection | null = null;

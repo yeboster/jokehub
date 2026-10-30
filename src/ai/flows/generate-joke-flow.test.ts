@@ -154,6 +154,24 @@ describe('taste calibration and automatic checks', () => {
   });
 });
 
+describe('proven classics mode', () => {
+  const library = ['Why do crabs never volunteer? Because they are shell-fish'];
+  it.each(['original', 'classic'] as const)('drops near-duplicates of library jokes in %s mode', async (mode) => {
+    const jokes = candidates.map(c => ({ ...c }));
+    jokes[0].jokeText = "Why don't crabs ever volunteer? They're shellfish";
+    initial(rankings([10, 9, 8, 7, 6, 5]), jokes);
+    await expect(generateJoke({ mode, libraryJokes: library })).resolves.toEqual({ jokes: candidates.slice(1, 4) });
+  });
+  it('lets the critic accept well-known jokes in classic mode only', async () => {
+    initial(); await generateJoke({ mode: 'classic', libraryJokes: library });
+    expect(aiMock.generate.mock.calls[0][0].prompt).toContain('proven jokes');
+    expect(aiMock.generate.mock.calls[1][0].system).toContain('Classic mode');
+    expect(aiMock.generate.mock.calls[1][0].prompt).not.toContain(library[0]);
+    aiMock.generate.mockReset(); initial(); await generateJoke({});
+    expect(aiMock.generate.mock.calls[1][0].system).not.toContain('Classic mode');
+  });
+});
+
 describe('request and runtime schemas', () => {
   it.each([[{}, DEFAULT_GENERATE_MODEL, 1.1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2]] as const)(
     'preserves two-call model/temperature contract %j', async (options, model, temperature) => {
@@ -182,7 +200,7 @@ describe('request and runtime schemas', () => {
     expect(critic.system).toContain('original only');
   });
   it.each([
-    { topicHint: 'x'.repeat(501) }, { prefilledJokes: Array(26).fill('ok') }, { exemplarJokes: Array(26).fill('ok') }, { avoidJokes: Array(9).fill('ok') }, { avoidJokes: ['!!!'] },
+    { topicHint: 'x'.repeat(501) }, { prefilledJokes: Array(26).fill('ok') }, { exemplarJokes: Array(26).fill('ok') }, { avoidJokes: Array(9).fill('ok') }, { avoidJokes: ['!!!'] }, { mode: 'remix' }, { libraryJokes: Array(1001).fill('ok') },
     { recentGeneratedJokes: Array(13).fill('ok') }, { prefilledJokes: ['!!!'] }, { exemplarJokes: ['x'.repeat(2001)] },
     { model: 'unsupported' }, { temperature: Infinity }, { temperature: NaN }, { temperature: -0.1 }, { temperature: 2.1 },
   ])('invalid input consumes zero calls on both entry paths %j', async (input) => {

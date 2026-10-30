@@ -1,10 +1,21 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from './jokeGenerationContract';
+import { JOKE_GENERATION_LIMITS, JOKE_MODES, isNearDuplicateJoke, mergeUniqueJokeTexts, normalizeJokeKey } from './jokeGenerationContract';
 
 describe('jokeGenerationContract', () => {
   it('publishes exact browser-safe shared caps', () => {
-    expect(JOKE_GENERATION_LIMITS).toEqual({ topicHintChars: 500, contextTextChars: 2000, prefilledJokes: 25, exemplarJokes: 25, recentGeneratedJokes: 12, avoidJokes: 8 });
+    expect(JOKE_GENERATION_LIMITS).toEqual({ topicHintChars: 500, contextTextChars: 2000, prefilledJokes: 25, exemplarJokes: 25, recentGeneratedJokes: 12, avoidJokes: 8, libraryJokes: 1000 });
+    expect(JOKE_MODES).toEqual(['original', 'classic']);
+  });
+  it.each([
+    ['Hello world', 'hello world!', true],
+    ["Why do crabs never volunteer? Because they're shell-fish", "Why don't crabs ever volunteer? They are shellfish!", true],
+    ['Why did the computer go to the dentist? It had a Bluetooth infection', 'Why was the computer cold? It left its Windows open', false],
+    ['Candidate 0', 'Candidate 1', false],
+    ['Never trust a statistician. They are always plotting something.', 'Never trust an atom. They make up everything.', false],
+  ])('near-duplicate %j vs %j is %s', (a, b, expected) => {
+    expect(isNearDuplicateJoke(a, b)).toBe(expected);
+    expect(isNearDuplicateJoke(b, a)).toBe(expected);
   });
   it.each([
     [' ＨＥＬＬＯ!!!\n World  ', 'hello world'],

@@ -5,6 +5,7 @@ vi.mock('@/lib/admin', () => ({ adminDb: { collection: mocks.collection } }));
 const doc = (id: string, overrides: Record<string, unknown> = {}) => ({ id, data: () => ({ text: `Joke ${id}`, averageRating: 4.5, ratingCount: 1, category: 'Work', ...overrides }) });
 async function fetcher() { return (await import('./jokeExemplars')).fetchJokeExemplars; }
 async function avoider() { return (await import('./jokeExemplars')).fetchAvoidExamples; }
+async function library() { return (await import('./jokeExemplars')).fetchLibraryJokeTexts; }
 beforeEach(() => {
   vi.resetModules(); vi.clearAllMocks();
   vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -113,5 +114,22 @@ describe('fetchAvoidExamples', () => {
   it('degrades to no examples when the read fails', async () => {
     mocks.get.mockRejectedValue(new Error('offline'));
     expect(await (await avoider())()).toEqual([]);
+  });
+});
+
+describe('fetchLibraryJokeTexts', () => {
+  it('returns every valid library text regardless of rating, newest first and bounded', async () => {
+    mocks.get.mockResolvedValueOnce({ docs: [doc('a', { averageRating: null }), doc('b', { text: '', jokeText: 'Compatible text' }), doc('blank', { text: '!!!' })] });
+    expect(await (await library())()).toEqual(['Joke a', 'Compatible text']);
+    expect(mocks.order).toHaveBeenCalledWith('dateAdded', 'desc');
+    expect(mocks.limit).toHaveBeenCalledWith(1000);
+  });
+  it('caches for 60s and degrades to an empty library when the read fails', async () => {
+    mocks.get.mockResolvedValue({ docs: [doc('a')] });
+    const fetch = await library();
+    await fetch(); await fetch();
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    vi.resetModules(); mocks.get.mockRejectedValue(new Error('offline'));
+    expect(await (await library())()).toEqual([]);
   });
 });
