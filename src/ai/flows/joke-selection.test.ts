@@ -86,7 +86,7 @@ describe('critic schema and bounded feedback', () => {
     expect(feedback[0].duplicateFailure).toBe('candidate-and-reference');
     expect(feedback[1].duplicateFailure).toBe('candidate-and-reference');
     expect(feedback[2].duplicateFailure).toBe('none');
-    expect(Object.keys(feedback[0]).sort()).toEqual(['index', 'score', 'reason', 'safeForGeneralAudience', 'fitsRequest', 'original', 'premiseKey', 'mechanismKey', 'jokeText', 'duplicateFailure'].sort());
+    expect(Object.keys(feedback[0]).sort()).toEqual(['index', 'score', 'reason', 'safeForGeneralAudience', 'fitsRequest', 'original', 'premiseKey', 'mechanismKey', 'jokeText', 'duplicateFailure', 'lintIssues', 'adjustedScore'].sort());
   });
   it('no repair trigger from homogeneous descriptors alone or score above4', () => {
     expect(hasRepairTrigger(jokes, verdict([4.1, 5, 5, 5, 5, 5], Array(6).fill('same'), Array(6).fill('same')), [])).toBe(false);

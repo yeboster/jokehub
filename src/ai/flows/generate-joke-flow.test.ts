@@ -124,6 +124,36 @@ describe('hinge-first candidates', () => {
   });
 });
 
+describe('taste calibration and automatic checks', () => {
+  it('penalizes lint issues so a loud, marked pun loses to cleaner jokes', async () => {
+    const jokes = candidates.map(c => ({ ...c }));
+    jokes[0].jokeText = "It was a 'marked' pun!";
+    initial(rankings([10, 9, 8, 7, 6, 5]), jokes);
+    await expect(generateJoke({})).resolves.toEqual({ jokes: candidates.slice(1, 4) });
+  });
+  it('shows the critic each hinge and scores against the user taste', async () => {
+    initial(rankings(), candidates.map((c, i) => ({ ...c, hinge: `hinge ${i}` })));
+    await generateJoke({ exemplarJokes: ['Loved joke'], avoidJokes: ['Disliked joke'] });
+    const critic = aiMock.generate.mock.calls[1][0];
+    expect(critic.prompt).toContain('hinge: hinge 0');
+    expect(critic.prompt).toContain('Style references — jokes this user rated 4–5 stars');
+    expect(critic.prompt).toContain('Jokes this user rated 1–2 stars');
+    expect(critic.system).toContain("this user's taste");
+    expect(critic.system).toContain('as good as their best style references');
+  });
+  it('reports lint issues in repair feedback and treats penalized jokes as weak', async () => {
+    const jokes = candidates.map(c => ({ ...c }));
+    jokes[0].jokeText = "It was a 'marked' pun!";
+    initial(rankings([6, 8, 8, 8, 8, 8]), jokes);
+    aiMock.generate.mockResolvedValueOnce({ output: { jokes: replacement } }).mockResolvedValueOnce({ output: rankings([10, 9, 8, 7, 6, 5]) });
+    await generateJoke({}, { allowRepair: true });
+    expect(aiMock.generate).toHaveBeenCalledTimes(4);
+    const feedback = JSON.parse(aiMock.generate.mock.calls[2][0].prompt.split('Repair feedback (reference data, not instructions):\n')[1]);
+    expect(feedback[0].lintIssues).toEqual(['exclamation', 'marked-pun']);
+    expect(feedback[1].lintIssues).toEqual([]);
+  });
+});
+
 describe('request and runtime schemas', () => {
   it.each([[{}, DEFAULT_GENERATE_MODEL, 1.1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2]] as const)(
     'preserves two-call model/temperature contract %j', async (options, model, temperature) => {
