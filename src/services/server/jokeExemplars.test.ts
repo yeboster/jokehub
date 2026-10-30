@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ get: vi.fn(), order: vi.fn(), limit: vi.fn(), collection: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), order: vi.fn(), limit: vi.fn(), collection: vi.fn(), where: vi.fn(), feedback: vi.fn() }));
 vi.mock('@/lib/admin', () => ({ adminDb: { collection: mocks.collection } }));
 const doc = (id: string, overrides: Record<string, unknown> = {}) => ({ id, data: () => ({ text: `Joke ${id}`, averageRating: 4.5, ratingCount: 1, category: 'Work', ...overrides }) });
 async function fetcher() { return (await import('./jokeExemplars')).fetchJokeExemplars; }
@@ -9,7 +9,10 @@ async function library() { return (await import('./jokeExemplars')).fetchLibrary
 beforeEach(() => {
   vi.resetModules(); vi.clearAllMocks();
   vi.spyOn(Math, 'random').mockReturnValue(0);
-  mocks.collection.mockReturnValue({ orderBy: mocks.order });
+  mocks.collection.mockImplementation((name: string) => name === 'generatedJokeFeedback'
+    ? { where: mocks.where } : { orderBy: mocks.order });
+  mocks.where.mockReturnValue({ limit: () => ({ get: mocks.feedback }) });
+  mocks.feedback.mockResolvedValue({ docs: [] });
   mocks.order.mockReturnValue({ limit: mocks.limit });
   mocks.limit.mockReturnValue({ get: mocks.get });
   mocks.get.mockResolvedValue({ docs: [] });
@@ -111,8 +114,16 @@ describe('fetchAvoidExamples', () => {
     mocks.get.mockResolvedValue({ docs: Array.from({ length: 20 }, (_, i) => doc(`${i}`, { averageRating: 1 })) });
     expect(await (await avoider())()).toHaveLength(6);
   });
+  it('leads with the most recent thumbs-down generated jokes, then low-rated library jokes', async () => {
+    const vote = (id: string, jokeText: string, at: number) => ({ id, data: () => ({ jokeText, vote: 'down', updatedAt: { toMillis: () => at } }) });
+    mocks.feedback.mockResolvedValueOnce({ docs: [vote('old', 'Old dud', 1), vote('new', 'New dud', 3), vote('mid', 'Mid dud', 2), vote('x', 'Joke one', 4), vote('older', 'Oldest dud', 0)] });
+    mocks.get.mockResolvedValueOnce({ docs: [doc('one', { averageRating: 1 }), doc('two', { averageRating: 2 })] });
+    expect(await (await avoider())()).toEqual(['Joke one', 'New dud', 'Mid dud', 'Old dud', 'Joke two']);
+    expect(mocks.where).toHaveBeenCalledWith('vote', '==', 'down');
+  });
   it('degrades to no examples when the read fails', async () => {
     mocks.get.mockRejectedValue(new Error('offline'));
+    mocks.feedback.mockRejectedValue(new Error('offline'));
     expect(await (await avoider())()).toEqual([]);
   });
 });

@@ -76,6 +76,43 @@ describe('joke style', () => {
   });
 });
 
+describe('generated joke feedback', () => {
+  const feedbackCalls = () => mocks.fetch.mock.calls.filter(([url]) => url === '/api/generated-joke-feedback');
+  const thumb = (index: number, kind: 'good' | 'bad') =>
+    container.querySelectorAll<HTMLButtonElement>(`button[aria-label^="Mark as a ${kind} joke"]`)[index];
+  it('records a toggleable vote per generated joke with its context', async () => {
+    await render(); await generate();
+    mocks.fetch.mockResolvedValue(response({ ok: true }));
+    expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
+    await settle(() => thumb(0, 'bad').click());
+    expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('true');
+    const [, options] = feedbackCalls()[0];
+    expect(options.headers.Authorization).toBe('Bearer token-a');
+    expect(JSON.parse(options.body)).toEqual({ jokeText: 'batch 1 joke 0', category: 'Work', vote: 'down', mode: 'original', model: DEFAULT_GENERATE_MODEL });
+    await settle(() => thumb(0, 'good').click());
+    expect(thumb(0, 'good').getAttribute('aria-pressed')).toBe('true');
+    expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
+    await settle(() => thumb(0, 'good').click());
+    expect(thumb(0, 'good').getAttribute('aria-pressed')).toBe('false');
+    expect(feedbackCalls().map(([, o]) => JSON.parse(o.body).vote)).toEqual(['down', 'up', 'none']);
+    expect(thumb(1, 'bad').getAttribute('aria-pressed')).toBe('false');
+  });
+  it('reverts the vote and explains when saving feedback fails', async () => {
+    await render(); await generate();
+    mocks.fetch.mockResolvedValue(response({ error: 'nope' }, false));
+    await settle(() => thumb(0, 'bad').click());
+    expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Couldn't save feedback", variant: 'destructive' }));
+  });
+  it('clears votes when a new batch arrives', async () => {
+    await render(); await generate();
+    mocks.fetch.mockResolvedValueOnce(response({ ok: true }));
+    await settle(() => thumb(0, 'bad').click());
+    mocks.fetch.mockResolvedValueOnce(response(batch(2))); await generate();
+    expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
+  });
+});
+
 describe('recent generation memory', () => {
   it('second request sends prior ranked batch separately, retains latest 12 and excludes failed batch', async () => {
     await render();

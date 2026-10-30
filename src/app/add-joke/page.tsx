@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, CheckCircle, Star } from 'lucide-react';
+import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, CheckCircle, Star, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
@@ -35,6 +35,9 @@ const GenerationResponseSchema = z.object({
   })).length(3),
 });
 
+type JokeVote = 'up' | 'down' | 'none';
+type BatchContext = { mode: JokeMode; model: string; topicHint: string; requestId: string | null };
+
 function boundedInspirations(values: unknown[]): string[] {
   return mergeUniqueJokeTexts(values.filter((value): value is string =>
     typeof value === 'string' && value.length <= JOKE_GENERATION_LIMITS.contextTextChars && !!normalizeJokeKey(value)), [], JOKE_GENERATION_LIMITS.prefilledJokes);
@@ -56,6 +59,7 @@ function AddJokeSession() {
   const [isGeneratingJoke, setIsGeneratingJoke] = useState(false);
   const [aiTopicHint, setAiTopicHint] = useState<string>('');
   const [jokeMode, setJokeMode] = useState<JokeMode>('original');
+  const [votes, setVotes] = useState<Record<string, JokeVote>>({});
   const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
   const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GENERATE_MODEL);
@@ -87,6 +91,7 @@ function AddJokeSession() {
   const inspirationSequence = useRef(0);
   const inspirationVersion = useRef(0);
   const history = useRef<string[]>([]);
+  const batchContext = useRef<BatchContext | null>(null);
 
   useLayoutEffect(() => {
     mounted.current = true;
@@ -151,6 +156,8 @@ function AddJokeSession() {
     setElapsedSeconds(0);
     setSelectedJoke(null);
     setAiGeneratedJokes([]);
+    setVotes({});
+    const context: BatchContext = { mode: jokeMode, model: selectedModel, topicHint: aiTopicHint.trim(), requestId: null };
     try {
       const idToken = await user.getIdToken();
       if (!current()) return;
@@ -164,7 +171,8 @@ function AddJokeSession() {
         }),
       });
       if (!current()) return;
-      setRequestId(response.headers?.get('x-request-id') ?? null);
+      context.requestId = response.headers?.get('x-request-id') ?? null;
+      setRequestId(context.requestId);
       if (!response.ok) {
         let errorData;
         try { errorData = await response.json(); } catch { /* preserve HTTP error */ }
@@ -174,6 +182,7 @@ function AddJokeSession() {
       const payload: unknown = response.headers?.get('content-type')?.includes('application/x-ndjson') && response.body
         ? await readGenerationStream(response.body, frame => {
           if (!current()) return;
+          context.requestId = frame.requestId;
           setRequestId(frame.requestId);
           if (frame.type === 'progress') setProgressStage(frame.stage);
         })
@@ -181,6 +190,7 @@ function AddJokeSession() {
       if (!current()) return;
       const result = GenerationResponseSchema.parse(payload);
       history.current = mergeUniqueJokeTexts(result.jokes.map(joke => joke.jokeText), history.current, JOKE_GENERATION_LIMITS.recentGeneratedJokes);
+      batchContext.current = context;
       setAiGeneratedJokes(result.jokes);
       // A newer load (including a pending one) owns its inspiration version.
       if (inspirationVersion.current === owner.inspirationVersion) {
@@ -198,6 +208,33 @@ function AddJokeSession() {
         generation.current = null;
         setIsGeneratingJoke(false);
       }
+    }
+  };
+
+  // Votes on jokes that are never saved are the only record of what the user rejects.
+  const handleVote = async (joke: JokeVariation, kind: 'up' | 'down') => {
+    if (!user) return;
+    const previous = votes[joke.jokeText] ?? 'none';
+    const vote: JokeVote = previous === kind ? 'none' : kind;
+    setVotes(current => ({ ...current, [joke.jokeText]: vote }));
+    const context = batchContext.current;
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/generated-joke-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          jokeText: joke.jokeText, category: joke.category, vote, mode: context?.mode, model: context?.model,
+          ...(context?.topicHint ? { topicHint: context.topicHint } : {}),
+          ...(context?.requestId ? { requestId: context.requestId } : {}),
+        }),
+      });
+      if (!response.ok) throw new Error(`Feedback request failed with status ${response.status}`);
+    } catch {
+      if (!mounted.current) return;
+      // Only roll back if no later click has replaced this vote.
+      setVotes(current => current[joke.jokeText] === vote ? { ...current, [joke.jokeText]: previous } : current);
+      toast({ title: "Couldn't save feedback", description: 'Your vote was not recorded. Please try again.', variant: 'destructive' });
     }
   };
 
@@ -463,6 +500,25 @@ function AddJokeSession() {
                                       </CardContent>
                                       <CardFooter className="bg-muted/40 p-3 flex justify-between items-center">
                                           <Badge variant="secondary">{joke.category}</Badge>
+                                          <div className="flex items-center gap-1">
+                                          <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={`Mark as a good joke, option ${index + 1}`}
+                                          aria-pressed={votes[joke.jokeText] === 'up'}
+                                          onClick={() => handleVote(joke, 'up')}
+                                          >
+                                          <ThumbsUp className={`h-4 w-4 ${votes[joke.jokeText] === 'up' ? 'fill-current text-primary' : ''}`} />
+                                          </Button>
+                                          <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={`Mark as a bad joke, option ${index + 1}`}
+                                          aria-pressed={votes[joke.jokeText] === 'down'}
+                                          onClick={() => handleVote(joke, 'down')}
+                                          >
+                                          <ThumbsDown className={`h-4 w-4 ${votes[joke.jokeText] === 'down' ? 'fill-current text-primary' : ''}`} />
+                                          </Button>
                                           <Button
                                           variant={selectedJoke === joke ? 'default' : 'outline'}
                                           size="sm"
@@ -471,6 +527,7 @@ function AddJokeSession() {
                                           {selectedJoke === joke && <CheckCircle className="mr-2 h-4 w-4" />}
                                           {selectedJoke === joke ? 'Selected' : 'Use this Joke'}
                                           </Button>
+                                          </div>
                                       </CardFooter>
                                   </Card>
                               </motion.div>
