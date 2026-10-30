@@ -23,7 +23,10 @@ const GenerateJokeInputSchema = z.object({
 export type GenerateJokeInput = z.infer<typeof GenerateJokeInputSchema>;
 export type GenerateJokeOptions = { allowRepair?: boolean; onProgress?: (event: GenerationProgress) => void; signal?: AbortSignal };
 export type JokeVariation = z.infer<typeof JokeVariationSchema>;
-const GenerateCandidatesOutputSchema = z.object({ jokes: z.array(JokeVariationSchema).length(6) });
+// The hinge is requested before the joke so the model commits to a double meaning first.
+const CandidateSchema = JokeVariationSchema.extend({ hinge: z.string().max(200).optional() });
+type Candidate = z.infer<typeof CandidateSchema>;
+const GenerateCandidatesOutputSchema = z.object({ jokes: z.array(CandidateSchema).length(6) });
 const GenerateJokeOutputSchema = z.object({ jokes: z.array(JokeVariationSchema).length(3) });
 export type GenerateJokeOutput = z.infer<typeof GenerateJokeOutputSchema>;
 
@@ -66,7 +69,7 @@ async function runGenerateJoke(rawInput: GenerateJokeInput, options: GenerateJok
   const progress = (stage: GenerationProgress['stage']) => {
     try { options.onProgress?.({ stage, callCount }); } catch { /* Observability cannot change generation semantics. */ }
   };
-  async function generateCandidates(candidatePrompt: string, repairing = false): Promise<JokeVariation[]> {
+  async function generateCandidates(candidatePrompt: string, repairing = false): Promise<Candidate[]> {
     checkConnected();
     callCount++;
     progress(repairing ? 'repairing' : 'generating');
@@ -76,7 +79,7 @@ async function runGenerateJoke(rawInput: GenerateJokeInput, options: GenerateJok
     if (!parsed.success) throw new Error('AI returned candidate data in an unexpected format.');
     return parsed.data.jokes;
   }
-  async function assess(candidates: JokeVariation[], repairing = false) {
+  async function assess(candidates: Candidate[], repairing = false) {
     checkConnected();
     callCount++;
     progress(repairing ? 'reviewing-repair' : 'reviewing');
@@ -101,15 +104,17 @@ async function runGenerateJoke(rawInput: GenerateJokeInput, options: GenerateJok
       const replacementVerdict = await assess(replacements, true);
       progress('selecting-repair');
       const repaired = selectJokes(replacements, replacementVerdict, references);
-      if (repaired && (!baseline || compareSelections(repaired, baseline) > 0)) return { jokes: repaired.jokes };
+      if (repaired && (!baseline || compareSelections(repaired, baseline) > 0)) return { jokes: repaired.jokes.map(toVariation) };
     } catch {
       // A usable assessed baseline survives every repair-boundary failure.
     }
     if (baseline) progress('repair-fallback');
   }
   if (!baseline) throw new Error(SCARCITY_ERROR);
-  return { jokes: baseline.jokes };
+  return { jokes: baseline.jokes.map(toVariation) };
 }
+
+const toVariation = ({ jokeText, category }: JokeVariation): JokeVariation => ({ jokeText, category });
 
 const generateJokeFlow = ai.defineFlow({
   name: 'generateJokeFlow', inputSchema: GenerateJokeInputSchema, outputSchema: GenerateJokeOutputSchema,

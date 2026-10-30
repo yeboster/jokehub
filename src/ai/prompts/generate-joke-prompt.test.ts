@@ -77,13 +77,28 @@ describe('jokeGenerationPrompt', () => {
     expect(CRAFT_PRINCIPLES).not.toContain('Before responding');
   });
 
-  it('shares specific setup, earned pivot and soft final-beat discipline with critic', () => {
-    expect(CRAFT_PRINCIPLES).toContain('recognizable situation, action, or tension');
-    expect(CRAFT_PRINCIPLES).toContain('believable setup');
-    expect(CRAFT_PRINCIPLES).toContain('surprising but earned pivot');
-    expect(CRAFT_PRINCIPLES).toContain('final beat, on the final word where natural');
-    expect(CRAFT_PRINCIPLES).toContain('cut filler and explanations after it');
-    expect(CRAFT_PRINCIPLES).toContain('not a forced pun');
+  it('specifies short dad-joke one-liners built around a hinge that lands last, shared with the critic', () => {
+    expect(CRAFT_PRINCIPLES).toContain('At most 20 words');
+    expect(CRAFT_PRINCIPLES).toContain('question and a one-line answer');
+    expect(CRAFT_PRINCIPLES).toMatch(/hinge.*two meanings/);
+    expect(CRAFT_PRINCIPLES).toContain('Pick the hinge first');
+    expect(CRAFT_PRINCIPLES).toContain('Nothing comes after the hinge');
+    expect(CRAFT_PRINCIPLES).toContain('No exclamation marks');
+    expect(CRAFT_PRINCIPLES).toMatch(/quotation marks.*asterisks/);
+    expect(CRAFT_PRINCIPLES).toMatch(/logic twist/);
+    expect(CRAFT_PRINCIPLES).toMatch(/long stories/);
+  });
+
+  it('bans tired premises rather than classic formats the user rates highly', () => {
+    expect(CLICHE_BLACKLIST).toContain('Tired premises');
+    expect(CLICHE_BLACKLIST).toMatch(/Windows open/);
+    expect(CLICHE_BLACKLIST).toMatch(/knock-knock.*are fine when the premise is fresh/);
+    expect(CLICHE_BLACKLIST).not.toMatch(/"Knock knock…" format|walks into a bar…" setups/);
+    expect(CRAFT_PRINCIPLES).not.toContain('Did you hear about');
+  });
+
+  it('asks for the hinge as its own field so the model commits to it before the joke', () => {
+    expect(jokeGenerationPrompt()).toContain('Put the hinge word or phrase in the hinge field');
   });
 
   it('appends optional recent history without changing first four arguments or claiming reference ratings', () => {
@@ -105,6 +120,6 @@ describe('jokeGenerationPrompt', () => {
     expect(systemInstruction).toContain('Avoid offensive, discriminatory, or inappropriate content; jokes must be suitable for a general audience.');
     expect(systemInstruction).toContain(CRAFT_PRINCIPLES);
     expect(systemInstruction).toContain(CLICHE_BLACKLIST);
-    expect(CLICHE_BLACKLIST).toContain('DO NOT use these unless the user explicitly asks');
+    expect(CLICHE_BLACKLIST).toContain('do not use these unless the user explicitly asks');
   });
 });

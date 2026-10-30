@@ -113,6 +113,17 @@ describe('explicit-index quality selection', () => {
   });
 });
 
+describe('hinge-first candidates', () => {
+  it('requests a hinge per candidate and returns only joke text and category', async () => {
+    const hinged = candidates.map((c, i) => ({ hinge: `hinge ${i}`, ...c }));
+    initial(rankings([10, 9, 8, 7, 6, 5]), hinged);
+    await expect(generateJoke({})).resolves.toEqual({ jokes: candidates.slice(0, 3) });
+    const schema = aiMock.generate.mock.calls[0][0].output.schema;
+    expect(schema.parse({ jokes: hinged }).jokes[0].hinge).toBe('hinge 0');
+    expect(schema.safeParse({ jokes: candidates }).success).toBe(true);
+  });
+});
+
 describe('request and runtime schemas', () => {
   it.each([[{}, DEFAULT_GENERATE_MODEL, 1.1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2]] as const)(
     'preserves two-call model/temperature contract %j', async (options, model, temperature) => {
