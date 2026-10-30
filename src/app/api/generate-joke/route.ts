@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateJoke, type GenerateJokeInput } from '@/ai/flows/generate-joke-flow';
 import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
-import { fetchJokeExemplars } from '@/services/server/jokeExemplars';
+import { fetchAvoidExamples, fetchJokeExemplars } from '@/services/server/jokeExemplars';
 import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import type { GenerationFrame, GenerationProgress, GenerationStage } from '@/lib/generationProgress';
 import { verifyRequestAuth } from '@/lib/auth';
@@ -88,13 +88,17 @@ export async function POST(request: NextRequest) {
       };
       log('started', { allowRepair });
       send({ type: 'progress', requestId, stage: 'examples', callCount: 0, elapsedMs: Date.now() - started });
-      const serverExemplars = input.useServerExemplars !== false ? await fetchJokeExemplars() : [];
+      const useServer = input.useServerExemplars !== false;
+      const [serverExemplars, avoidJokes] = useServer ? await Promise.all([fetchJokeExemplars(), fetchAvoidExamples()]) : [[], []];
       if (lifecycle.signal.aborted) throw new Error('Request disconnected');
+      // Exemplars already count as copy references in the flow; listing them as
+      // prefilled too would repeat every example in the prompt.
       const aiInput: GenerateJokeInput = {
         topicHint: input.topicHint, model: input.model, temperature: input.temperature,
-        prefilledJokes: mergeUniqueJokeTexts(input.prefilledJokes ?? [], serverExemplars, JOKE_GENERATION_LIMITS.prefilledJokes),
+        prefilledJokes: mergeUniqueJokeTexts(input.prefilledJokes ?? [], [], JOKE_GENERATION_LIMITS.prefilledJokes),
         exemplarJokes: mergeUniqueJokeTexts(input.exemplarJokes ?? [], serverExemplars, JOKE_GENERATION_LIMITS.exemplarJokes),
         recentGeneratedJokes: input.recentGeneratedJokes,
+        avoidJokes,
       };
       const output = await generateJoke(aiInput, { allowRepair, onProgress: progress, signal: lifecycle.signal });
       log('completed');

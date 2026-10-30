@@ -180,7 +180,7 @@ describe('inspiration ownership', () => {
     mocks.inspiration.mockResolvedValue(['!!!', null, 'x'.repeat(2001), ...Array.from({ length: 30 }, (_, i) => `Reference ${i}`)]);
     await render(); await settle(() => button('Load My').click()); await generate();
     expect(bodies()[0].prefilledJokes).toEqual(Array.from({ length: 25 }, (_, i) => `Reference ${i}`));
-    expect(bodies()[0].exemplarJokes).toEqual(Array.from({ length: 10 }, (_, i) => `Reference ${i}`));
+    expect(bodies()[0].exemplarJokes).toEqual(Array.from({ length: 25 }, (_, i) => `Reference ${i}`));
   });
   it('generation completion cannot erase newer pending/load inspiration', async () => {
     const inspiration = deferred<string[]>(); mocks.inspiration.mockReturnValueOnce(inspiration.promise);

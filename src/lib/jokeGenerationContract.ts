@@ -2,8 +2,9 @@ export const JOKE_GENERATION_LIMITS = {
   topicHintChars: 500,
   contextTextChars: 2000,
   prefilledJokes: 25,
-  exemplarJokes: 10,
+  exemplarJokes: 25,
   recentGeneratedJokes: 12,
+  avoidJokes: 8,
 } as const;
 
 /** Deterministic textual equivalence only; not semantic duplicate detection. */

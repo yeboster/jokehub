@@ -4,7 +4,7 @@ import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey } from '
 
 describe('jokeGenerationContract', () => {
   it('publishes exact browser-safe shared caps', () => {
-    expect(JOKE_GENERATION_LIMITS).toEqual({ topicHintChars: 500, contextTextChars: 2000, prefilledJokes: 25, exemplarJokes: 10, recentGeneratedJokes: 12 });
+    expect(JOKE_GENERATION_LIMITS).toEqual({ topicHintChars: 500, contextTextChars: 2000, prefilledJokes: 25, exemplarJokes: 25, recentGeneratedJokes: 12, avoidJokes: 8 });
   });
   it.each([
     [' ＨＥＬＬＯ!!!\n World  ', 'hello world'],

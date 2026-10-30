@@ -16,6 +16,7 @@ const GenerateJokeInputSchema = z.object({
   prefilledJokes: z.array(contextText).max(JOKE_GENERATION_LIMITS.prefilledJokes).optional(),
   exemplarJokes: z.array(contextText).max(JOKE_GENERATION_LIMITS.exemplarJokes).optional(),
   recentGeneratedJokes: z.array(contextText).max(JOKE_GENERATION_LIMITS.recentGeneratedJokes).optional(),
+  avoidJokes: z.array(contextText).max(JOKE_GENERATION_LIMITS.avoidJokes).optional(),
   model: z.enum(GEMINI_MODELS).optional(),
   temperature: z.number().finite().min(0).max(2).optional(),
 });
@@ -44,6 +45,7 @@ function criticPrompt(candidates: JokeVariation[], input: GenerateJokeInput): st
     ['Already-present jokes', input.prefilledJokes],
     ['Style references', input.exemplarJokes],
     ['Recent successful generated jokes', input.recentGeneratedJokes],
+    ['Jokes this user rated 1–2 stars', input.avoidJokes],
   ] as const) {
     if (texts?.length) prompt += `\n\n${label} (do not copy):\n${texts.map(j => `- "${j}"`).join('\n')}`;
   }
@@ -56,8 +58,8 @@ async function runGenerateJoke(rawInput: GenerateJokeInput, options: GenerateJok
   const input = GenerateJokeInputSchema.parse(rawInput);
   const model = input.model ?? DEFAULT_GENERATE_MODEL;
   const temperature = input.temperature ?? 1.1;
-  const references = [...input.prefilledJokes ?? [], ...input.exemplarJokes ?? [], ...input.recentGeneratedJokes ?? []];
-  const prompt = jokeGenerationPrompt(input.topicHint, input.prefilledJokes, input.exemplarJokes, 6, input.recentGeneratedJokes);
+  const references = [...input.prefilledJokes ?? [], ...input.exemplarJokes ?? [], ...input.recentGeneratedJokes ?? [], ...input.avoidJokes ?? []];
+  const prompt = jokeGenerationPrompt(input.topicHint, input.prefilledJokes, input.exemplarJokes, 6, input.recentGeneratedJokes, input.avoidJokes);
 
   const checkConnected = () => { if (options.signal?.aborted) throw new Error('Generation request disconnected.'); };
   let callCount = 0;

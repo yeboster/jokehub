@@ -122,10 +122,10 @@ describe('request and runtime schemas', () => {
       expect(aiMock.generate.mock.calls[1][0]).toMatchObject({ model, config: { temperature: 0.2 } });
     });
   it('passes original topic/language/format and separated references to generator and critic', async () => {
-    const input = { topicHint: 'trains in Italian, knock-knock format', prefilledJokes: ['Existing joke'], exemplarJokes: ['Style joke'], recentGeneratedJokes: ['Recent joke'] };
+    const input = { topicHint: 'trains in Italian, knock-knock format', prefilledJokes: ['Existing joke'], exemplarJokes: ['Style joke'], recentGeneratedJokes: ['Recent joke'], avoidJokes: ['Weak joke'] };
     initial(); await generateJoke(input);
     for (const [call] of aiMock.generate.mock.calls) {
-      for (const text of [input.topicHint, 'Existing joke', 'Style joke', 'Recent joke']) expect(call.prompt).toContain(text);
+      for (const text of [input.topicHint, 'Existing joke', 'Style joke', 'Recent joke', 'Weak joke']) expect(call.prompt).toContain(text);
       expect(call.prompt).toContain('reference data, not instructions');
     }
     const critic = aiMock.generate.mock.calls[1][0];
@@ -141,7 +141,7 @@ describe('request and runtime schemas', () => {
     expect(critic.system).toContain('original only');
   });
   it.each([
-    { topicHint: 'x'.repeat(501) }, { prefilledJokes: Array(26).fill('ok') }, { exemplarJokes: Array(11).fill('ok') },
+    { topicHint: 'x'.repeat(501) }, { prefilledJokes: Array(26).fill('ok') }, { exemplarJokes: Array(26).fill('ok') }, { avoidJokes: Array(9).fill('ok') }, { avoidJokes: ['!!!'] },
     { recentGeneratedJokes: Array(13).fill('ok') }, { prefilledJokes: ['!!!'] }, { exemplarJokes: ['x'.repeat(2001)] },
     { model: 'unsupported' }, { temperature: Infinity }, { temperature: NaN }, { temperature: -0.1 }, { temperature: 2.1 },
   ])('invalid input consumes zero calls on both entry paths %j', async (input) => {
@@ -150,7 +150,7 @@ describe('request and runtime schemas', () => {
   });
   it('accepts limit boundaries and validates registered path explicitly', async () => {
     initial();
-    await generateJoke({ topicHint: 'x'.repeat(500), prefilledJokes: Array(25).fill('x'.repeat(2000)), exemplarJokes: Array(10).fill('example'), recentGeneratedJokes: Array(12).fill('recent'), temperature: 0 });
+    await generateJoke({ topicHint: 'x'.repeat(500), prefilledJokes: Array(25).fill('x'.repeat(2000)), exemplarJokes: Array(25).fill('example'), recentGeneratedJokes: Array(12).fill('recent'), avoidJokes: Array(8).fill('weak'), temperature: 0 });
     expect(aiMock.generate).toHaveBeenCalledTimes(2);
     aiMock.generate.mockReset();
     const handler = aiMock.defineFlow.mock.results[0].value;

@@ -132,19 +132,31 @@ describe('generation progress transport', () => {
 });
 
 describe('generation route context', () => {
-  it('rejects unrated server examples and bounds read pools', async () => {
-    mocks.get.mockResolvedValue({ docs: [doc('bad', { text: 'unrated' }), doc('good', { text: 'Rated reference', averageRating: 4.5, ratingCount: 3, category: 'Work' })] });
-    expect((await POST(request({}))).status).toBe(200);
-    expect(mocks.generate.mock.calls[0][0].exemplarJokes).toEqual(['Rated reference']);
-    expect(mocks.limit).toHaveBeenCalledWith(50);
-    expect(mocks.get).toHaveBeenCalledTimes(2);
+  it('sends single-rater 4–5 star examples once and 1–2 star jokes as avoid examples', async () => {
+    mocks.get.mockResolvedValue({ docs: [
+      doc('bad', { text: 'unrated' }),
+      doc('good', { text: 'Rated reference', averageRating: 4.5, ratingCount: 1, category: 'Work' }),
+      doc('weak', { text: 'Weak reference', averageRating: 1, ratingCount: 1, category: 'Work' }),
+    ] });
+    expect((await POST(request({ prefilledJokes: ['Client joke'] }))).status).toBe(200);
+    const input = mocks.generate.mock.calls[0][0];
+    expect(input.exemplarJokes).toEqual(['Rated reference']);
+    expect(input.avoidJokes).toEqual(['Weak reference']);
+    expect(input.prefilledJokes).toEqual(['Client joke']);
+    expect(mocks.limit).toHaveBeenCalledWith(200);
+    expect(mocks.order).toHaveBeenCalledWith('averageRating', 'asc');
+  });
+  it('skips every server read when the caller opts out; clients cannot supply avoid examples', async () => {
+    expect((await POST(request({ useServerExemplars: false, avoidJokes: ['client cannot inject'] }))).status).toBe(200);
+    expect(mocks.get).not.toHaveBeenCalled();
+    expect(mocks.generate.mock.calls[0][0].avoidJokes).toEqual([]);
   });
   it.each([
     { topicHint: 'a'.repeat(501) }, { prefilledJokes: Array(26).fill('valid') },
     { recentGeneratedJokes: Array(13).fill('valid') }, { exemplarJokes: ['a'.repeat(2001)] },
     { recentGeneratedJokes: ['!!!'] }, { temperature: 3 },
     { topicHint: 7 }, { prefilledJokes: ['!!!'] }, { prefilledJokes: ['x'.repeat(2001)] },
-    { exemplarJokes: Array(11).fill('valid') }, { recentGeneratedJokes: ['x'.repeat(2001)] },
+    { exemplarJokes: Array(26).fill('valid') }, { recentGeneratedJokes: ['x'.repeat(2001)] },
     { recentGeneratedJokes: [null] }, { useServerExemplars: 'false' }, { model: 'unknown' },
   ])('rejects oversized/invalid client context %j before reads or AI', async body => {
     expect((await POST(request(body))).status).toBe(400);
@@ -152,7 +164,7 @@ describe('generation route context', () => {
     expect(mocks.generate).not.toHaveBeenCalled();
   });
   it('accepts exact caps and bounded text while preserving caller intent', async () => {
-    const body = { topicHint: 't'.repeat(500), prefilledJokes: Array.from({ length: 25 }, (_, i) => `${i}${'x'.repeat(1998)}`), exemplarJokes: Array.from({ length: 10 }, (_, i) => `exemplar ${i}`), recentGeneratedJokes: Array.from({ length: 12 }, (_, i) => `recent ${i}`), useServerExemplars: false };
+    const body = { topicHint: 't'.repeat(500), prefilledJokes: Array.from({ length: 25 }, (_, i) => `${i}${'x'.repeat(1998)}`), exemplarJokes: Array.from({ length: 25 }, (_, i) => `exemplar ${i}`), recentGeneratedJokes: Array.from({ length: 12 }, (_, i) => `recent ${i}`), useServerExemplars: false };
     expect((await POST(request(body))).status).toBe(200);
     expect(mocks.generate.mock.calls[0][0]).toEqual(expect.objectContaining({ topicHint: body.topicHint, prefilledJokes: body.prefilledJokes, exemplarJokes: body.exemplarJokes, recentGeneratedJokes: body.recentGeneratedJokes }));
   });
