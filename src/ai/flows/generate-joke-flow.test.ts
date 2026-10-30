@@ -173,7 +173,7 @@ describe('proven classics mode', () => {
 });
 
 describe('request and runtime schemas', () => {
-  it.each([[{}, DEFAULT_GENERATE_MODEL, 1.1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2]] as const)(
+  it.each([[{}, DEFAULT_GENERATE_MODEL, 1.1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2], [{ model: 'opencode/glm-5.3-flash', temperature: 1 }, 'opencode/glm-5.3-flash', 1]] as const)(
     'preserves two-call model/temperature contract %j', async (options, model, temperature) => {
       initial(); await generateJoke(options);
       expect(aiMock.generate).toHaveBeenCalledTimes(2);
@@ -202,7 +202,7 @@ describe('request and runtime schemas', () => {
   it.each([
     { topicHint: 'x'.repeat(501) }, { prefilledJokes: Array(26).fill('ok') }, { exemplarJokes: Array(26).fill('ok') }, { avoidJokes: Array(9).fill('ok') }, { avoidJokes: ['!!!'] }, { mode: 'remix' }, { libraryJokes: Array(1001).fill('ok') },
     { recentGeneratedJokes: Array(13).fill('ok') }, { prefilledJokes: ['!!!'] }, { exemplarJokes: ['x'.repeat(2001)] },
-    { model: 'unsupported' }, { temperature: Infinity }, { temperature: NaN }, { temperature: -0.1 }, { temperature: 2.1 },
+    { model: 'unsupported' }, { model: 'opencode/../x' }, { model: 'opencode/' }, { temperature: Infinity }, { temperature: NaN }, { temperature: -0.1 }, { temperature: 2.1 },
   ])('invalid input consumes zero calls on both entry paths %j', async (input) => {
     for (const options of [undefined, { allowRepair: true }]) await expect(generateJoke(input as GenerateJokeInput, options)).rejects.toThrow();
     expect(aiMock.generate).not.toHaveBeenCalled();

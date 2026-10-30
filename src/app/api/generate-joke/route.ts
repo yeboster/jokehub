@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateJoke, type GenerateJokeInput } from '@/ai/flows/generate-joke-flow';
 import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
+import { fetchOpenCodeModels, isOpenCodeModelId } from '@/ai/opencode';
 import { fetchAvoidExamples, fetchJokeExemplars, fetchLibraryJokeTexts } from '@/services/server/jokeExemplars';
 import { JOKE_GENERATION_LIMITS, JOKE_MODES, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import type { GenerationFrame, GenerationProgress, GenerationStage } from '@/lib/generationProgress';
@@ -17,11 +18,18 @@ const ApiInputSchema = z.object({
   prefilledJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.prefilledJokes).optional(),
   exemplarJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.exemplarJokes).optional(),
   recentGeneratedJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.recentGeneratedJokes).optional(),
-  model: z.enum(GEMINI_MODELS).optional(),
+  model: z.string().max(100).optional(),
   temperature: z.number().finite().min(0).max(2).optional(),
   useServerExemplars: z.boolean().optional(),
   mode: z.enum(JOKE_MODES).optional(),
 });
+
+// OpenCode models must be in the filtered catalog, so callers cannot pick
+// models the picker never offered (such as expensive ones).
+async function isOfferedModel(model: string) {
+  if ((GEMINI_MODELS as readonly string[]).includes(model)) return true;
+  return isOpenCodeModelId(model) && (await fetchOpenCodeModels()).some(option => option.id === model);
+}
 
 // Allowlisted messages only: provider errors may contain prompts or credentials.
 function publicFailure(error: unknown) {
@@ -73,6 +81,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid input', details: parsedInput.error.format() }, { status: 400, headers });
     }
     const input = parsedInput.data;
+    if (input.model !== undefined && !await isOfferedModel(input.model)) {
+      log('rejected', { code: 'UNSUPPORTED_MODEL' });
+      return NextResponse.json({ error: 'Invalid input', details: { model: { _errors: ['Unsupported model.'] } } }, { status: 400, headers });
+    }
     model = input.model ?? DEFAULT_GENERATE_MODEL;
     const allowRepair = process.env.JOKEHUB_ENABLE_JOKE_REPAIR === 'true';
     const lifecycle = new AbortController();
