@@ -3,13 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
-  generate: vi.fn(), auth: vi.fn(), rate: vi.fn(), key: vi.fn(), get: vi.fn(), order: vi.fn(), limit: vi.fn(), collection: vi.fn(),
+  generate: vi.fn(), auth: vi.fn(), rate: vi.fn(), key: vi.fn(), get: vi.fn(), order: vi.fn(), limit: vi.fn(), collection: vi.fn(), taste: vi.fn(),
 }));
 vi.mock('@/ai/flows/generate-joke-flow', () => ({ generateJoke: mocks.generate }));
 vi.mock('@/lib/auth', () => ({ verifyRequestAuth: mocks.auth }));
 vi.mock('@/lib/rateLimit', () => ({ rateLimit: mocks.rate, rateLimitKeyFor: mocks.key }));
 vi.mock('@/lib/admin', () => ({ adminDb: { collection: mocks.collection } }));
-import { POST } from './route';
+vi.mock('@/services/server/tasteStore', () => ({ loadTasteProfile: mocks.taste }));
+import { POST, maxDuration } from './route';
 const request = (body: unknown) => new NextRequest('http://localhost/api/generate-joke', { method: 'POST', body: JSON.stringify(body) });
 const doc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data });
 
@@ -23,6 +24,7 @@ beforeEach(() => {
   mocks.order.mockReturnValue({ limit: mocks.limit });
   mocks.limit.mockReturnValue({ get: mocks.get });
   mocks.get.mockResolvedValue({ docs: [] });
+  mocks.taste.mockResolvedValue({ samples: [], liked: [], disliked: [] });
   mocks.generate.mockResolvedValue({ jokes: ['one', 'two', 'three'].map(jokeText => ({ jokeText, category: 'Work' })) });
   vi.stubEnv('JOKEHUB_ENABLE_JOKE_REPAIR', 'false');
 });
@@ -167,6 +169,7 @@ describe('generation route context', () => {
     { topicHint: 7 }, { prefilledJokes: ['!!!'] }, { prefilledJokes: ['x'.repeat(2001)] },
     { exemplarJokes: Array(26).fill('valid') }, { recentGeneratedJokes: ['x'.repeat(2001)] },
     { recentGeneratedJokes: [null] }, { useServerExemplars: 'false' }, { model: 'unknown' }, { mode: 'remix' },
+    { count: 0 }, { count: 6 }, { count: 2.5 }, { count: '3' }, { useTasteProfile: 'yes' },
   ])('rejects oversized/invalid client context %j before reads or AI', async body => {
     expect((await POST(request(body))).status).toBe(400);
     expect(mocks.get).not.toHaveBeenCalled();
@@ -208,5 +211,114 @@ describe('generation route context', () => {
     vi.clearAllMocks();
     expect((await POST(request({ useServerExemplars: false }))).status).toBe(200);
     expect(mocks.rate).not.toHaveBeenCalled();
+  });
+});
+
+describe('studio request contract', () => {
+  const idToken = () => mocks.auth.mockResolvedValue({ success: true, via: 'id-token', userId: 'uid-1' });
+  const profile = { samples: ['TASTE_SAMPLE'], liked: [{ text: 'TASTE_LIKED', reason: 'TASTE_REASON' }], disliked: [{ text: 'TASTE_DISLIKED' }] };
+  const frames = async (res: Response) => (await res.text()).trim().split('\n').map(line => JSON.parse(line));
+  const stream = (body: unknown) => new NextRequest('http://localhost/api/generate-joke', { method: 'POST', headers: { Accept: 'application/x-ndjson' }, body: JSON.stringify(body) });
+
+  it('allows up to 120 seconds on the hosting platform', () => {
+    expect(maxDuration).toBe(120);
+  });
+  it('forwards count only when sent, so the legacy exactly-three rule applies without it', async () => {
+    await POST(request({ useServerExemplars: false }));
+    expect(mocks.generate.mock.calls[0][0]).not.toHaveProperty('count');
+    await POST(request({ useServerExemplars: false, count: 5 }));
+    expect(mocks.generate.mock.calls[1][0].count).toBe(5);
+  });
+  it('drops an unknown style field instead of forwarding it', async () => {
+    await POST(request({ useServerExemplars: false, style: 'pun' }));
+    expect(mocks.generate.mock.calls[0][0]).not.toHaveProperty('style');
+  });
+  it.each([
+    ['googleai/gemini-3.6-flash', 'googleai/gemini-3.6-flash'],
+    ['googleai/gemini-2.5-flash', 'googleai/gemini-3.5-flash-lite'],
+    ['googleai/gemini-3.7-flash', 'googleai/gemini-3.8-flash'],
+  ])('accepts model %s and forwards %s', async (sent, resolved) => {
+    expect((await POST(request({ useServerExemplars: false, model: sent }))).status).toBe(200);
+    expect(mocks.generate.mock.calls[0][0].model).toBe(resolved);
+  });
+  it('loads the taste profile for id-token callers and passes it with the request start time', async () => {
+    idToken(); mocks.taste.mockResolvedValue(profile);
+    expect((await POST(request({ useServerExemplars: false }))).status).toBe(200);
+    expect(mocks.taste).toHaveBeenCalledWith('uid-1');
+    expect(mocks.generate.mock.calls[0][0].taste).toEqual(profile);
+    expect(mocks.generate.mock.calls[0][1]).toEqual(expect.objectContaining({ startedAt: expect.any(Number), onLog: expect.any(Function) }));
+    expect(JSON.stringify(vi.mocked(console.info).mock.calls)).not.toMatch(/TASTE_|uid-1/);
+  });
+  it.each([
+    ['opt-out', { useTasteProfile: false }, 'id-token'],
+    ['api-token', {}, 'api-token'],
+    ['other credential', {}, 'firebase'],
+  ] as const)('does not load taste for %s', async (_, body, via) => {
+    mocks.auth.mockResolvedValue({ success: true, via, userId: 'uid-1' });
+    await POST(request({ useServerExemplars: false, ...body }));
+    expect(mocks.taste).not.toHaveBeenCalled();
+    expect(mocks.generate.mock.calls[0][0].taste).toBeUndefined();
+  });
+  it.each([
+    ['rejects', () => mocks.taste.mockRejectedValue(new Error('TASTE_SECRET'))],
+    ['throws', () => mocks.taste.mockImplementation(() => { throw new Error('TASTE_SECRET'); })],
+  ])('never fails the request when taste loading %s', async (_, arrange) => {
+    idToken(); arrange();
+    expect((await POST(request({ useServerExemplars: false }))).status).toBe(200);
+    expect(mocks.generate.mock.calls[0][0].taste).toBeUndefined();
+    expect(JSON.stringify([vi.mocked(console.info).mock.calls, vi.mocked(console.error).mock.calls])).not.toContain('TASTE_SECRET');
+  });
+  it('sanitizes and caps a taste profile before the flow sees it', async () => {
+    idToken();
+    mocks.taste.mockResolvedValue({
+      samples: ['!!!', ...Array.from({ length: 12 }, (_, i) => `sample ${i}`)],
+      liked: [{ text: 'x'.repeat(2001) }, { text: 'liked', reason: 'r'.repeat(300) }, { text: 7 }],
+      disliked: [{ text: 'disliked', reason: '   ' }],
+    });
+    await POST(request({ useServerExemplars: false }));
+    const taste = mocks.generate.mock.calls[0][0].taste;
+    expect(taste.samples).toEqual(Array.from({ length: 10 }, (_, i) => `sample ${i}`));
+    expect(taste.liked).toEqual([{ text: 'liked', reason: 'r'.repeat(200) }]);
+    expect(taste.disliked).toEqual([{ text: 'disliked' }]);
+  });
+  it('loads taste concurrently with server examples', async () => {
+    idToken();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() + 10 * 60_000); // Past earlier tests' 60s caches.
+    let release!: (value: unknown) => void;
+    mocks.taste.mockReturnValue(new Promise(resolve => { release = resolve; }));
+    const res = await POST(stream({}));
+    await vi.waitFor(() => expect(mocks.get).toHaveBeenCalled());
+    expect(mocks.generate).not.toHaveBeenCalled();
+    release(profile);
+    expect((await frames(res)).at(-1).type).toBe('result');
+    expect(mocks.generate.mock.calls[0][0].taste).toEqual(profile);
+  });
+  it('streams progress frames with model and fallback, and logs safe flow events', async () => {
+    mocks.generate.mockImplementationOnce(async (_input, options) => {
+      options.onProgress({ stage: 'generating', callCount: 1, model: 'googleai/gemini-3.5-flash-lite' });
+      options.onLog('attempt-failed', { model: 'googleai/gemini-3.5-flash-lite', step: 'generate', reason: 'provider', providerStatus: 'UNAVAILABLE', httpStatus: 503 });
+      options.onProgress({ stage: 'fallback', callCount: 1, model: 'googleai/gemini-3.1-flash-lite' });
+      options.onLog('model-fallback', { fromModel: 'googleai/gemini-3.5-flash-lite', toModel: 'googleai/gemini-3.1-flash-lite', step: 'generate' });
+      return { jokes: [{ jokeText: 'one', category: 'Work' }], model: 'googleai/gemini-3.1-flash-lite', requestedCount: 3 };
+    });
+    const all = await frames(await POST(stream({ useServerExemplars: false })));
+    expect(all).toContainEqual(expect.objectContaining({ type: 'progress', stage: 'fallback', model: 'googleai/gemini-3.1-flash-lite' }));
+    expect(all.at(-1)).toMatchObject({ type: 'result', output: { model: 'googleai/gemini-3.1-flash-lite', requestedCount: 3 } });
+    const errors = JSON.stringify(vi.mocked(console.error).mock.calls);
+    expect(errors).toContain('"providerStatus":"UNAVAILABLE"');
+    expect(errors).toContain('"httpStatus":503');
+    const infos = JSON.stringify(vi.mocked(console.info).mock.calls);
+    expect(infos).toContain('"fromModel":"googleai/gemini-3.5-flash-lite"');
+    expect(infos).toContain('"toModel":"googleai/gemini-3.1-flash-lite"');
+  });
+  it('maps an exhausted model chain to MODELS_UNAVAILABLE', async () => {
+    mocks.generate.mockRejectedValueOnce(new Error('All models are busy right now. Please try again in a minute.'));
+    const all = await frames(await POST(stream({ useServerExemplars: false })));
+    expect(all.at(-1)).toMatchObject({ type: 'error', code: 'MODELS_UNAVAILABLE', error: 'All models are busy right now. Please try again in a minute.' });
+  });
+  it('maps an empty partial batch to INSUFFICIENT_JOKES', async () => {
+    mocks.generate.mockRejectedValueOnce(new Error('No joke passed the quality check. Please try again.'));
+    const all = await frames(await POST(stream({ useServerExemplars: false, count: 3 })));
+    expect(all.at(-1)).toMatchObject({ type: 'error', code: 'INSUFFICIENT_JOKES' });
   });
 });

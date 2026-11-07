@@ -1,13 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateJoke, type GenerateJokeInput } from '@/ai/flows/generate-joke-flow';
-import { DEFAULT_GENERATE_MODEL, GEMINI_MODELS } from '@/ai/models';
+import { PUBLIC_GENERATION_ERRORS } from '@/ai/flows/generation-errors';
+import { DEFAULT_GENERATE_MODEL, resolveModelId } from '@/ai/models';
 import { fetchAvoidExamples, fetchJokeExemplars, fetchLibraryJokeTexts } from '@/services/server/jokeExemplars';
+import { loadTasteProfile } from '@/services/server/tasteStore';
 import { JOKE_GENERATION_LIMITS, JOKE_MODES, mergeUniqueJokeTexts, normalizeJokeKey } from '@/lib/jokeGenerationContract';
+import { isEmptyTasteProfile, type TasteExample, type TasteProfile } from '@/lib/tasteProfile';
 import type { GenerationFrame, GenerationProgress, GenerationStage } from '@/lib/generationProgress';
 import { verifyRequestAuth } from '@/lib/auth';
 import { rateLimit, rateLimitKeyFor } from '@/lib/rateLimit';
 import { z } from 'zod';
+
+/** Seconds the hosting platform may keep this route alive; the flow budget is 90 s. */
+export const maxDuration = 120;
 
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60_000 };
 const ContextTextSchema = z.string().max(JOKE_GENERATION_LIMITS.contextTextChars)
@@ -17,23 +23,44 @@ const ApiInputSchema = z.object({
   prefilledJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.prefilledJokes).optional(),
   exemplarJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.exemplarJokes).optional(),
   recentGeneratedJokes: z.array(ContextTextSchema).max(JOKE_GENERATION_LIMITS.recentGeneratedJokes).optional(),
-  model: z.enum(GEMINI_MODELS).optional(),
+  /** Catalog id or legacy alias; resolved before generation. */
+  model: z.string().refine(value => resolveModelId(value) !== null, 'Unsupported model.').optional(),
   temperature: z.number().finite().min(0).max(2).optional(),
   useServerExemplars: z.boolean().optional(),
   mode: z.enum(JOKE_MODES).optional(),
+  count: z.number().int().min(JOKE_GENERATION_LIMITS.minCount).max(JOKE_GENERATION_LIMITS.maxCount).optional(),
+  useTasteProfile: z.boolean().optional(),
 });
 
 // Allowlisted messages only: provider errors may contain prompts or credentials.
 function publicFailure(error: unknown) {
   const message = error instanceof Error ? error.message : '';
-  const known: Record<string, string> = {
-    'Joke quality check failed. Please try again.': 'QUALITY_CHECK_FAILED',
-    'Could not produce three eligible, unique jokes. Please try again.': 'INSUFFICIENT_JOKES',
-    'AI failed to generate joke candidates. The output was empty.': 'EMPTY_CANDIDATES',
-    'AI returned candidate data in an unexpected format.': 'INVALID_CANDIDATES',
-  };
-  return Object.hasOwn(known, message) ? { error: message, code: known[message] }
+  return Object.hasOwn(PUBLIC_GENERATION_ERRORS, message) ? { error: message, code: PUBLIC_GENERATION_ERRORS[message] }
     : { error: 'Could not generate jokes. Please try again.', code: 'GENERATION_FAILED' };
+}
+
+const validText = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= JOKE_GENERATION_LIMITS.contextTextChars && !!normalizeJokeKey(value);
+
+function cleanExamples(items: unknown, cap: number): TasteExample[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap(item => {
+    const { text, reason } = (item ?? {}) as { text?: unknown; reason?: unknown };
+    if (!validText(text)) return [];
+    const trimmed = typeof reason === 'string' ? reason.trim().slice(0, JOKE_GENERATION_LIMITS.tasteReasonChars) : '';
+    return [trimmed ? { text, reason: trimmed } : { text }];
+  }).slice(0, cap);
+}
+
+/** Store data is untrusted here: drop invalid texts and enforce the caps the flow validates. */
+function sanitizeTasteProfile(profile: unknown): TasteProfile | undefined {
+  const raw = (profile ?? {}) as { samples?: unknown; liked?: unknown; disliked?: unknown };
+  const clean: TasteProfile = {
+    samples: (Array.isArray(raw.samples) ? raw.samples.filter(validText) : []).slice(0, JOKE_GENERATION_LIMITS.tasteSamples),
+    liked: cleanExamples(raw.liked, JOKE_GENERATION_LIMITS.tasteLiked),
+    disliked: cleanExamples(raw.disliked, JOKE_GENERATION_LIMITS.tasteDisliked),
+  };
+  return isEmptyTasteProfile(clean) ? undefined : clean;
 }
 
 export async function POST(request: NextRequest) {
@@ -73,7 +100,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid input', details: parsedInput.error.format() }, { status: 400, headers });
     }
     const input = parsedInput.data;
-    model = input.model ?? DEFAULT_GENERATE_MODEL;
+    const selectedModel = resolveModelId(input.model) ?? DEFAULT_GENERATE_MODEL;
+    model = selectedModel;
+    const userId = authResult.via === 'id-token' && input.useTasteProfile !== false ? authResult.userId : undefined;
     const allowRepair = process.env.JOKEHUB_ENABLE_JOKE_REPAIR === 'true';
     const lifecycle = new AbortController();
     if (request.signal.aborted) lifecycle.abort();
@@ -84,26 +113,37 @@ export async function POST(request: NextRequest) {
       const progress = (event: GenerationProgress) => {
         log('stage-finished');
         stage = event.stage; callCount = event.callCount; stageStarted = Date.now();
+        if (event.model) model = event.model;
         log('stage-started');
         send({ type: 'progress', requestId, elapsedMs: Date.now() - started, ...event });
       };
-      log('started', { allowRepair });
-      send({ type: 'progress', requestId, stage: 'examples', callCount: 0, elapsedMs: Date.now() - started });
+      // Flow events carry model ids, statuses and counts only.
+      const flowLog = (event: string, fields: Record<string, string | number>) => log(event, fields, event === 'attempt-failed');
+      log('started', { allowRepair, requestedCount: input.count ?? JOKE_GENERATION_LIMITS.defaultCount });
+      send({ type: 'progress', requestId, stage: 'examples', callCount: 0, elapsedMs: Date.now() - started, model });
       const useServer = input.useServerExemplars !== false;
-      const [serverExemplars, avoidJokes, libraryJokes] = useServer
-        ? await Promise.all([fetchJokeExemplars(), fetchAvoidExamples(), fetchLibraryJokeTexts()])
-        : [[], [], []];
+      // Taste never fails the request: any error yields no taste profile.
+      const tasteLoad: Promise<TasteProfile | undefined> = userId
+        ? Promise.resolve().then(() => loadTasteProfile(userId)).then(sanitizeTasteProfile).catch(() => { log('taste-unavailable'); return undefined; })
+        : Promise.resolve(undefined);
+      const [[serverExemplars, avoidJokes, libraryJokes], taste] = useServer || userId ? await Promise.all([
+        useServer ? Promise.all([fetchJokeExemplars(), fetchAvoidExamples(), fetchLibraryJokeTexts()]) : Promise.resolve([[], [], []] as string[][]),
+        tasteLoad,
+      ]) : [[[], [], []] as string[][], undefined];
+      if (taste) log('taste-loaded', { samples: taste.samples.length, liked: taste.liked.length, disliked: taste.disliked.length });
       if (lifecycle.signal.aborted) throw new Error('Request disconnected');
       // Exemplars already count as copy references in the flow; listing them as
       // prefilled too would repeat every example in the prompt.
       const aiInput: GenerateJokeInput = {
-        topicHint: input.topicHint, model: input.model, temperature: input.temperature,
+        topicHint: input.topicHint, model: selectedModel, temperature: input.temperature,
         prefilledJokes: mergeUniqueJokeTexts(input.prefilledJokes ?? [], [], JOKE_GENERATION_LIMITS.prefilledJokes),
         exemplarJokes: mergeUniqueJokeTexts(input.exemplarJokes ?? [], serverExemplars, JOKE_GENERATION_LIMITS.exemplarJokes),
         recentGeneratedJokes: input.recentGeneratedJokes,
         avoidJokes, mode: input.mode, libraryJokes,
+        ...(input.count !== undefined ? { count: input.count } : {}),
+        ...(taste ? { taste } : {}),
       };
-      const output = await generateJoke(aiInput, { allowRepair, onProgress: progress, signal: lifecycle.signal });
+      const output = await generateJoke(aiInput, { allowRepair, onProgress: progress, signal: lifecycle.signal, onLog: flowLog, startedAt: started });
       log('completed');
       return output;
     };
