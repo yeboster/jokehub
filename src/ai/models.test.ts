@@ -11,6 +11,15 @@ describe('model catalog', () => {
     expect(GEMINI_MODELS).toContain(DEFAULT_GENERATE_MODEL);
   });
 
+  it('defaults to Gemma 4 31B, falling back to the Flash-Lite models, and says so in the picker', () => {
+    expect(DEFAULT_GENERATE_MODEL).toBe('googleai/gemma-4-31b-it');
+    expect(modelChain(DEFAULT_GENERATE_MODEL)).toEqual([
+      'googleai/gemma-4-31b-it', 'googleai/gemini-3.5-flash-lite', 'googleai/gemini-3.1-flash-lite',
+    ]);
+    const marked = GEMINI_MODEL_CATALOG.filter(model => model.description.includes('(default)'));
+    expect(marked.map(model => model.id)).toEqual([DEFAULT_GENERATE_MODEL]);
+  });
+
   it('does not offer retired or routed models', () => {
     for (const retired of ['googleai/gemini-3.7-flash', 'googleai/gemini-3.5-flash', 'googleai/gemini-2.5-flash']) {
       expect(GEMINI_MODELS as readonly string[]).not.toContain(retired);

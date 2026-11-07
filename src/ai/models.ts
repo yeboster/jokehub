@@ -30,9 +30,9 @@ export type GeminiModelInfo = {
 export const GEMINI_MODEL_CATALOG = [
   { id: 'googleai/gemini-3.6-flash', label: 'Gemini 3.6 Flash', description: 'Best balance of wit and speed', thinkingLevel: 'LOW' },
   { id: 'googleai/gemini-3.8-flash', label: 'Gemini 3.8 Flash', description: 'Newest model; can be busier', thinkingLevel: 'LOW' },
-  { id: 'googleai/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', description: 'Fastest and most reliable (default)' },
+  { id: 'googleai/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', description: 'Fastest and most reliable' },
   { id: 'googleai/gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', description: 'Backup model; retires May 2027' },
-  { id: 'googleai/gemma-4-31b-it', label: 'Gemma 4 31B', description: 'Free open model, larger', maxTemperature: 1 },
+  { id: 'googleai/gemma-4-31b-it', label: 'Gemma 4 31B', description: 'Free open model, larger (default)', maxTemperature: 1 },
   { id: 'googleai/gemma-4-26b-a4b-it', label: 'Gemma 4 26B', description: 'Free open model, lighter (4B active)', maxTemperature: 1 },
 ] as const satisfies readonly GeminiModelInfo[];
 
@@ -51,8 +51,8 @@ export const GEMINI_MODEL_LABELS: Record<GeminiModel, string> = Object.fromEntri
   GEMINI_MODEL_CATALOG.map(model => [model.id, model.label]),
 ) as Record<GeminiModel, string>;
 
-/** The owner reports this as the model that works reliably for them. */
-export const DEFAULT_GENERATE_MODEL: GeminiModel = 'googleai/gemini-3.5-flash-lite';
+/** The owner chose Gemma 4 31B (free tier) as the default on 2026-11-07. */
+export const DEFAULT_GENERATE_MODEL: GeminiModel = 'googleai/gemma-4-31b-it';
 
 /** Cheap, reliable model for explain-style follow-up calls. */
 export const EXPLAIN_MODEL: GeminiModel = 'googleai/gemini-3.5-flash-lite';

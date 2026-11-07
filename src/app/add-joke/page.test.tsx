@@ -313,7 +313,7 @@ describe('votes and samples from cards', () => {
     expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
     await settle(() => thumb(0, 'bad').click());
     expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('true');
-    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'down', reason: null, saved: false, mode: 'original', model: DEFAULT_GENERATE_MODEL });
+    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'down', reason: null, saved: false, mode: 'original', model: MODEL });
     await settle(() => thumb(0, 'good').click());
     expect(thumb(0, 'good').getAttribute('aria-pressed')).toBe('true');
     expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');

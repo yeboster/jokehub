@@ -306,7 +306,8 @@ describe('proven classics mode', () => {
 });
 
 describe('request and runtime schemas', () => {
-  it.each([[{}, DEFAULT_GENERATE_MODEL, 1.1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2]] as const)(
+  // The flow's default temperature is 1.1; the default Gemma model caps it at 1 (see model-runner).
+  it.each([[{}, DEFAULT_GENERATE_MODEL, 1], [{ model: GEMINI_MODELS[0], temperature: 0 }, GEMINI_MODELS[0], 0], [{ model: GEMINI_MODELS[2], temperature: 2 }, GEMINI_MODELS[2], 2]] as const)(
     'preserves two-call model/temperature contract %j', async (options, model, temperature) => {
       initial(); await generateJoke(options);
       expect(aiMock.generate).toHaveBeenCalledTimes(2);
