@@ -1,11 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { JOKE_GENERATION_LIMITS, JOKE_MODES, isNearDuplicateJoke, mergeUniqueJokeTexts, normalizeJokeKey } from './jokeGenerationContract';
+import { GenerationResultSchema, JOKE_GENERATION_LIMITS, JOKE_MODES, isNearDuplicateJoke, mergeUniqueJokeTexts, normalizeJokeKey } from './jokeGenerationContract';
 
 describe('jokeGenerationContract', () => {
   it('publishes exact browser-safe shared caps', () => {
-    expect(JOKE_GENERATION_LIMITS).toEqual({ topicHintChars: 500, contextTextChars: 2000, prefilledJokes: 25, exemplarJokes: 25, recentGeneratedJokes: 12, avoidJokes: 8, libraryJokes: 1000 });
+    expect(JOKE_GENERATION_LIMITS).toEqual({
+      topicHintChars: 500, contextTextChars: 2000, prefilledJokes: 25, exemplarJokes: 25, recentGeneratedJokes: 12, avoidJokes: 8, libraryJokes: 1000,
+      minCount: 1, maxCount: 5, defaultCount: 3, tasteSamples: 10, tasteLiked: 10, tasteDisliked: 10, tasteReasonChars: 200,
+    });
     expect(JOKE_MODES).toEqual(['original', 'classic']);
+  });
+  it('accepts partial results up to the max count and rejects empty or oversized batches', () => {
+    const joke = { jokeText: 'A joke', category: 'Puns' };
+    expect(GenerationResultSchema.safeParse({ jokes: [joke], model: 'm', requestedCount: 3 }).success).toBe(true);
+    expect(GenerationResultSchema.safeParse({ jokes: Array(5).fill(joke), model: 'm', requestedCount: 5 }).success).toBe(true);
+    expect(GenerationResultSchema.safeParse({ jokes: [], model: 'm', requestedCount: 3 }).success).toBe(false);
+    expect(GenerationResultSchema.safeParse({ jokes: Array(6).fill(joke), model: 'm', requestedCount: 5 }).success).toBe(false);
+    expect(GenerationResultSchema.safeParse({ jokes: [{ jokeText: '!!!', category: 'x' }], model: 'm', requestedCount: 1 }).success).toBe(false);
+    expect(GenerationResultSchema.safeParse({ jokes: [{ jokeText: 'ok', category: ' ' }], model: 'm', requestedCount: 1 }).success).toBe(false);
   });
   it.each([
     ['Hello world', 'hello world!', true],

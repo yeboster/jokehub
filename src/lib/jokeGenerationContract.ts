@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export const JOKE_GENERATION_LIMITS = {
   topicHintChars: 500,
   contextTextChars: 2000,
@@ -6,11 +8,41 @@ export const JOKE_GENERATION_LIMITS = {
   recentGeneratedJokes: 12,
   avoidJokes: 8,
   libraryJokes: 1000,
+  minCount: 1,
+  maxCount: 5,
+  defaultCount: 3,
+  tasteSamples: 10,
+  tasteLiked: 10,
+  tasteDisliked: 10,
+  tasteReasonChars: 200,
 } as const;
 
 /** `classic` asks for proven, already-existing jokes instead of new ones. */
 export const JOKE_MODES = ['original', 'classic'] as const;
 export type JokeMode = (typeof JOKE_MODES)[number];
+
+/** Context/joke text rule shared by the API, the flow and the client. */
+export const JokeTextSchema = z.string()
+  .max(JOKE_GENERATION_LIMITS.contextTextChars)
+  .refine(text => !!normalizeJokeKey(text), 'Joke text must not be empty.');
+
+export const JokeVariationSchema = z.object({
+  jokeText: JokeTextSchema,
+  category: z.string().refine(category => !!category.trim(), 'Category must not be empty.'),
+});
+export type JokeVariation = z.infer<typeof JokeVariationSchema>;
+
+/**
+ * Terminal generation result (NDJSON `result` frame `output`, or JSON body).
+ * `jokes` may be shorter than `requestedCount` when fewer candidates pass
+ * the quality gates; `model` is the model that produced the candidates.
+ */
+export const GenerationResultSchema = z.object({
+  jokes: z.array(JokeVariationSchema).min(JOKE_GENERATION_LIMITS.minCount).max(JOKE_GENERATION_LIMITS.maxCount),
+  model: z.string().min(1),
+  requestedCount: z.number().int().min(JOKE_GENERATION_LIMITS.minCount).max(JOKE_GENERATION_LIMITS.maxCount),
+});
+export type GenerationResult = z.infer<typeof GenerationResultSchema>;
 
 /** Deterministic textual equivalence only; not semantic duplicate detection. */
 export function normalizeJokeKey(text: string): string {

@@ -7,9 +7,12 @@ export const GENERATION_STAGE_LABELS = {
   'reviewing-repair': 'Reviewing improved candidates',
   'selecting-repair': 'Comparing improved jokes',
   'repair-fallback': 'Keeping the reviewed original batch',
+  fallback: 'Switching to a backup model',
 } as const;
+/** Upper bound on application model calls per request, fallbacks included. */
+export const MAX_GENERATION_CALLS = 10;
 export type GenerationStage = keyof typeof GENERATION_STAGE_LABELS;
-export type GenerationProgress = { stage: GenerationStage; callCount: number };
+export type GenerationProgress = { stage: GenerationStage; callCount: number; model?: string };
 export type GenerationFrame =
   | ({ type: 'progress'; requestId: string; elapsedMs: number } & GenerationProgress)
   | { type: 'heartbeat'; requestId: string; elapsedMs: number }
@@ -32,7 +35,7 @@ export async function readGenerationStream(
     const frame = JSON.parse(line) as GenerationFrame;
     if (!frame || typeof frame.requestId !== 'string' || !frame.requestId || terminal || (requestId && requestId !== frame.requestId)) throw new Error('Invalid generation progress response.');
     requestId = frame.requestId;
-    if (frame.type === 'progress' && (!Object.hasOwn(GENERATION_STAGE_LABELS, frame.stage) || !Number.isFinite(frame.elapsedMs) || frame.elapsedMs < 0 || !Number.isInteger(frame.callCount) || frame.callCount < 0 || frame.callCount > 4)) throw new Error('Invalid generation stage.');
+    if (frame.type === 'progress' && (!Object.hasOwn(GENERATION_STAGE_LABELS, frame.stage) || !Number.isFinite(frame.elapsedMs) || frame.elapsedMs < 0 || !Number.isInteger(frame.callCount) || frame.callCount < 0 || frame.callCount > MAX_GENERATION_CALLS || (frame.model !== undefined && typeof frame.model !== 'string'))) throw new Error('Invalid generation stage.');
     if (frame.type === 'error' && (typeof frame.error !== 'string' || typeof frame.code !== 'string')) throw new Error('Invalid generation error.');
     if (!['progress', 'heartbeat', 'error', 'result'].includes(frame.type)) throw new Error('Invalid generation progress response.');
     if (frame.type === 'heartbeat' && (!Number.isFinite(frame.elapsedMs) || frame.elapsedMs < 0)) throw new Error('Invalid generation heartbeat.');
