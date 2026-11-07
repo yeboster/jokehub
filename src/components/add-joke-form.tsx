@@ -6,7 +6,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Loader2, ShieldAlert } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,16 +28,24 @@ const jokeFormSchema = z.object({
 
 export type JokeFormValues = z.infer<typeof jokeFormSchema>; // Exporting for use in parent
 
+/** Values to load into the form. A new `key` reloads it, even for the same text. */
+export type JokeFormPrefill = { key: string; text: string; category: string; source: string };
+
 interface AddJokeFormProps {
+  /** Resolve when saved (the form resets); reject to keep the fields as typed. */
   onAddJoke: (data: JokeFormValues) => Promise<void>;
-  aiGeneratedText?: string | null;
-  aiGeneratedCategory?: string | null;
-  aiGeneratedSource?: string | null;
-  onAiJokeSubmitted?: () => void;
+  prefill?: JokeFormPrefill | null;
 }
 
-const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGeneratedCategory, aiGeneratedSource, onAiJokeSubmitted }) => {
+const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, prefill }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The text field is disabled while submitting, so focus waits for re-enable.
+  // A DOM ref, not `form.setFocus`: `form.reset` empties RHF's field registry
+  // until the next render, so `setFocus` right after it does nothing.
+  // A counter, not a flag: a fast save batches submitting true→false into one
+  // render, and an unchanged `isSubmitting` would not re-run the effect.
+  const [saveCount, setSaveCount] = useState(0);
+  const textField = useRef<HTMLTextAreaElement | null>(null);
   const { user } = useAuth();
   const { loadingCategories } = useJokes();
 
@@ -50,26 +58,22 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
     },
   });
 
+  const prefillKey = prefill?.key;
   useEffect(() => {
-    if (aiGeneratedText) {
-      form.setValue('text', aiGeneratedText, { shouldValidate: true });
-    } else if (aiGeneratedText === null) { 
-        form.setValue('text', '', { shouldValidate: true });
-    }
+    if (!prefill) return;
+    // The combobox seeds its search box from the category each time it opens.
+    form.reset({ text: prefill.text, category: prefill.category, source: prefill.source });
+    textField.current?.focus();
+    // Only a new key reloads: re-renders must not overwrite the user's edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillKey, form]);
 
-    if (aiGeneratedCategory) {
-      // The combobox seeds its search box from this value each time it opens.
-      form.setValue('category', aiGeneratedCategory, { shouldValidate: true });
-    } else if (aiGeneratedCategory === null) {
-        form.setValue('category', '', { shouldValidate: true });
-    }
-
-    if (aiGeneratedSource) {
-      form.setValue('source', aiGeneratedSource, { shouldValidate: true });
-    } else if (aiGeneratedSource === null) {
-      form.setValue('source', '', { shouldValidate: true });
-    }
-  }, [aiGeneratedText, aiGeneratedCategory, aiGeneratedSource, form]);
+  const focusedSave = useRef(0);
+  useEffect(() => {
+    if (isSubmitting || saveCount === focusedSave.current) return;
+    focusedSave.current = saveCount;
+    textField.current?.focus();
+  }, [saveCount, isSubmitting]);
 
   const onSubmit: SubmitHandler<JokeFormValues> = async (data) => {
     if (!user) {
@@ -81,10 +85,9 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
       await onAddJoke(data);
       // Only on success. The fields are the user's work; a failed write is not
       // a reason to throw it away.
-      form.reset();
-      if (aiGeneratedText && onAiJokeSubmitted) {
-        onAiJokeSubmitted();
-      }
+      form.reset({ text: '', category: '', source: '' });
+      // Ready for the next joke without reaching for the mouse.
+      setSaveCount(count => count + 1);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('Failed to add joke from form:', error);
@@ -130,7 +133,15 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, aiGeneratedText, aiGener
                   {/* No `text-sm`: `Textarea` is `text-base md:text-sm` on
                       purpose, and anything under 16px makes iOS Safari zoom
                       the viewport when the field takes focus. */}
-                  <Textarea placeholder="Enter the joke text…" {...field} disabled={isFormDisabled} rows={3} className="h-auto" aria-required />
+                  <Textarea
+                    placeholder="Enter the joke text…"
+                    {...field}
+                    ref={element => { field.ref(element); textField.current = element; }}
+                    disabled={isFormDisabled}
+                    rows={3}
+                    className="h-auto"
+                    aria-required
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

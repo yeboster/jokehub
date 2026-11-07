@@ -38,7 +38,8 @@ interface JokeContextProps {
   loadingInitialJokes: boolean;
   loadingMoreJokes: boolean;
   loadingCategories: boolean;
-  addJoke: (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => Promise<void>;
+  /** Resolves to the new joke's id. Announces failures only; the caller announces success. */
+  addJoke: (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => Promise<string | undefined>;
   importJokes: (importedJokesData: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => Promise<void>;
   toggleUsed: (id: string, currentUsedStatus: boolean) => Promise<void>;
   getJokeById: (jokeId: string) => Promise<Joke | null>;
@@ -286,15 +287,16 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // No list reload: the mounted page owns its list. A brand-new joke can't be
   // spliced into a filtered, paginated list without re-running the query
-  // (nothing here knows whether it matches the active filters), and the add
-  // flow navigates to /jokes afterwards, which fetches on mount anyway.
+  // (nothing here knows whether it matches the active filters); /jokes
+  // fetches on mount. No success toast either: the add page stays put and
+  // announces the save itself, with a link to the new joke.
   const addJoke = useCallback(
     (newJokeData: { text: string; category: string; source?: string; funnyRate?: number }) => {
        if (!user) throw new Error("User not authenticated for adding joke.");
        return handleApiCall(
          () => jokeService.addJoke(newJokeData, user.uid),
-         { title: 'Joke added', description: 'It is in the feed now.' }
-       )!;
+         null
+       );
     },
     [handleApiCall, user]
   );

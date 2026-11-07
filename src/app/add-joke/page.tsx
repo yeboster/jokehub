@@ -1,50 +1,59 @@
-
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert, CheckCircle, Star, ThumbsUp, ThumbsDown } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, Wand2, PlusCircle, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
+import type { User } from 'firebase/auth';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
-import type { JokeVariation } from '@/ai/flows/generate-joke-flow';
-import { DEFAULT_GENERATE_MODEL, GEMINI_MODEL_LABELS, GEMINI_MODELS } from '@/ai/models';
 import Header from '@/components/header';
-import AddJokeForm, { type JokeFormValues } from '@/components/add-joke-form';
+import AddJokeForm, { type JokeFormPrefill, type JokeFormValues } from '@/components/add-joke-form';
 import PageLoading from '@/components/PageLoading';
+import GenerationControls, { type StudioCount } from '@/components/joke-studio/GenerationControls';
+import GeneratedBatch, { modelLabel } from '@/components/joke-studio/GeneratedBatch';
+import SamplesPanel from '@/components/joke-studio/SamplesPanel';
+import TastePanel from '@/components/joke-studio/TastePanel';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
-import { Slider } from '@/components/ui/slider';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import * as jokeService from '@/services/jokeService';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { JOKE_GENERATION_LIMITS, mergeUniqueJokeTexts, normalizeJokeKey, type JokeMode } from '@/lib/jokeGenerationContract';
-import { z } from 'zod';
-import { GENERATION_STAGE_LABELS, readGenerationStream, type GenerationStage } from '@/lib/generationProgress';
+import { ToastAction } from '@/components/ui/toast';
+import { useToast } from '@/hooks/use-toast';
+import { useGenerationFeedback } from '@/hooks/useGenerationFeedback';
+import { useJokeGeneration } from '@/hooks/useJokeGeneration';
+import { useJokeSamples } from '@/hooks/useJokeSamples';
+import { useRememberedModel } from '@/hooks/useRememberedModel';
+import { useStudioBatches } from '@/hooks/useStudioBatches';
+import { normalizeJokeKey, type JokeMode } from '@/lib/jokeGenerationContract';
+import { GENERATION_STAGE_LABELS } from '@/lib/generationProgress';
+import { clearAllStoredBatches, recentGeneratedHistory, sessionStorageOrNull, studioId, type StudioBatch, type StudioJoke } from '@/lib/studioBatches';
+import type { FeedbackUpsertInput, FeedbackVote } from '@/lib/tasteProfile';
 
-const GenerationResponseSchema = z.object({
-  jokes: z.array(z.object({
-    jokeText: z.string().max(JOKE_GENERATION_LIMITS.contextTextChars).refine(text => !!normalizeJokeKey(text)),
-    category: z.string().refine(category => !!category.trim()),
-  })).length(3),
-});
+const AI_SOURCE = 'AI Assistant';
 
-type JokeVote = 'up' | 'down' | 'none';
-type BatchContext = { mode: JokeMode; model: string; topicHint: string; requestId: string | null };
-
-function boundedInspirations(values: unknown[]): string[] {
-  return mergeUniqueJokeTexts(values.filter((value): value is string =>
-    typeof value === 'string' && value.length <= JOKE_GENERATION_LIMITS.contextTextChars && !!normalizeJokeKey(value)), [], JOKE_GENERATION_LIMITS.prefilledJokes);
+/** Context a feedback record carries about the batch a joke came from. */
+function batchContext(batch: Pick<StudioBatch, 'mode' | 'model' | 'topicHint' | 'requestId'>) {
+  return {
+    mode: batch.mode,
+    model: batch.model,
+    ...(batch.topicHint ? { topicHint: batch.topicHint } : {}),
+    ...(batch.requestId ? { requestId: batch.requestId } : {}),
+  };
 }
 
 export default function AddJokePage() {
   const { user, loading } = useAuth();
+  // Signing out on this page drops the batches kept in this tab.
+  const signedIn = useRef(false);
+  useEffect(() => {
+    if (user) signedIn.current = true;
+    else if (!loading && signedIn.current) {
+      clearAllStoredBatches(sessionStorageOrNull());
+      signedIn.current = false;
+    }
+  }, [user, loading]);
   if (loading) return <PageLoading label="Checking your sign-in…" />;
   // UID-keyed lifecycle keeps request authority and memory local to one session.
   return <AddJokeSession key={user ? `uid:${user.uid}` : 'signed-out'} />;
@@ -52,211 +61,14 @@ export default function AddJokePage() {
 
 function AddJokeSession() {
   const { user, loading: authLoading } = useAuth();
-  const { addJoke } = useJokes();
   const router = useRouter();
-  const { toast } = useToast();
 
-  const [isGeneratingJoke, setIsGeneratingJoke] = useState(false);
-  const [aiTopicHint, setAiTopicHint] = useState<string>('');
-  const [jokeMode, setJokeMode] = useState<JokeMode>('original');
-  const [votes, setVotes] = useState<Record<string, JokeVote>>({});
-  const [aiGeneratedJokes, setAiGeneratedJokes] = useState<JokeVariation[]>([]);
-  const [selectedJoke, setSelectedJoke] = useState<JokeVariation | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GENERATE_MODEL);
-  const [temperature, setTemperature] = useState([0.8]);
-  const [inspirationalJokes, setInspirationalJokes] = useState<string[]>([]);
-  const [isLoadingInspirationalJokes, setIsLoadingInspirationalJokes] = useState(false);
-  const [progressStage, setProgressStage] = useState<GenerationStage | null>(null);
-  const [requestId, setRequestId] = useState<string | null>(null);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  useEffect(() => {
-    if (!isGeneratingJoke) return;
-    const started = Date.now();
-    const timer = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => clearInterval(timer);
-  }, [isGeneratingJoke]);
-  
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth?redirect=/add-joke');
     }
   }, [user, authLoading, router]);
 
-  const uid = user?.uid ?? null;
-  const session = useRef({ uid, epoch: 0 });
-  const mounted = useRef(true);
-  const requestSequence = useRef(0);
-  const generation = useRef<{ id: number; controller: AbortController } | null>(null);
-  const inspirationSequence = useRef(0);
-  const inspirationVersion = useRef(0);
-  const history = useRef<string[]>([]);
-  const batchContext = useRef<BatchContext | null>(null);
-
-  useLayoutEffect(() => {
-    mounted.current = true;
-    const authority = session.current;
-    return () => {
-      mounted.current = false;
-      authority.epoch++;
-      generation.current?.controller.abort();
-      generation.current = null;
-    };
-  }, []);
-
-  const handleLoadInspirationalJokes = async () => {
-    if (!user) {
-      toast({ title: 'Sign in required', description: 'Log in to load your 5-star jokes.', variant: 'destructive' });
-      return;
-    }
-    const owner = { uid: user.uid, epoch: session.current.epoch, id: ++inspirationSequence.current };
-    inspirationVersion.current++;
-    const current = () => mounted.current && session.current.uid === owner.uid &&
-      session.current.epoch === owner.epoch && inspirationSequence.current === owner.id;
-    setIsLoadingInspirationalJokes(true);
-    try {
-      const loaded = await jokeService.fetchUserFiveStarJokes(owner.uid);
-      if (!current()) return;
-      const jokes = boundedInspirations(loaded);
-      inspirationVersion.current++;
-      setInspirationalJokes(jokes);
-      if (jokes.length > 0) {
-        toast({ title: 'Inspiration loaded', description: `${jokes.length} of your 5-star jokes will guide the next batch.` });
-      } else {
-        toast({ title: 'No 5-star jokes yet', description: 'Rate a few jokes five stars and try again.', variant: 'default' });
-      }
-    } catch (error) {
-      if (!current()) return;
-      console.error('Error loading 5-star jokes:', error);
-      toast({ title: "Couldn't load your jokes", description: error instanceof Error ? error.message : 'Failed to load inspirational jokes.', variant: 'destructive' });
-    } finally {
-      if (current()) setIsLoadingInspirationalJokes(false);
-    }
-  };
-
-  const handleGenerateJoke = async () => {
-    if (!user) {
-      toast({ title: 'Sign in required', description: 'Log in to generate jokes.', variant: 'destructive' });
-      return;
-    }
-    // State updates are batched: ref ownership blocks same-render double clicks.
-    if (generation.current) return;
-    const operation = { id: ++requestSequence.current, controller: new AbortController() };
-    generation.current = operation;
-    const owner = { uid: user.uid, epoch: session.current.epoch, inspirationVersion: inspirationVersion.current };
-    const recentGeneratedJokes = [...history.current];
-    const prefilledJokes = boundedInspirations(inspirationalJokes);
-    const exemplarJokes = prefilledJokes.slice(0, JOKE_GENERATION_LIMITS.exemplarJokes);
-    const current = () => mounted.current && session.current.uid === owner.uid &&
-      session.current.epoch === owner.epoch && generation.current?.id === operation.id;
-    setIsGeneratingJoke(true);
-    setProgressStage(null);
-    setRequestId(null);
-    setGenerationError(null);
-    setElapsedSeconds(0);
-    setSelectedJoke(null);
-    setAiGeneratedJokes([]);
-    setVotes({});
-    const context: BatchContext = { mode: jokeMode, model: selectedModel, topicHint: aiTopicHint.trim(), requestId: null };
-    try {
-      const idToken = await user.getIdToken();
-      if (!current()) return;
-      const response = await fetch('/api/generate-joke', {
-        method: 'POST',
-        signal: operation.controller.signal,
-        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({
-          topicHint: aiTopicHint.trim(), prefilledJokes, exemplarJokes, recentGeneratedJokes,
-          model: selectedModel, temperature: temperature[0], mode: jokeMode,
-        }),
-      });
-      if (!current()) return;
-      context.requestId = response.headers?.get('x-request-id') ?? null;
-      setRequestId(context.requestId);
-      if (!response.ok) {
-        let errorData;
-        try { errorData = await response.json(); } catch { /* preserve HTTP error */ }
-        if (!current()) return;
-        throw new Error(errorData?.error || `API request failed with status ${response.status}`);
-      }
-      const payload: unknown = response.headers?.get('content-type')?.includes('application/x-ndjson') && response.body
-        ? await readGenerationStream(response.body, frame => {
-          if (!current()) return;
-          context.requestId = frame.requestId;
-          setRequestId(frame.requestId);
-          if (frame.type === 'progress') setProgressStage(frame.stage);
-        })
-        : await response.json();
-      if (!current()) return;
-      const result = GenerationResponseSchema.parse(payload);
-      history.current = mergeUniqueJokeTexts(result.jokes.map(joke => joke.jokeText), history.current, JOKE_GENERATION_LIMITS.recentGeneratedJokes);
-      batchContext.current = context;
-      setAiGeneratedJokes(result.jokes);
-      // A newer load (including a pending one) owns its inspiration version.
-      if (inspirationVersion.current === owner.inspirationVersion) {
-        setInspirationalJokes([]);
-        inspirationVersion.current++;
-      }
-      toast({ title: 'Three variations ready', description: 'Pick one to fill the form.' });
-    } catch (error) {
-      if (!current()) return;
-      const message = error instanceof Error ? error.message : 'Failed to generate jokes.';
-      setGenerationError(message);
-      toast({ title: "Couldn't generate jokes", description: message, variant: 'destructive' });
-    } finally {
-      if (current()) {
-        generation.current = null;
-        setIsGeneratingJoke(false);
-      }
-    }
-  };
-
-  // Votes on jokes that are never saved are the only record of what the user rejects.
-  const handleVote = async (joke: JokeVariation, kind: 'up' | 'down') => {
-    if (!user) return;
-    const previous = votes[joke.jokeText] ?? 'none';
-    const vote: JokeVote = previous === kind ? 'none' : kind;
-    setVotes(current => ({ ...current, [joke.jokeText]: vote }));
-    const context = batchContext.current;
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/generated-joke-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({
-          jokeText: joke.jokeText, category: joke.category, vote, mode: context?.mode, model: context?.model,
-          ...(context?.topicHint ? { topicHint: context.topicHint } : {}),
-          ...(context?.requestId ? { requestId: context.requestId } : {}),
-        }),
-      });
-      if (!response.ok) throw new Error(`Feedback request failed with status ${response.status}`);
-    } catch {
-      if (!mounted.current) return;
-      // Only roll back if no later click has replaced this vote.
-      setVotes(current => current[joke.jokeText] === vote ? { ...current, [joke.jokeText]: previous } : current);
-      toast({ title: "Couldn't save feedback", description: 'Your vote was not recorded. Please try again.', variant: 'destructive' });
-    }
-  };
-
-  const handleSelectJoke = (joke: JokeVariation) => {
-    setSelectedJoke(joke);
-  };
-
-  const handleAddJokeAndRedirect = async (data: JokeFormValues) => {
-    if (!user) {
-      toast({ title: 'Sign in required', description: 'Log in to add jokes.', variant: 'destructive' });
-      return;
-    }
-    // Deliberately NOT wrapped in try/catch. `AddJokeForm` only calls
-    // `form.reset()` when this promise resolves; swallowing the rejection here
-    // told it the save succeeded, so a failed write cleared the joke the user
-    // had just typed (or generated and then edited) and left them with a red
-    // toast and an empty form. The rejection is handled in the form's own
-    // catch, which keeps the fields and surfaces the reason next to them.
-    await addJoke(data);
-    router.push('/jokes');
-  };
-  
   if (authLoading) {
     return <PageLoading label="Checking your sign-in…" />;
   }
@@ -283,269 +95,309 @@ function AddJokeSession() {
      );
   }
 
-  // No category-loading gate here: it made the whole page a spinner — the AI
-  // panel included — while a subscription that only feeds one combobox landed.
-  // `CategoryCombobox` disables itself while it loads, which is the right scope
-  // for it.
+  return <JokeStudio user={user} />;
+}
+
+type EditLink = { jokeId: string; batch: Pick<StudioBatch, 'mode' | 'model' | 'topicHint' | 'requestId'> };
+
+function JokeStudio({ user }: { user: User }) {
+  const { addJoke } = useJokes();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const [model, chooseModel] = useRememberedModel();
+  const [temperature, setTemperature] = useState(0.8);
+  const [topicHint, setTopicHint] = useState('');
+  const [mode, setMode] = useState<JokeMode>('original');
+  const [count, setCount] = useState<StudioCount>(3);
+  const [useTasteProfile, setUseTasteProfile] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [prefill, setPrefill] = useState<JokeFormPrefill | null>(null);
+  const [editing, setEditing] = useState<EditLink | null>(null);
+
+  const { batches, addBatch, updateJoke, updateJokes, findJoke } = useStudioBatches(user.uid);
+  const feedback = useGenerationFeedback(user);
+  const samples = useJokeSamples(user);
+  const generation = useJokeGeneration(user, ({ result, request, requestId }) => {
+    const batch: StudioBatch = {
+      id: studioId('batch'),
+      createdAt: new Date().toISOString(),
+      topicHint: request.topicHint,
+      mode: request.mode,
+      model: result.model,
+      requestId,
+      requestedCount: result.requestedCount,
+      jokes: result.jokes.map(joke => ({ id: studioId('joke'), jokeText: joke.jokeText, category: joke.category, status: 'idle', vote: null })),
+    };
+    addBatch(batch);
+    // The new batch opens; older ones fold away.
+    setExpanded({ [batch.id]: true });
+  });
+
+  const mounted = useRef(true);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const editLink = useRef<EditLink | null>(null);
+  const saving = useRef(new Set<string>());
+  const feedbackOps = useRef(new Map<string, number>());
+
+  const announceSaved = useCallback((id: string) => {
+    toast({
+      title: 'Joke saved',
+      description: 'It is in your collection now.',
+      action: <ToastAction altText="View the saved joke" asChild><Link href={`/joke/${id}`}>View</Link></ToastAction>,
+    });
+  }, [toast]);
+
+  const feedbackFailed = useCallback(() => {
+    toast({ title: "Couldn't save feedback", description: 'Your vote was not recorded. Please try again.', variant: 'destructive' });
+  }, [toast]);
+
+  const recordSave = useCallback(async (input: FeedbackUpsertInput) => {
+    try {
+      await feedback.record(input);
+    } catch (error) {
+      console.error('Error recording saved-joke feedback:', error);
+      if (mounted.current) feedbackFailed();
+    }
+  }, [feedback, feedbackFailed]);
+
+  const handleGenerate = () => {
+    void generation.generate({
+      topicHint: topicHint.trim(), model, temperature, count, mode, useTasteProfile,
+      recentGeneratedJokes: recentGeneratedHistory(batches),
+    });
+  };
+
+  const handleSave = async (target: StudioJoke) => {
+    const found = findJoke(target.id);
+    if (!found || found.joke.status !== 'idle' || saving.current.has(target.id)) return;
+    const { batch, joke } = found;
+    saving.current.add(joke.id);
+    updateJoke(joke.id, entry => ({ ...entry, status: 'saving' }));
+    // A direct save ends any edit of the same card; the form keeps its text.
+    if (editLink.current?.jokeId === joke.id) { editLink.current = null; setEditing(null); }
+    try {
+      const id = await addJoke({ text: joke.jokeText, category: joke.category, source: AI_SOURCE });
+      if (!id) throw new Error('The joke was not saved.');
+      if (!mounted.current) return;
+      updateJoke(joke.id, entry => ({ ...entry, status: 'saved', savedJokeId: id }));
+      announceSaved(id);
+      void recordSave({ jokeText: joke.jokeText, category: joke.category, saved: true, ...batchContext(batch) });
+    } catch (error) {
+      // The context has already announced the failure.
+      console.error('Error saving generated joke:', error);
+      if (mounted.current) updateJoke(joke.id, entry => ({ ...entry, status: 'idle' }));
+    } finally {
+      saving.current.delete(joke.id);
+    }
+  };
+
+  /** Optimistic feedback change; rolled back only if no later change replaced it. */
+  const changeFeedback = async (
+    joke: StudioJoke, batch: StudioBatch,
+    next: Pick<StudioJoke, 'vote' | 'reason'>,
+    input: Omit<FeedbackUpsertInput, 'jokeText'>,
+  ) => {
+    const previous = { vote: joke.vote, reason: joke.reason };
+    const op = (feedbackOps.current.get(joke.id) ?? 0) + 1;
+    feedbackOps.current.set(joke.id, op);
+    updateJoke(joke.id, entry => ({ ...entry, ...next }));
+    try {
+      await feedback.record({ jokeText: joke.jokeText, category: joke.category, ...input, ...batchContext(batch) });
+    } catch (error) {
+      console.error('Error recording generation feedback:', error);
+      if (!mounted.current) return;
+      if (feedbackOps.current.get(joke.id) === op) updateJoke(joke.id, entry => ({ ...entry, ...previous }));
+      feedbackFailed();
+    }
+  };
+
+  // Votes on jokes that are never saved are the only record of what the user rejects.
+  const handleVote = (target: StudioJoke, kind: FeedbackVote) => {
+    const found = findJoke(target.id);
+    if (!found) return;
+    const vote = found.joke.vote === kind ? null : kind;
+    // A reason explains one vote; changing the vote drops it.
+    void changeFeedback(found.joke, found.batch, { vote, reason: undefined }, { vote, reason: null });
+  };
+
+  const handleReason = (target: StudioJoke, text: string) => {
+    const found = findJoke(target.id);
+    if (!found || !found.joke.vote) return;
+    const reason = text.trim();
+    if (reason === (found.joke.reason ?? '')) return;
+    void changeFeedback(found.joke, found.batch, { vote: found.joke.vote, reason: reason || undefined }, { vote: found.joke.vote, reason: reason || null });
+  };
+
+  const handleEdit = (batch: StudioBatch, joke: StudioJoke) => {
+    const link = { jokeId: joke.id, batch: { mode: batch.mode, model: batch.model, topicHint: batch.topicHint, requestId: batch.requestId } };
+    editLink.current = link;
+    setEditing(link);
+    setPrefill({ key: studioId('edit'), text: joke.jokeText, category: joke.category, source: AI_SOURCE });
+  };
+
+  const stopEditing = () => { editLink.current = null; setEditing(null); };
+
+  const handleFormSave = async (data: JokeFormValues) => {
+    const link = editLink.current;
+    // Deliberately no try/catch: `AddJokeForm` resets only when this
+    // resolves, so a failed write must reject and keep the user's text. The
+    // context announces the failure.
+    const id = await addJoke(data);
+    if (!id) throw new Error('The joke was not saved.');
+    if (!mounted.current) return;
+    announceSaved(id);
+    if (!link) return;
+    if (editLink.current === link) { editLink.current = null; setEditing(null); }
+    updateJoke(link.jokeId, entry => ({ ...entry, status: 'saved', savedJokeId: id }));
+    // The record is about the joke the user kept: the edited text.
+    void recordSave({ jokeText: data.text, category: data.category, saved: true, ...batchContext(link.batch) });
+  };
+
+  const handleFeedbackRemoved = (item: { jokeText: string }) => {
+    const key = normalizeJokeKey(item.jokeText);
+    updateJokes(joke => normalizeJokeKey(joke.jokeText) === key, joke => ({ ...joke, vote: null, reason: undefined }));
+  };
+
+  const handleFeedbackReset = () => {
+    updateJokes(joke => joke.vote !== null || !!joke.reason, joke => ({ ...joke, vote: null, reason: undefined }));
+  };
+
+  const { isGenerating, progressStage, progressModel, requestId, error: generationError, elapsedSeconds } = generation;
+  const statusText = isGenerating
+    ? progressStage
+      ? `${GENERATION_STAGE_LABELS[progressStage]}…${progressModel ? ` (${modelLabel(progressModel)})` : ''}`
+      : 'Connecting securely…'
+    : '';
 
   return (
     /*
       Round 4's reduced-motion policy is a CSS media query and cannot reach
-      animations framer-motion drives in JS, so the AI panel has been sliding
-      and fading for reduced-motion users for three rounds. `reducedMotion="user"`
-      reads the same OS setting and drops transform/layout animation while
-      keeping opacity, which is the one channel the policy allows.
+      animations framer-motion drives in JS. `reducedMotion="user"` reads the
+      same OS setting and drops transform/layout animation while keeping
+      opacity, which is the one channel the policy allows.
     */
     <MotionConfig reducedMotion="user">
       <div className="container mx-auto px-4 py-8 sm:px-6 md:py-12">
         <Header title="Craft a New Joke" />
         <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-        
-          {/* Left Column: Form */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
-             <Card className="sticky top-24">
-                  <CardHeader>
-                  <CardTitle as="h2" className="flex items-center">
-                      <PlusCircle className="mr-2 h-5 w-5 text-primary"/> Your New Joke
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                      {selectedJoke ? "Review the selected joke from the right, or enter your own." : "Fill in the form to add a new joke manually."}
-                  </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                  <AddJokeForm
-                      onAddJoke={handleAddJokeAndRedirect}
-                      aiGeneratedText={selectedJoke?.jokeText}
-                      aiGeneratedCategory={selectedJoke?.category}
-                      aiGeneratedSource={selectedJoke ? "AI Assistant" : null}
-                      onAiJokeSubmitted={() => { setSelectedJoke(null); setAiGeneratedJokes([]); }}
-                  />
-                  </CardContent>
-              </Card>
 
-             <Button variant="outline" onClick={() => router.push('/jokes')} className="w-full mt-auto">
+          {/* Left column: form, then samples and what the AI learns */}
+          <div className="lg:col-span-1 flex flex-col gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle as="h2" className="flex items-center">
+                  <PlusCircle className="mr-2 h-5 w-5 text-primary"/> Your New Joke
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  {editing ? 'Editing a generated joke. Saving marks it saved in its batch.' : 'Fill in the form to add a new joke manually, or press Edit on a generated joke.'}
+                </CardDescription>
+                {editing && (
+                  <Button variant="link" size="sm" className="h-auto justify-start p-0" onClick={stopEditing}>Stop linking to the generated joke</Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <AddJokeForm onAddJoke={handleFormSave} prefill={prefill} />
+              </CardContent>
+            </Card>
+
+            <Button variant="outline" onClick={() => router.push('/jokes')} className="w-full">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Jokes List
             </Button>
+
+            <SamplesPanel samples={samples} />
+            <TastePanel feedback={feedback} onRemoved={handleFeedbackRemoved} onReset={handleFeedbackReset} />
           </div>
 
-          {/* Right Column: AI Assistant */}
+          {/* Right column: AI assistant and batches */}
           <div className="lg:col-span-2">
-              <Card>
-                  <CardHeader>
-                    <CardTitle as="h2" className="flex items-center">
-                        <Wand2 className="mr-2 h-5 w-5 text-primary"/> AI Assistant
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                        Use the controls to generate joke variations.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                      {/* --- AI Controls --- */}
-                      <div className="space-y-6">
-                          <div>
-                              <Label htmlFor="ai-model-select" className="text-sm font-medium">AI Model</Label>
-                              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isGeneratingJoke}>
-                              <SelectTrigger id="ai-model-select" className="mt-1">
-                                  <SelectValue placeholder="Select a model" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  {GEMINI_MODELS.map((model) => (
-                                    <SelectItem key={model} value={model}>
-                                      {GEMINI_MODEL_LABELS[model]}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                              </Select>
-                          </div>
-                          <div>
-                              <div className="flex justify-between items-center mb-1">
-                                  {/* No `htmlFor`: Radix puts the id on the
-                                      slider's wrapper span, which is not a
-                                      labelable element. The name rides on the
-                                      thumb via `thumbLabel`. */}
-                                  <span className="text-sm font-medium">Creativity (Temperature)</span>
-                                  <span className="text-sm tabular-nums text-muted-foreground">{temperature[0].toFixed(1)}</span>
-                              </div>
-                              <Slider
-                                  id="temperature-slider"
-                                  thumbLabel="Creativity (temperature)"
-                                  min={0}
-                                  max={2}
-                                  step={0.1}
-                                  value={temperature}
-                                  onValueChange={setTemperature}
-                                  disabled={isGeneratingJoke}
-                              />
-                              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                  <span>Predictable</span>
-                                  <span>Creative</span>
-                                  <span>Wild</span>
-                              </div>
-                          </div>
-                          <div>
-                              <Label htmlFor="ai-topic-hint-page" className="text-sm font-medium">Topic Hint (Optional)</Label>
-                              <Input
-                              id="ai-topic-hint-page"
-                              type="text"
-                              placeholder="e.g., animals, space"
-                              value={aiTopicHint}
-                              onChange={(e) => setAiTopicHint(e.target.value)}
-                              disabled={isGeneratingJoke}
-                              className="mt-1"
-                              />
-                          </div>
+            <Card>
+              <CardHeader>
+                <CardTitle as="h2" className="flex items-center">
+                  <Wand2 className="mr-2 h-5 w-5 text-primary"/> AI Assistant
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Generate batches, keep every joke you like, and vote so later batches fit your taste.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <GenerationControls
+                  model={model} onModelChange={chooseModel}
+                  temperature={temperature} onTemperatureChange={setTemperature}
+                  topicHint={topicHint} onTopicHintChange={setTopicHint}
+                  mode={mode} onModeChange={setMode}
+                  count={count} onCountChange={setCount}
+                  useTasteProfile={useTasteProfile} onUseTasteProfileChange={setUseTasteProfile}
+                  isGenerating={isGenerating} onGenerate={handleGenerate}
+                />
 
-                          <div>
-                              <Label id="ai-joke-mode-label" className="text-sm font-medium">Joke Style</Label>
-                              <RadioGroup
-                                  aria-labelledby="ai-joke-mode-label"
-                                  value={jokeMode}
-                                  onValueChange={(value: JokeMode) => setJokeMode(value)}
-                                  disabled={isGeneratingJoke}
-                                  className="mt-2 space-y-1"
-                              >
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="original" id="ai-joke-mode-original" />
-                                      <Label htmlFor="ai-joke-mode-original" className="font-normal">New jokes</Label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="classic" id="ai-joke-mode-classic" />
-                                      <Label htmlFor="ai-joke-mode-classic" className="font-normal">Proven classics not in your library</Label>
-                                  </div>
-                              </RadioGroup>
-                          </div>
+                {/* Always in the DOM so it is a live region *before* the text
+                    changes — a role="status" that mounts with its message
+                    already inside it does not announce. */}
+                <div role="status" aria-live="polite" className="text-sm text-center text-muted-foreground">{statusText}</div>
+                {(isGenerating || generationError || batches.length > 0) && (
+                  <div className="space-y-1 text-center text-xs text-muted-foreground">
+                    <p>Elapsed: {elapsedSeconds}s</p>
+                    {requestId && <p className="break-all">Request ID: <code className="select-all">{requestId}</code></p>}
+                  </div>
+                )}
+                {generationError && (
+                  <div role="alert" className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                    <p className="font-medium">Couldn&apos;t generate jokes</p>
+                    <p className="text-sm">{generationError}</p>
+                    {requestId && <p className="text-xs break-all">Request ID: <code className="select-all">{requestId}</code></p>}
+                    <Button variant="outline" onClick={handleGenerate} disabled={isGenerating}>Try again</Button>
+                  </div>
+                )}
 
-                          <div className="space-y-2">
-                              <Button
-                                  onClick={handleLoadInspirationalJokes}
-                                  disabled={isLoadingInspirationalJokes || isGeneratingJoke || !user}
-                                  variant="outline"
-                                  className="w-full"
-                              >
-                                  {isLoadingInspirationalJokes ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4 text-primary" />}
-                                  {isLoadingInspirationalJokes ? 'Loading Jokes…' : 'Load My 5-Star Jokes for Inspiration'}
-                              </Button>
-                              {inspirationalJokes.length > 0 && (
-                                  <p className="text-xs text-center text-muted-foreground">
-                                      {inspirationalJokes.length} joke{inspirationalJokes.length === 1 ? '' : 's'} will be used for inspiration.
-                                  </p>
-                              )}
-                          </div>
+                <AnimatePresence>
+                  {isGenerating && (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center min-h-[160px] bg-card rounded-lg border border-dashed p-4 text-center"
+                    >
+                      <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                      <p className="text-lg font-medium text-muted-foreground">Generating witty humor…</p>
+                      <p className="text-sm text-muted-foreground">{elapsedSeconds >= 30 ? 'Still working. Model responses can take time; progress updates appear above.' : 'Live stages appear above as each step starts.'}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                          <Button
-                              onClick={handleGenerateJoke}
-                              disabled={isGeneratingJoke || !user}
-                              className="w-full"
-                          >
-                              <Wand2 className="mr-2 h-4 w-4" />
-                              {isGeneratingJoke ? 'Generating…' : aiGeneratedJokes.length > 0 ? 'Generate Again' : 'Generate 3 Jokes'}
-                          </Button>
-                      </div>
-                    
-                      {/* Always in the DOM so it is a live region *before* the
-                          text changes — a role="status" that mounts with its
-                          message already inside it does not announce. The
-                          placeholder below carries the same words on screen. */}
-                      <div role="status" aria-live="polite" className="text-sm text-center text-muted-foreground">
-                        {isGeneratingJoke ? progressStage ? `${GENERATION_STAGE_LABELS[progressStage]}…` : 'Connecting securely…' : ''}
-                      </div>
-                      {(isGeneratingJoke || generationError || aiGeneratedJokes.length > 0) && (
-                        <div className="space-y-1 text-center text-xs text-muted-foreground">
-                          <p>Elapsed: {elapsedSeconds}s</p>
-                          {requestId && <p className="break-all">Request ID: <code className="select-all">{requestId}</code></p>}
-                        </div>
-                      )}
-                      {generationError && (
-                        <div role="alert" className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-                          <p className="font-medium">Couldn&apos;t generate jokes</p>
-                          <p className="text-sm">{generationError}</p>
-                          {requestId && <p className="text-xs break-all">Request ID: <code className="select-all">{requestId}</code></p>}
-                          <Button variant="outline" onClick={handleGenerateJoke} disabled={isGeneratingJoke}>Try again</Button>
-                        </div>
-                      )}
-
-                      <AnimatePresence>
-                        {isGeneratingJoke && (
-                            <motion.div
-                                key="loading"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="flex flex-col items-center justify-center min-h-[200px] bg-card rounded-lg border border-dashed"
-                            >
-                                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-                                <p className="text-lg font-medium text-muted-foreground">Generating witty humor…</p>
-                                <p className="text-sm text-muted-foreground">{elapsedSeconds >= 30 ? 'Still working. Model responses can take time; progress updates appear above.' : 'Live stages appear above as each step starts.'}</p>
-                            </motion.div>
-                        )}
-                      </AnimatePresence>
-                    
-                      {aiGeneratedJokes.length > 0 && !isGeneratingJoke && (
-                        <>
-                          <Separator />
-                          <motion.div key="joke-variations" className="space-y-4">
-                              <h3 className="text-lg font-semibold text-center">Choose Your Favorite</h3>
-                              <AnimatePresence>
-                              {aiGeneratedJokes.map((joke, index) => (
-                              <motion.div
-                                  key={`${joke.jokeText}-${index}`} // Key change to force re-animation
-                                  initial={{ opacity: 0, y: 20 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -20 }}
-                                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                              >
-                                  <Card className={`overflow-hidden transition-all duration-300 ${selectedJoke === joke ? 'border-primary shadow-primary/20 shadow-lg' : 'border-border'}`}>
-                                      <CardContent className="p-5">
-                                          <p className="whitespace-pre-line text-base leading-relaxed text-foreground">{joke.jokeText}</p>
-                                      </CardContent>
-                                      <CardFooter className="bg-muted/40 p-3 flex justify-between items-center">
-                                          <Badge variant="secondary">{joke.category}</Badge>
-                                          <div className="flex items-center gap-1">
-                                          <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          aria-label={`Mark as a good joke, option ${index + 1}`}
-                                          aria-pressed={votes[joke.jokeText] === 'up'}
-                                          onClick={() => handleVote(joke, 'up')}
-                                          >
-                                          <ThumbsUp className={`h-4 w-4 ${votes[joke.jokeText] === 'up' ? 'fill-current text-primary' : ''}`} />
-                                          </Button>
-                                          <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          aria-label={`Mark as a bad joke, option ${index + 1}`}
-                                          aria-pressed={votes[joke.jokeText] === 'down'}
-                                          onClick={() => handleVote(joke, 'down')}
-                                          >
-                                          <ThumbsDown className={`h-4 w-4 ${votes[joke.jokeText] === 'down' ? 'fill-current text-primary' : ''}`} />
-                                          </Button>
-                                          <Button
-                                          variant={selectedJoke === joke ? 'default' : 'outline'}
-                                          size="sm"
-                                          onClick={() => handleSelectJoke(joke)}
-                                          >
-                                          {selectedJoke === joke && <CheckCircle className="mr-2 h-4 w-4" />}
-                                          {selectedJoke === joke ? 'Selected' : 'Use this Joke'}
-                                          </Button>
-                                          </div>
-                                      </CardFooter>
-                                  </Card>
-                              </motion.div>
-                              ))}
-                              </AnimatePresence>
-                              {selectedJoke && (
-                                  <p className="text-sm text-muted-foreground text-center pt-2">The selected joke has been filled into the form on the left.</p>
-                              )}
-                          </motion.div>
-                        </>
-                      )}
-                  </CardContent>
-              </Card>
+                {batches.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold">Your batches</h3>
+                      <p className="text-sm text-muted-foreground">Save every joke you like. The last {batches.length === 1 ? 'batch stays' : `${batches.length} batches stay`} here while you work.</p>
+                      {batches.map((batch, index) => (
+                        <GeneratedBatch
+                          key={batch.id}
+                          batch={batch}
+                          expanded={expanded[batch.id] ?? index === 0}
+                          onToggle={() => setExpanded(previous => ({ ...previous, [batch.id]: !(previous[batch.id] ?? index === 0) }))}
+                          onSave={joke => { void handleSave(joke); }}
+                          onEdit={handleEdit}
+                          onVote={handleVote}
+                          onReason={handleReason}
+                          onAddSample={joke => { void samples.add(joke.jokeText); }}
+                          inSamples={samples.hasSample}
+                          addingSample={samples.isAdding}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
     </MotionConfig>
   );
 }
-
-    

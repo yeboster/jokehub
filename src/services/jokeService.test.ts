@@ -41,8 +41,10 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: MockTimestamp,
 }));
 
-import { buildJokesQuery, fetchJokes } from '@/services/jokeService';
-import { getDocs, query as queryFactory } from 'firebase/firestore';
+vi.mock('@/services/categoryService', () => ({ ensureCategoryExists: vi.fn(async (name: string) => name.trim()) }));
+
+import { addJoke, buildJokesQuery, fetchJokes } from '@/services/jokeService';
+import { addDoc, getDocs, query as queryFactory } from 'firebase/firestore';
 
 /** The default page size baked into `jokeService`. */
 const PAGE_SIZE = 12;
@@ -446,5 +448,13 @@ describe('fetchJokes — the rating filter without its index', () => {
 
     expect(page.ratingFilterDegraded).toBe(false);
     expect(getDocsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('addJoke', () => {
+  it('returns the new document id so the caller can link to the saved joke', async () => {
+    vi.mocked(addDoc).mockResolvedValueOnce({ id: 'new-joke-id' } as Awaited<ReturnType<typeof addDoc>>);
+    await expect(addJoke({ text: 'A joke', category: ' Work ', source: 'AI Assistant' }, 'user-1')).resolves.toBe('new-joke-id');
+    expect(vi.mocked(addDoc).mock.calls.at(-1)?.[1]).toMatchObject({ text: 'A joke', category: 'Work', source: 'AI Assistant', userId: 'user-1' });
   });
 });

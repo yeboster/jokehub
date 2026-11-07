@@ -340,9 +340,9 @@ export async function fetchJokes(
 export async function addJoke(
   newJokeData: { text: string; category: string; source?: string, funnyRate?: number },
   userId: string
-) {
+): Promise<string> {
   const finalCategoryName = await ensureCategoryExists(newJokeData.category, userId);
-  await addDoc(collection(db, JOKES_COLLECTION), {
+  const created = await addDoc(collection(db, JOKES_COLLECTION), {
     ...newJokeData,
     category: finalCategoryName,
     source: newJokeData.source || '',
@@ -352,6 +352,7 @@ export async function addJoke(
     userId: userId,
     keywords: generateKeywords(newJokeData.text),
   });
+  return created.id;
 }
 
 export async function importJokes(
