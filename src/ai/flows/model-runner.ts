@@ -21,7 +21,7 @@ export const FALLBACK_STATUSES: ReadonlySet<string> = new Set([
 ]);
 
 export type GenerationStep = keyof typeof STEP_TIMEOUT_MS;
-type FailureReason = 'provider' | 'timeout' | 'output';
+type FailureReason = 'provider' | 'network' | 'timeout' | 'output';
 export type RunnerLogFields = Record<string, string | number>;
 
 /** Thrown by a step parser when the model answered with unusable data. */
@@ -56,6 +56,12 @@ export type RunnerStep<T> = {
 function providerStatus(error: unknown): string | undefined {
   const status = (error as { status?: unknown } | null)?.status;
   return typeof status === 'string' ? status : undefined;
+}
+
+/** Class name only (e.g. `TypeError`), never the message; anything unusual is redacted. */
+function errorName(error: unknown): string {
+  const name = error instanceof Error ? error.name : typeof error;
+  return /^[A-Za-z]{1,40}$/.test(name) ? name : 'Error';
 }
 
 /** Digits from a `[NNN ...` HTTP marker only; never any other message text. */
@@ -141,10 +147,18 @@ export function createModelRunner(options: ModelRunnerOptions) {
         failure = { reason: 'timeout' };
       } else {
         const status = providerStatus(result.error);
-        if (!status || !FALLBACK_STATUSES.has(status)) throw result.error;
-        lastReason = 'provider';
-        const http = httpStatus(result.error);
-        failure = { reason: 'provider', providerStatus: status, ...(http ? { httpStatus: http } : {}) };
+        if (!status) {
+          // No provider status: network failure or an SDK error before the
+          // HTTP call. Another model may well succeed.
+          lastReason = 'network';
+          failure = { reason: 'network', errorName: errorName(result.error) };
+        } else {
+          // Statuses outside the set (auth, permission) fail the same on every model.
+          if (!FALLBACK_STATUSES.has(status)) throw result.error;
+          lastReason = 'provider';
+          const http = httpStatus(result.error);
+          failure = { reason: 'provider', providerStatus: status, ...(http ? { httpStatus: http } : {}) };
+        }
       }
       markModelFailure(model);
       log('attempt-failed', { model, step, attemptMs: Date.now() - attemptStarted, ...failure });

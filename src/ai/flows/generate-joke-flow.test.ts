@@ -31,6 +31,8 @@ const out = (jokes: Array<{ jokeText: string; category: string }>, model: string
 const qualityError = 'Joke quality check failed. Please try again.';
 const scarcityError = 'Could not produce three eligible, unique jokes. Please try again.';
 const busyError = 'All models are busy right now. Please try again in a minute.';
+/** A step failure that never falls back (same key fails on every model). */
+const hardError = () => new GenkitError({ status: 'PERMISSION_DENIED' as never, message: 'private upstream details' });
 const providerError = (status = 'UNAVAILABLE') => new GenkitError({ status: status as never, message: '[503 Service Unavailable] provider text' });
 function initial(verdict: unknown = rankings(), jokes: unknown[] = candidates) {
   aiMock.generate.mockResolvedValueOnce({ output: { jokes } }).mockResolvedValueOnce({ output: verdict });
@@ -41,7 +43,7 @@ beforeEach(() => { aiMock.generate.mockReset(); resetModelHealth(); });
 describe('real progress boundaries', () => {
   it('reports stages before each awaited call and includes repair/fallback without extra calls', async () => {
     initial();
-    aiMock.generate.mockRejectedValueOnce(new Error('private upstream details'));
+    aiMock.generate.mockRejectedValueOnce(hardError());
     const events: GenerationProgress[] = [];
     await generateJoke({}, { allowRepair: true, onProgress: event => events.push(event) });
     expect(events.map(e => e.stage)).toEqual(['generating', 'reviewing', 'selecting', 'repairing', 'repair-fallback']);
@@ -142,7 +144,7 @@ describe('explicit-index quality selection', () => {
     await expect(generateJoke({})).resolves.toEqual(out([candidates[1], candidates[3], candidates[2]]));
   });
   it('fails closed on throwing initial critic even with repair enabled', async () => {
-    aiMock.generate.mockResolvedValueOnce({ output: { jokes: candidates } }).mockRejectedValueOnce(new Error('offline'));
+    aiMock.generate.mockResolvedValueOnce({ output: { jokes: candidates } }).mockRejectedValueOnce(hardError());
     await expect(generateJoke({}, { allowRepair: true })).rejects.toThrow(qualityError);
     expect(aiMock.generate).toHaveBeenCalledTimes(2);
   });
@@ -354,10 +356,15 @@ describe('request and runtime schemas', () => {
     expect(config.outputSchema.safeParse(out([])).success).toBe(false);
     expect(config.outputSchema.safeParse({ jokes: candidates.slice(0, 3) }).success).toBe(false);
   });
-  it('preserves a non-provider generator transport error without fallback', async () => {
-    const error = new Error('Generator unavailable'); aiMock.generate.mockRejectedValueOnce(error);
+  it('preserves a non-eligible provider error without fallback', async () => {
+    const error = hardError(); aiMock.generate.mockRejectedValueOnce(error);
     await expect(generateJoke({}, { allowRepair: true })).rejects.toBe(error);
     expect(aiMock.generate).toHaveBeenCalledTimes(1);
+  });
+  it('a status-less network error tries every model, then reports models unavailable', async () => {
+    aiMock.generate.mockRejectedValue(new TypeError('fetch failed'));
+    await expect(generateJoke({}, { allowRepair: true })).rejects.toThrow('All models are busy right now');
+    expect(aiMock.generate.mock.calls.map(([call]) => call.model)).toEqual(chain);
   });
   it.each([
     [null, 'AI failed to generate joke candidates. The output was empty.'],
@@ -421,11 +428,11 @@ describe('trusted bounded repair', () => {
   const repairCalls = { success: 4, 'generator throws': 3, 'generator invalid': 5, 'critic throws': 4, 'critic invalid': 6, scarcity: 4 } as const;
   it.each(['generator throws', 'generator invalid', 'critic throws', 'critic invalid', 'scarcity'] as const)('preserves usable baseline after repair %s', async (failure) => {
     initial();
-    if (failure === 'generator throws') aiMock.generate.mockRejectedValueOnce(new Error('offline'));
+    if (failure === 'generator throws') aiMock.generate.mockRejectedValueOnce(hardError());
     else if (failure === 'generator invalid') aiMock.generate.mockResolvedValue({ output: { jokes: [] } });
     else {
       aiMock.generate.mockResolvedValueOnce({ output: { jokes: replacement } });
-      if (failure === 'critic throws') aiMock.generate.mockRejectedValueOnce(new Error('offline'));
+      if (failure === 'critic throws') aiMock.generate.mockRejectedValueOnce(hardError());
       else if (failure === 'critic invalid') aiMock.generate.mockResolvedValue({ output: null });
       else { const verdict = rankings(); verdict.rankings.forEach(r => { r.original = false; }); aiMock.generate.mockResolvedValueOnce({ output: verdict }); }
     }
@@ -436,11 +443,11 @@ describe('trusted bounded repair', () => {
   });
   it.each(['success', 'generator throws', 'generator invalid', 'critic throws', 'critic invalid', 'scarcity'] as const)('no-baseline repair %s obeys scarcity and call bound', async (failure) => {
     const verdict = rankings(); verdict.rankings.forEach(r => { r.original = false; }); initial(verdict);
-    if (failure === 'generator throws') aiMock.generate.mockRejectedValueOnce(new Error('offline'));
+    if (failure === 'generator throws') aiMock.generate.mockRejectedValueOnce(hardError());
     else if (failure === 'generator invalid') aiMock.generate.mockResolvedValue({ output: null });
     else {
       aiMock.generate.mockResolvedValueOnce({ output: { jokes: replacement } });
-      if (failure === 'critic throws') aiMock.generate.mockRejectedValueOnce(new Error('offline'));
+      if (failure === 'critic throws') aiMock.generate.mockRejectedValueOnce(hardError());
       else if (failure === 'critic invalid') aiMock.generate.mockResolvedValue({ output: null });
       else aiMock.generate.mockResolvedValueOnce({ output: failure === 'scarcity' ? verdict : rankings() });
     }

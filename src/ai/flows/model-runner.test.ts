@@ -64,16 +64,24 @@ describe('model chain and fallback', () => {
       expect(isModelCooling(chain[0])).toBe(true);
       expect(isModelCooling(chain[1])).toBe(false);
     });
-  it.each([
-    ['plain error', new Error('offline')],
-    ['non-eligible status', new GenkitError({ status: 'PERMISSION_DENIED', message: 'denied' })],
-  ])('rethrows a %s without fallback or cool-down', async (_, error) => {
-    aiMock.generate.mockRejectedValueOnce(error);
-    const { runner } = setup();
-    await expect(runner.run(step)).rejects.toBe(error);
-    expect(aiMock.generate).toHaveBeenCalledTimes(1);
-    expect(isModelCooling(chain[0])).toBe(false);
+  it('falls back on a status-less error (e.g. network failure) and logs only its class name', async () => {
+    aiMock.generate.mockRejectedValueOnce(new TypeError('fetch failed SECRET_PROVIDER_TEXT')).mockResolvedValueOnce(ok);
+    const { runner, logs, calls } = setup();
+    await expect(runner.run(step)).resolves.toEqual({ value: 'fine', model: chain[1] });
+    expect(calls).toEqual([chain[0], chain[1]]);
+    expect(logs).toContainEqual(['attempt-failed', expect.objectContaining({ model: chain[0], reason: 'network', errorName: 'TypeError' })]);
+    expect(JSON.stringify(logs)).not.toMatch(/SECRET|fetch failed/);
+    expect(isModelCooling(chain[0])).toBe(true);
   });
+  it.each(['PERMISSION_DENIED', 'UNAUTHENTICATED', 'FAILED_PRECONDITION'])(
+    'rethrows non-eligible status %s without fallback or cool-down (same key fails on every model)', async status => {
+      const error = new GenkitError({ status: status as never, message: 'denied' });
+      aiMock.generate.mockRejectedValueOnce(error);
+      const { runner } = setup();
+      await expect(runner.run(step)).rejects.toBe(error);
+      expect(aiMock.generate).toHaveBeenCalledTimes(1);
+      expect(isModelCooling(chain[0])).toBe(false);
+    });
   it('treats unusable output as fallback-eligible and rethrows the last output error when exhausted', async () => {
     aiMock.generate.mockResolvedValue({ output: null });
     const { runner, logs } = setup();
