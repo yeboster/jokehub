@@ -107,8 +107,9 @@ export function createModelRunner(options: ModelRunnerOptions) {
       onAbort = () => reject(new Error('aborted'));
       signal.addEventListener('abort', onAbort, { once: true });
     });
-    const thinkingLevel = (getModelInfo(model) as { thinkingLevel?: string }).thinkingLevel;
-    const config = { ...request.config, ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}) };
+    const { thinkingLevel, maxTemperature } = getModelInfo(model) as { thinkingLevel?: string; maxTemperature?: number };
+    const config: Record<string, unknown> = { ...request.config, ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}) };
+    if (maxTemperature !== undefined && typeof config.temperature === 'number') config.temperature = Math.min(config.temperature, maxTemperature);
     try {
       const response = await Promise.race([
         Promise.resolve().then(() => ai.generate({ ...request, model, config, abortSignal: signal } as Parameters<typeof ai.generate>[0])),

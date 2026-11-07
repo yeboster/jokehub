@@ -51,6 +51,20 @@ describe('model chain and fallback', () => {
     await setup({ selected: 'googleai/gemini-3.5-flash-lite' }).runner.run(step);
     expect(aiMock.generate.mock.calls[0][0].config).toEqual({ temperature: 1 });
   });
+  it.each([[1.1, 1], [2, 1], [0.2, 0.2]])('caps temperature %s to %s for Gemma models and sends no thinking config', async (temperature, sent) => {
+    aiMock.generate.mockResolvedValueOnce(ok);
+    const gemmaStep = { ...step, request: () => ({ prompt: 'p', config: { temperature } }) };
+    await setup({ selected: 'googleai/gemma-4-31b-it' }).runner.run(gemmaStep);
+    expect(aiMock.generate.mock.calls[0][0]).toMatchObject({ model: 'googleai/gemma-4-31b-it', config: { temperature: sent } });
+    expect(aiMock.generate.mock.calls[0][0].config).not.toHaveProperty('thinkingConfig');
+  });
+  it('keeps the requested temperature when falling back from Gemma to a Gemini model', async () => {
+    aiMock.generate.mockRejectedValueOnce(providerError('RESOURCE_EXHAUSTED', 429)).mockResolvedValueOnce(ok);
+    const gemmaStep = { ...step, request: () => ({ prompt: 'p', config: { temperature: 1.1 } }) };
+    await setup({ selected: 'googleai/gemma-4-31b-it' }).runner.run(gemmaStep);
+    expect(aiMock.generate.mock.calls[0][0].config).toEqual({ temperature: 1 });
+    expect(aiMock.generate.mock.calls[1][0]).toMatchObject({ model: 'googleai/gemini-3.5-flash-lite', config: { temperature: 1.1 } });
+  });
   it.each(['UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'INTERNAL', 'DEADLINE_EXCEEDED', 'UNKNOWN', 'NOT_FOUND', 'INVALID_ARGUMENT'])(
     'falls back on %s with safe logs and a cool-down', async status => {
       aiMock.generate.mockRejectedValueOnce(providerError(status)).mockResolvedValueOnce(ok);

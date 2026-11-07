@@ -44,6 +44,18 @@ describe('model catalog', () => {
     }
   });
 
+  it('offers the free Gemma 4 models with a temperature cap and no thinking level', () => {
+    for (const id of ['googleai/gemma-4-31b-it', 'googleai/gemma-4-26b-a4b-it']) {
+      expect(resolveModelId(id)).toBe(id);
+      const info = getModelInfo(id as (typeof GEMINI_MODELS)[number]);
+      expect(info).toMatchObject({ maxTemperature: 1 });
+      expect('thinkingLevel' in info).toBe(false);
+    }
+    expect(modelChain('googleai/gemma-4-26b-a4b-it')).toEqual([
+      'googleai/gemma-4-26b-a4b-it', 'googleai/gemini-3.5-flash-lite', 'googleai/gemini-3.1-flash-lite',
+    ]);
+  });
+
   it('only sets a thinking level on non-lite models', () => {
     for (const model of GEMINI_MODEL_CATALOG) {
       if (model.id.includes('lite')) expect('thinkingLevel' in model).toBe(false);

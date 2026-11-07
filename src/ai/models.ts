@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the Gemini models offered in the app.
+ * Single source of truth for the Google AI models offered in the app.
  *
  * Catalog checked against Google's model and deprecation pages on 2026-11-07:
  * 3.6 Flash and 3.5/3.1 Flash-Lite are stable, 3.8 Flash is new. 3.7 Flash
@@ -7,6 +7,10 @@
  * 2.5 Flash is deprecated, so they are accepted only as legacy aliases.
  * Any `gemini-*` id is forwarded by `@genkit-ai/google-genai`, so ids the
  * installed plugin does not list still resolve.
+ *
+ * Gemma 4 (31B and 26B-A4B) is served by the same Gemini API key and plugin;
+ * Google's pricing page lists it as free of charge on the free tier. The
+ * plugin's Gemma config schema caps temperature at 1, so it gets maxTemperature.
  */
 export type ThinkingLevel = 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -19,6 +23,8 @@ export type GeminiModelInfo = {
    * supported; Flash-Lite models already work without it.
    */
   thinkingLevel?: ThinkingLevel;
+  /** Upper bound applied to the requested temperature for this model only. */
+  maxTemperature?: number;
 };
 
 export const GEMINI_MODEL_CATALOG = [
@@ -26,6 +32,8 @@ export const GEMINI_MODEL_CATALOG = [
   { id: 'googleai/gemini-3.8-flash', label: 'Gemini 3.8 Flash', description: 'Newest model; can be busier', thinkingLevel: 'LOW' },
   { id: 'googleai/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', description: 'Fastest and most reliable (default)' },
   { id: 'googleai/gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', description: 'Backup model; retires May 2027' },
+  { id: 'googleai/gemma-4-31b-it', label: 'Gemma 4 31B', description: 'Free open model, larger', maxTemperature: 1 },
+  { id: 'googleai/gemma-4-26b-a4b-it', label: 'Gemma 4 26B', description: 'Free open model, lighter (4B active)', maxTemperature: 1 },
 ] as const satisfies readonly GeminiModelInfo[];
 
 export const GEMINI_MODELS = [
@@ -33,6 +41,8 @@ export const GEMINI_MODELS = [
   'googleai/gemini-3.8-flash',
   'googleai/gemini-3.5-flash-lite',
   'googleai/gemini-3.1-flash-lite',
+  'googleai/gemma-4-31b-it',
+  'googleai/gemma-4-26b-a4b-it',
 ] as const satisfies readonly (typeof GEMINI_MODEL_CATALOG)[number]['id'][];
 
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
