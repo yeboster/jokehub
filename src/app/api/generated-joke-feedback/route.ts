@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { rateLimit, rateLimitKeyFor } from '@/lib/rateLimit';
-import { FeedbackUpsertSchema, TASTE_LIMITS, type FeedbackCounts, type GenerationFeedback } from '@/lib/tasteProfile';
+import { FeedbackUpsertSchema, TASTE_LIMITS } from '@/lib/tasteProfile';
 import { internalError, invalidInput, jsonResponse, readJson, requireUser } from '@/lib/userRouteGuard';
-import { clearFeedback, listFeedback, upsertFeedback } from '@/services/server/tasteStore';
+import { clearFeedback, summarizeFeedback, upsertFeedback } from '@/services/server/tasteStore';
 
 /**
  * Feedback on generated jokes (thumbs up/down, reasons, saves), one record per
@@ -42,17 +42,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** Same rule as the taste profile: liked = up, or saved without a down vote. */
-function countFeedback(feedback: GenerationFeedback[]): FeedbackCounts {
-  let liked = 0;
-  let disliked = 0;
-  for (const item of feedback) {
-    if (item.vote === 'down') disliked++;
-    else if (item.vote === 'up' || item.saved) liked++;
-  }
-  return { liked, disliked };
-}
-
 function parseLimit(value: string | null): number | null {
   if (value === null) return TASTE_LIMITS.feedbackPage;
   if (!/^\d{1,3}$/.test(value)) return null;
@@ -66,8 +55,8 @@ export async function GET(request: NextRequest) {
     if ('response' in user) return user.response;
     const limit = parseLimit(request.nextUrl.searchParams.get('limit'));
     if (limit === null) return invalidInput();
-    const feedback = await listFeedback(user.uid, limit);
-    return jsonResponse({ feedback, counts: countFeedback(feedback) });
+    // Counts cover every record read (up to 500), not just the returned page.
+    return jsonResponse(await summarizeFeedback(user.uid, limit));
   } catch (error) {
     return internalError(MANAGE_SCOPE, 'GET', error);
   }

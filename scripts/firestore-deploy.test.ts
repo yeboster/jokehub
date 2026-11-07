@@ -178,8 +178,10 @@ describe('deployFirestore', () => {
       (c) => c.method === 'POST' && c.url.includes('firestore.googleapis.com')
     );
     expect(indexPosts).toHaveLength(missingCount);
+    const missing = wantedIndexes.slice(2) as unknown as Array<{ collectionGroup: string }>;
+    expect(indexPosts.map(post => post.url)).toEqual(missing.map(index =>
+      expect.stringContaining(`/projects/${PID}/databases/(default)/collectionGroups/${index.collectionGroup}/indexes`)));
     for (const post of indexPosts) {
-      expect(post.url).toContain(`/projects/${PID}/databases/(default)/collectionGroups/jokes/indexes`);
       const indexBody = post.body as unknown as { queryScope: string; fields: IndexField[] };
       expect(indexBody.queryScope).toBe('COLLECTION');
       expect(indexBody.fields.length).toBeGreaterThan(0);

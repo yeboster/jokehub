@@ -82,6 +82,15 @@ describe('model chain and fallback', () => {
       expect(aiMock.generate).toHaveBeenCalledTimes(1);
       expect(isModelCooling(chain[0])).toBe(false);
     });
+  it('treats a Genkit schema ValidationError as unusable output, ending in the step error rather than MODELS_UNAVAILABLE', async () => {
+    const validation = () => Object.assign(new GenkitError({ status: 'INVALID_ARGUMENT', message: 'Schema validation failed SECRET_PROVIDER_TEXT' }), { name: 'ValidationError' });
+    aiMock.generate.mockRejectedValue(validation());
+    const { runner, logs, calls } = setup();
+    await expect(runner.run(step)).rejects.toThrow('Empty output.');
+    expect(calls).toEqual(chain);
+    expect(logs).toContainEqual(['attempt-failed', expect.objectContaining({ model: chain[0], reason: 'output' })]);
+    expect(JSON.stringify(logs)).not.toMatch(/SECRET/);
+  });
   it('treats unusable output as fallback-eligible and rethrows the last output error when exhausted', async () => {
     aiMock.generate.mockResolvedValue({ output: null });
     const { runner, logs } = setup();
@@ -181,6 +190,17 @@ describe('time budget and call cap', () => {
     await assertion;
     expect(aiMock.generate).toHaveBeenCalledTimes(1);
     expect(logs.map(([event]) => event)).toContain('fallback-skipped');
+    // The 15 s attempt was cut short by the request budget, not by the model.
+    expect(isModelCooling(chain[0])).toBe(false);
+  });
+  it('cools a model whose attempt used its full step timeout', async () => {
+    vi.useFakeTimers();
+    aiMock.generate.mockImplementationOnce(hang).mockResolvedValueOnce(ok);
+    const { runner } = setup();
+    const pending = runner.run(step);
+    await vi.advanceTimersByTimeAsync(35_000);
+    await pending;
+    expect(isModelCooling(chain[0])).toBe(true);
   });
   it('fails without calling when the budget is already spent', async () => {
     const { runner } = setup({ startedAt: Date.now() - GENERATION_BUDGET_MS });

@@ -64,6 +64,18 @@ function errorName(error: unknown): string {
   return /^[A-Za-z]{1,40}$/.test(name) ? name : 'Error';
 }
 
+function isSchemaValidationError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'ValidationError';
+}
+
+/** The error a step's parser raises for missing output: its public failure message. */
+function stepOutputError(parse: (output: unknown) => unknown): UnusableOutputError {
+  try { parse(undefined); } catch (error) {
+    if (error instanceof UnusableOutputError) return error;
+  }
+  return new UnusableOutputError('AI returned data in an unexpected format.');
+}
+
 /** Digits from a `[NNN ...` HTTP marker only; never any other message text. */
 function httpStatus(error: unknown): number | undefined {
   const message = error instanceof Error ? error.message : '';
@@ -130,8 +142,11 @@ export function createModelRunner(options: ModelRunnerOptions) {
       callCount++;
       try { options.onCall?.(model, callCount); } catch { /* Observability cannot change generation. */ }
       const attemptStarted = Date.now();
-      const result = await attempt(model, request(model), Math.min(STEP_TIMEOUT_MS[step], left));
+      const timeoutMs = Math.min(STEP_TIMEOUT_MS[step], left);
+      const result = await attempt(model, request(model), timeoutMs);
       let failure: Record<string, string | number> | undefined;
+      // A timeout shortened by the request budget says nothing about the model.
+      let blameModel = true;
       if ('response' in result) {
         try {
           const value = parse(result.response?.output);
@@ -145,6 +160,13 @@ export function createModelRunner(options: ModelRunnerOptions) {
       } else if (result.timedOut) {
         lastReason = 'timeout';
         failure = { reason: 'timeout' };
+        blameModel = timeoutMs >= STEP_TIMEOUT_MS[step];
+      } else if (isSchemaValidationError(result.error)) {
+        // Genkit validates structured output inside ai.generate; a mismatch is
+        // unusable output, so the step keeps its own public error.
+        lastReason = 'output';
+        lastOutputError = stepOutputError(parse);
+        failure = { reason: 'output' };
       } else {
         const status = providerStatus(result.error);
         if (!status) {
@@ -160,7 +182,7 @@ export function createModelRunner(options: ModelRunnerOptions) {
           failure = { reason: 'provider', providerStatus: status, ...(http ? { httpStatus: http } : {}) };
         }
       }
-      markModelFailure(model);
+      if (blameModel) markModelFailure(model);
       log('attempt-failed', { model, step, attemptMs: Date.now() - attemptStarted, ...failure });
       const next = chain[index + 1];
       if (!next) break;

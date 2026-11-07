@@ -15,6 +15,8 @@ class FakeDb {
   directWrites = 0;
   batchSizes: number[] = [];
   failWith: Error | null = null;
+  /** Deployed composite indexes, as `${collection}:${equalityFields}:${orderField}`. */
+  indexes = new Set<string>();
   collection(path: string) { this.check(); return new FakeQuery(this, path); }
   check() { if (this.failWith) throw this.failWith; }
   async runTransaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
@@ -73,13 +75,16 @@ class FakeQuery {
     return new FakeQuery(this.db, this.path, [...this.filters, [field, op, value]], this.order, this.max);
   }
   orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
-    if (this.filters.length) throw new Error('where + orderBy would need a composite index');
     return new FakeQuery(this.db, this.path, this.filters, [field, direction], this.max);
   }
   limit(max: number) { return new FakeQuery(this.db, this.path, this.filters, this.order, max); }
   select() { return this; }
   async get() {
     this.db.check();
+    if (this.filters.length && this.order && !this.db.indexes.has(`${this.path}:${this.filters.map(([f]) => f).join(',')}:${this.order[0]}`)) {
+      // Like the Admin SDK: a where + orderBy query fails at get() until its composite index exists.
+      throw Object.assign(new Error('9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/x'), { code: 9 });
+    }
     this.db.queries.push({ path: this.path, filters: this.filters, order: this.order, max: this.max });
     const depth = this.path.split('/').length + 1;
     let entries = [...this.db.docs.entries()].filter(([path]) => path.startsWith(`${this.path}/`) && path.split('/').length === depth);
@@ -107,7 +112,7 @@ vi.mock('@/lib/admin', () => ({
 
 import {
   SampleLimitError, clearFeedback, createSample, deleteSample, listFeedback, listSamples,
-  loadTasteProfile, tasteDocId, updateSample, upsertFeedback,
+  loadTasteProfile, summarizeFeedback, tasteDocId, updateSample, upsertFeedback,
 } from './tasteStore';
 
 const UID = 'user-1';
@@ -182,6 +187,16 @@ describe('upsertFeedback', () => {
     expect(stored('Joke one')).not.toHaveProperty('reason');
   });
 
+  it('a vote change without a reason drops the old reason (old-format clients send no reason)', async () => {
+    await upsertFeedback(UID, { jokeText: 'Joke one', vote: 'up', reason: 'clever wordplay' });
+    const flipped = await upsertFeedback(UID, { jokeText: 'Joke one', vote: 'down' });
+    expect(flipped).toMatchObject({ vote: 'down' });
+    expect(flipped).not.toHaveProperty('reason');
+    expect(stored('Joke one')).not.toHaveProperty('reason');
+    await upsertFeedback(UID, { jokeText: 'Joke one', reason: 'too long' });
+    expect(await upsertFeedback(UID, { jokeText: 'Joke one', vote: 'down' })).toMatchObject({ vote: 'down', reason: 'too long' });
+  });
+
   it('clearing the vote (null or legacy "none") also clears the reason and never stores "none"', async () => {
     await upsertFeedback(UID, { jokeText: 'Joke one', vote: 'up', reason: 'great', saved: true });
     const cleared = await upsertFeedback(UID, { jokeText: 'Joke one', vote: 'none' });
@@ -242,6 +257,33 @@ describe('upsertFeedback', () => {
 describe('listFeedback', () => {
   const seed = (text: string, updatedMs: number, extra: Data = {}, uid = UID) =>
     state.db.docs.set(feedbackPath(expectedId(text), uid), { userId: uid, jokeText: text, vote: 'up', saved: false, createdAt: at(updatedMs), updatedAt: at(updatedMs), ...extra });
+
+  it('with the composite index deployed, reads the newest 500 by updatedAt so new votes are never cut off', async () => {
+    state.db.indexes.add('generatedJokeFeedback:userId:updatedAt');
+    for (let i = 0; i < 600; i++) seed(`Joke ${i}`, 1000 + i);
+    const all = await listFeedback(UID);
+    expect(all[0].jokeText).toBe('Joke 599');
+    expect(state.db.queries.at(-1)).toEqual({ path: 'generatedJokeFeedback', filters: [['userId', '==', UID]], order: ['updatedAt', 'desc'], max: 500 });
+  });
+
+  it('falls back to the unordered read when the index is missing, warning without user data', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    seed('Old', 1000);
+    seed('New', 3000);
+    expect((await listFeedback(UID)).map(item => item.jokeText)).toEqual(['New', 'Old']);
+    expect(warn).toHaveBeenCalled();
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(UID);
+  });
+
+  it('summarizes counts over every read record, not just the returned page', async () => {
+    seed('Up 1', 1000);
+    seed('Up 2', 2000);
+    seed('Saved', 3000, { vote: null, saved: true });
+    seed('Down', 4000, { vote: 'down', saved: true });
+    const summary = await summarizeFeedback(UID, 1);
+    expect(summary.feedback.map(item => item.jokeText)).toEqual(['Down']);
+    expect(summary.counts).toEqual({ liked: 3, disliked: 1 });
+  });
 
   it('reads with an equality-only userId filter capped at 500, then sorts newest first in memory', async () => {
     seed('Old', 1000);

@@ -12,11 +12,12 @@
 import { createHash } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/admin';
+import { isMissingIndexError } from '@/lib/firestoreErrors';
 import { JOKE_GENERATION_LIMITS, JokeTextSchema, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import {
   FeedbackUpsertSchema, GenerationFeedbackSchema, JokeSampleSchema, SampleCreateSchema, SampleUpdateSchema,
   TASTE_LIMITS, TasteDocIdSchema, emptyTasteProfile,
-  type FeedbackUpsertInput, type GenerationFeedback, type JokeSample,
+  type FeedbackCounts, type FeedbackUpsertInput, type GenerationFeedback, type JokeSample,
   type SampleCreate, type SampleUpdate, type TasteExample, type TasteProfile,
 } from '@/lib/tasteProfile';
 import { GENERATED_JOKE_FEEDBACK_COLLECTION } from '@/services/server/jokeExemplars';
@@ -125,8 +126,10 @@ export async function upsertFeedback(uid: string, input: FeedbackUpsertInput): P
       if (snapshot.exists) tx.delete(ref);
       return null;
     }
+    // A changed vote without a reason drops the old one: it explained the old vote.
+    const voteChanged = change.vote !== undefined && change.vote !== (existing?.vote ?? null);
     const reason = vote === null || change.vote === null ? undefined
-      : change.reason === undefined ? existing?.reason : optionalText(change.reason);
+      : change.reason === undefined ? (voteChanged ? undefined : existing?.reason) : optionalText(change.reason);
     const now = Timestamp.now();
     const record: GenerationFeedback = compact({
       id,
@@ -153,24 +156,62 @@ export async function upsertFeedback(uid: string, input: FeedbackUpsertInput): P
 }
 
 /**
- * Newest first by updatedAt. Reads at most 500 of the user's documents
- * (equality filter only), skips malformed and empty records, then applies
- * `limit`.
+ * The user's newest feedback documents, at most 500. Uses the
+ * (userId, updatedAt desc) composite index from firestore.indexes.json; until
+ * it is deployed, falls back to an equality-only read (which may miss the
+ * newest records once a user has more than 500) and warns.
  */
-export async function listFeedback(uid: string, limit: number = TASTE_LIMITS.feedbackPage): Promise<GenerationFeedback[]> {
-  if (!Number.isInteger(limit) || limit < 1 || limit > TASTE_LIMITS.feedbackPage) {
-    throw new RangeError(`Feedback limit must be an integer from 1 to ${TASTE_LIMITS.feedbackPage}.`);
+async function readUserFeedbackDocs(uid: string) {
+  try {
+    return (await userFeedbackQuery(uid).orderBy('updatedAt', 'desc').limit(FEEDBACK_READ_CAP).get()).docs;
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error;
+    console.warn('[taste-store] generatedJokeFeedback (userId, updatedAt) index missing; using an unordered read. Deploy firestore.indexes.json.');
+    return (await userFeedbackQuery(uid).limit(FEEDBACK_READ_CAP).get()).docs;
   }
+}
+
+/** Valid, non-empty records newest first by updatedAt (at most 500). */
+async function readAllFeedback(uid: string): Promise<GenerationFeedback[]> {
   const prefix = `${checkedUid(uid)}_`;
-  const snapshot = await userFeedbackQuery(uid).limit(FEEDBACK_READ_CAP).get();
-  return snapshot.docs
+  return (await readUserFeedbackDocs(uid))
     .flatMap(doc => {
       if (!doc.id.startsWith(prefix)) return [];
       const feedback = readFeedback(doc.id.slice(prefix.length), doc.data());
       return feedback && !isEmptyFeedback(feedback) ? [feedback] : [];
     })
-    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
-    .slice(0, limit);
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+}
+
+function checkedLimit(limit: number): number {
+  if (!Number.isInteger(limit) || limit < 1 || limit > TASTE_LIMITS.feedbackPage) {
+    throw new RangeError(`Feedback limit must be an integer from 1 to ${TASTE_LIMITS.feedbackPage}.`);
+  }
+  return limit;
+}
+
+/** Liked = up, or saved without a down vote (same rule as the taste profile). */
+export function countFeedback(feedback: readonly GenerationFeedback[]): FeedbackCounts {
+  let liked = 0;
+  let disliked = 0;
+  for (const item of feedback) {
+    if (item.vote === 'down') disliked++;
+    else if (item.vote === 'up' || item.saved) liked++;
+  }
+  return { liked, disliked };
+}
+
+/** Newest first by updatedAt; skips malformed and empty records, then applies `limit`. */
+export async function listFeedback(uid: string, limit: number = TASTE_LIMITS.feedbackPage): Promise<GenerationFeedback[]> {
+  checkedLimit(limit);
+  return (await readAllFeedback(uid)).slice(0, limit);
+}
+
+/** One read: the newest `limit` records plus counts over every record read. */
+export async function summarizeFeedback(uid: string, limit: number = TASTE_LIMITS.feedbackPage): Promise<{ feedback: GenerationFeedback[]; counts: FeedbackCounts }> {
+  checkedLimit(limit);
+  const all = await readAllFeedback(uid);
+  return { feedback: all.slice(0, limit), counts: countFeedback(all) };
 }
 
 /** Deletes every feedback document of the user in batches; returns the count. */

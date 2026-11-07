@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/auth', () => ({ verifyRequestAuth: mocks.auth }));
 vi.mock('@/lib/rateLimit', () => ({ rateLimit: mocks.rate, rateLimitKeyFor: mocks.key }));
-vi.mock('@/services/server/tasteStore', () => ({ upsertFeedback: mocks.upsert, listFeedback: mocks.list, clearFeedback: mocks.clear }));
+vi.mock('@/services/server/tasteStore', () => ({ upsertFeedback: mocks.upsert, summarizeFeedback: mocks.list, clearFeedback: mocks.clear }));
 import { DELETE, GET, POST } from './route';
 
 const URL = 'http://localhost/api/generated-joke-feedback';
@@ -132,21 +132,20 @@ describe('GET and DELETE (signed-in users only)', () => {
     expect(mocks.clear).not.toHaveBeenCalled();
   });
 
-  it('GET returns the page and liked/disliked counts with the default limit', async () => {
-    mocks.list.mockResolvedValue([
-      record({ vote: 'up' }), record({ vote: null, saved: true }), record({ vote: 'down', saved: true }), record({ vote: 'down' }),
-    ]);
+  it('GET returns the page and the store counts (over all records) with the default limit', async () => {
+    const feedback = [record({ vote: 'up' }), record({ vote: 'down' })];
+    mocks.list.mockResolvedValue({ feedback, counts: { liked: 7, disliked: 3 } });
     const response = await GET(req('GET'));
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const body = await response.json();
-    expect(body.counts).toEqual({ liked: 2, disliked: 2 });
-    expect(body.feedback).toHaveLength(4);
+    expect(body.counts).toEqual({ liked: 7, disliked: 3 });
+    expect(body.feedback).toHaveLength(2);
     expect(mocks.list).toHaveBeenCalledWith('u1', 100);
   });
 
   it.each(['1', '100', '42'])('GET accepts limit=%s', async limit => {
-    mocks.list.mockResolvedValue([]);
+    mocks.list.mockResolvedValue({ feedback: [], counts: { liked: 0, disliked: 0 } });
     expect((await GET(req('GET', `?limit=${limit}`))).status).toBe(200);
     expect(mocks.list).toHaveBeenCalledWith('u1', Number(limit));
   });

@@ -100,6 +100,14 @@
         { "fieldPath": "averageRating", "order": "DESCENDING" },
         { "fieldPath": "dateAdded", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "generatedJokeFeedback",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
