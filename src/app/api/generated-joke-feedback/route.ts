@@ -1,31 +1,22 @@
-import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, FieldValue } from '@/lib/admin';
 import { verifyRequestAuth } from '@/lib/auth';
-import { JOKE_GENERATION_LIMITS, JOKE_MODES, normalizeJokeKey } from '@/lib/jokeGenerationContract';
 import { rateLimit, rateLimitKeyFor } from '@/lib/rateLimit';
-import { GENERATED_JOKE_FEEDBACK_COLLECTION } from '@/services/server/jokeExemplars';
-import { z } from 'zod';
+import { FeedbackUpsertSchema, TASTE_LIMITS, type FeedbackCounts, type GenerationFeedback } from '@/lib/tasteProfile';
+import { internalError, invalidInput, jsonResponse, readJson, requireUser } from '@/lib/userRouteGuard';
+import { clearFeedback, listFeedback, upsertFeedback } from '@/services/server/tasteStore';
 
 /**
- * Thumbs up/down on generated jokes the user may never save. Saved jokes only
- * show what was kept; these votes record what was rejected, which feeds the
- * avoid examples and is the groundwork for any later tuning.
+ * Feedback on generated jokes (thumbs up/down, reasons, saves), one record per
+ * user and joke text in `generatedJokeFeedback` (see tasteStore). Votes on
+ * jokes the user never saves record what was rejected, which feeds the avoid
+ * examples and the per-user taste profile.
  *
- * Written through the Admin SDK: `generatedJokeFeedback` has no client rules,
- * so browsers cannot read or write it directly.
+ * POST keeps its original contract (API-token callers allowed) and also takes
+ * `reason`, `saved` and a null/omitted vote. GET and DELETE manage the signed-in
+ * user's own feedback and require a Firebase ID token.
  */
 const RATE_LIMIT = { limit: 60, windowMs: 5 * 60_000 };
-
-const FeedbackSchema = z.object({
-  jokeText: z.string().max(JOKE_GENERATION_LIMITS.contextTextChars).refine(text => !!normalizeJokeKey(text)),
-  category: z.string().max(100),
-  vote: z.enum(['up', 'down', 'none']),
-  mode: z.enum(JOKE_MODES).optional(),
-  model: z.string().max(100).optional(),
-  topicHint: z.string().max(JOKE_GENERATION_LIMITS.topicHintChars).optional(),
-  requestId: z.string().max(100).optional(),
-});
+const MANAGE_SCOPE = 'taste-feedback';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,21 +30,55 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Too many feedback requests. Please try again shortly.' }, { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } });
       }
     }
-    let body: unknown;
-    try { body = await request.json(); } catch {
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
-    }
-    const parsed = FeedbackSchema.safeParse(body);
+    const parsed = FeedbackUpsertSchema.safeParse(await readJson(request));
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid input', code: 'INVALID_INPUT' }, { status: 400 });
     }
-    // One document per user and joke text, so changing a vote overwrites it.
-    const textHash = createHash('sha256').update(normalizeJokeKey(parsed.data.jokeText)).digest('hex').slice(0, 32);
-    await adminDb.collection(GENERATED_JOKE_FEEDBACK_COLLECTION).doc(`${authResult.userId}_${textHash}`)
-      .set({ userId: authResult.userId, ...parsed.data, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-    return NextResponse.json({ ok: true });
+    const feedback = await upsertFeedback(authResult.userId, parsed.data);
+    return NextResponse.json({ ok: true, feedback });
   } catch (error) {
     console.error('[generated-joke-feedback] write failed', error instanceof Error ? error.name : 'unknown');
-    return NextResponse.json({ error: 'Could not save feedback. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not save feedback. Please try again.', code: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+}
+
+/** Same rule as the taste profile: liked = up, or saved without a down vote. */
+function countFeedback(feedback: GenerationFeedback[]): FeedbackCounts {
+  let liked = 0;
+  let disliked = 0;
+  for (const item of feedback) {
+    if (item.vote === 'down') disliked++;
+    else if (item.vote === 'up' || item.saved) liked++;
+  }
+  return { liked, disliked };
+}
+
+function parseLimit(value: string | null): number | null {
+  if (value === null) return TASTE_LIMITS.feedbackPage;
+  if (!/^\d{1,3}$/.test(value)) return null;
+  const limit = Number(value);
+  return limit >= 1 && limit <= TASTE_LIMITS.feedbackPage ? limit : null;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireUser(request, MANAGE_SCOPE);
+    if ('response' in user) return user.response;
+    const limit = parseLimit(request.nextUrl.searchParams.get('limit'));
+    if (limit === null) return invalidInput();
+    const feedback = await listFeedback(user.uid, limit);
+    return jsonResponse({ feedback, counts: countFeedback(feedback) });
+  } catch (error) {
+    return internalError(MANAGE_SCOPE, 'GET', error);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireUser(request, MANAGE_SCOPE);
+    if ('response' in user) return user.response;
+    return jsonResponse({ deleted: await clearFeedback(user.uid) });
+  } catch (error) {
+    return internalError(MANAGE_SCOPE, 'DELETE', error);
   }
 }
