@@ -16,6 +16,7 @@ const StudioJokeSchema = z.object({
   category: z.string().min(1),
   status: z.enum(['idle', 'saving', 'saved']),
   savedJokeId: z.string().optional(),
+  savedText: z.string().optional(),
   vote: FeedbackVoteSchema.nullable(),
   reason: z.string().optional(),
 });
@@ -33,7 +34,10 @@ const StudioBatchSchema = z.object({
 export type StudioJokeStatus = 'idle' | 'saving' | 'saved';
 export type StudioJoke = {
   id: string; jokeText: string; category: string; status: StudioJokeStatus;
-  savedJokeId?: string; vote: FeedbackVote | null; reason?: string;
+  savedJokeId?: string;
+  /** The text actually saved (an Edit may change it). */
+  savedText?: string;
+  vote: FeedbackVote | null; reason?: string;
 };
 export type StudioBatch = {
   id: string; createdAt: string; topicHint: string; mode: JokeMode; model: string;

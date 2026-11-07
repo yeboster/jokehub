@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   auth: { user: null as null | { uid: string; getIdToken: () => Promise<string> }, loading: false },
   fetch: vi.fn(), inspiration: vi.fn(), toast: vi.fn(), push: vi.fn(), add: vi.fn(),
   formData: { text: 'typed joke', category: 'Work', source: '' } as { text: string; category: string; source?: string },
-  formResult: vi.fn(),
+  formResult: vi.fn(), acceptPrefill: true,
   taste: {
     listFeedback: vi.fn(), setFeedback: vi.fn(), clearFeedback: vi.fn(), listSamples: vi.fn(),
     createSample: vi.fn(), updateSample: vi.fn(), deleteSample: vi.fn(),
@@ -19,14 +19,18 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }
 vi.mock('@/services/jokeService', () => ({ fetchUserFiveStarJokes: mocks.inspiration }));
 vi.mock('@/services/tasteService', () => mocks.taste);
 // The real form is covered by its own suite; here it only reports what the page gives it.
-vi.mock('@/components/add-joke-form', () => ({
-  default: ({ prefill, onAddJoke }: { prefill?: { text: string } | null; onAddJoke: (data: unknown) => Promise<void> }) => (
+vi.mock('@/components/add-joke-form', async () => {
+  const { useEffect } = await import('react');
+  return { default: function MockForm({ prefill, onAddJoke, onPrefillApplied }: { prefill?: { key: string; text: string } | null; onAddJoke: (data: unknown) => Promise<void>; onPrefillApplied?: (key: string) => void }) {
+    useEffect(() => { if (prefill && mocks.acceptPrefill) onPrefillApplied?.(prefill.key); }, [prefill, onPrefillApplied]);
+    return (
     <div>
       <div data-prefill>{prefill?.text ?? ''}</div>
       <button type="button" onClick={() => { onAddJoke(mocks.formData).then(() => mocks.formResult('resolved'), error => mocks.formResult('rejected', error)); }}>Mock form save</button>
     </div>
-  ),
-}));
+    );
+  } };
+});
 import AddJokePage from './page';
 import { DEFAULT_GENERATE_MODEL } from '@/ai/models';
 let container: HTMLDivElement; let root: Root;
@@ -53,7 +57,7 @@ beforeEach(() => {
   vi.resetAllMocks(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.stubGlobal('fetch', mocks.fetch);
   sessionStorage.clear(); localStorage.clear();
   mocks.auth.user = user('a'); mocks.auth.loading = false;
-  mocks.formData = { text: 'typed joke', category: 'Work', source: '' };
+  mocks.formData = { text: 'typed joke', category: 'Work', source: '' }; mocks.acceptPrefill = true;
   mocks.inspiration.mockResolvedValue([]); mocks.fetch.mockResolvedValue(response(batch(1)));
   mocks.taste.listFeedback.mockResolvedValue({ feedback: [], counts: { liked: 0, disliked: 0 } });
   mocks.taste.listSamples.mockResolvedValue([]);
@@ -235,7 +239,7 @@ describe('saving generated jokes', () => {
     const saved = mocks.toast.mock.calls.map(([t]) => t).filter(t => t.title === 'Joke saved');
     expect(saved).toHaveLength(2);
     expect(saved[0].action.props.children.props.href).toBe('/joke/joke-1');
-    expect(mocks.taste.setFeedback).toHaveBeenCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', saved: true, mode: 'original', model: 'googleai/gemini-3.6-flash' });
+    expect(mocks.taste.setFeedback).toHaveBeenCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: null, reason: null, saved: true, mode: 'original', model: 'googleai/gemini-3.6-flash' });
     expect(card('batch 1 joke 1')).toBeTruthy();
   });
   it('prevents double saves and keeps the card when the save fails', async () => {
@@ -309,7 +313,7 @@ describe('votes and samples from cards', () => {
     expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
     await settle(() => thumb(0, 'bad').click());
     expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('true');
-    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'down', reason: null, mode: 'original', model: DEFAULT_GENERATE_MODEL });
+    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'down', reason: null, saved: false, mode: 'original', model: DEFAULT_GENERATE_MODEL });
     await settle(() => thumb(0, 'good').click());
     expect(thumb(0, 'good').getAttribute('aria-pressed')).toBe('true');
     expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('false');
@@ -326,7 +330,7 @@ describe('votes and samples from cards', () => {
     await settle(() => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!; set.call(topic, ' cats '); topic.dispatchEvent(new Event('input', { bubbles: true })); });
     await generate();
     await settle(() => thumb(1, 'good').click());
-    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 1', category: 'Work', vote: 'up', reason: null, mode: 'original', model: MODEL, topicHint: 'cats', requestId: 'req-7' });
+    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 1', category: 'Work', vote: 'up', reason: null, saved: false, mode: 'original', model: MODEL, topicHint: 'cats', requestId: 'req-7' });
   });
   it('updates the taste summary and records a reason on Enter', async () => {
     await render(); await generate();
@@ -337,7 +341,7 @@ describe('votes and samples from cards', () => {
     expect(container.querySelector(`label[for="${reason.id}"]`)?.textContent).toContain('optional');
     await settle(() => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!; set.call(reason, 'great twist'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
     await settle(() => reason.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'up', reason: 'great twist', mode: 'original', model: MODEL });
+    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'up', reason: 'great twist', saved: false, mode: 'original', model: MODEL });
     const calls = mocks.taste.setFeedback.mock.calls.length;
     await settle(() => reason.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
     expect(mocks.taste.setFeedback).toHaveBeenCalledTimes(calls);
@@ -367,7 +371,9 @@ describe('votes and samples from cards', () => {
     await render(); await generate();
     await settle(() => button('Add as sample', card('batch 1 joke 0')).click());
     expect(mocks.taste.createSample).toHaveBeenCalledWith(mocks.auth.user, { text: 'batch 1 joke 0' });
-    expect(button('In samples', card('batch 1 joke 0')).disabled).toBe(true);
+    const inSamples = [...card('batch 1 joke 0').querySelectorAll('[tabindex="-1"]')].find(el => el.textContent?.includes('In samples')) as HTMLElement;
+    expect(inSamples).toBeTruthy();
+    expect(document.activeElement).toBe(inSamples);
     expect(container.textContent).toContain('1 of 50 samples');
   });
   it('removing an item from the feedback list clears the matching card vote', async () => {
@@ -461,4 +467,104 @@ it('has no buttons without an accessible name', async () => {
   const labelled = (el: Element) => !!el.id && !!container.querySelector(`label[for="${el.id}"]`)?.textContent?.trim();
   const unnamed = buttons().filter(el => !(el.getAttribute('aria-label') || el.textContent?.trim() || el.getAttribute('aria-labelledby') || labelled(el)));
   expect(unnamed.map(el => el.outerHTML)).toEqual([]);
+});
+
+describe('review fixes', () => {
+  const thumb = (index: number, kind: 'good' | 'bad') =>
+    container.querySelectorAll<HTMLButtonElement>(`button[aria-label^="Mark as a ${kind} joke"]`)[index];
+  const type = (el: HTMLInputElement, value: string) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, value); el.dispatchEvent(new Event('input', { bubbles: true })); };
+
+  it('disables Edit while a form save is in flight so the link cannot move to another card', async () => {
+    const pending = deferred<string>(); mocks.add.mockReturnValueOnce(pending.promise);
+    await render(); await generate();
+    await settle(() => button('Edit', card('batch 1 joke 0')).click());
+    mocks.formData = { text: 'batch 1 joke 0 edited', category: 'Work', source: 'AI Assistant' };
+    await settle(() => button('Mock form save').click());
+    expect(button('Edit', card('batch 1 joke 1')).disabled).toBe(true);
+    await settle(() => button('Edit', card('batch 1 joke 1')).click());
+    expect(container.querySelector('[data-prefill]')?.textContent).toBe('batch 1 joke 0');
+    await settle(() => pending.resolve('saved-a'));
+    expect(card('batch 1 joke 0').textContent).toContain('Saved');
+    expect(button('Edit', card('batch 1 joke 1')).disabled).toBe(false);
+    mocks.add.mockResolvedValueOnce('manual'); mocks.taste.setFeedback.mockClear();
+    mocks.formData = { text: 'unrelated', category: 'Work', source: '' };
+    await settle(() => button('Mock form save').click());
+    expect(card('batch 1 joke 1').textContent).not.toContain('Saved');
+    expect(mocks.taste.setFeedback).not.toHaveBeenCalled();
+  });
+
+  it('links a card only once the form accepts its prefill', async () => {
+    mocks.acceptPrefill = false;
+    await render(); await generate();
+    await settle(() => button('Edit', card('batch 1 joke 0')).click());
+    mocks.add.mockResolvedValueOnce('manual');
+    await settle(() => button('Mock form save').click());
+    expect(card('batch 1 joke 0').textContent).not.toContain('Saved');
+    expect(mocks.taste.setFeedback).not.toHaveBeenCalled();
+  });
+
+  it('marks the linked card as saving during a form save and restores it on failure', async () => {
+    const pending = deferred<string>(); mocks.add.mockReturnValueOnce(pending.promise);
+    await render(); await generate();
+    await settle(() => button('Edit', card('batch 1 joke 2')).click());
+    await settle(() => button('Mock form save').click());
+    expect(button('Saving', card('batch 1 joke 2')).disabled).toBe(true);
+    await settle(() => pending.reject(new Error('write failed')));
+    expect(button('Save', card('batch 1 joke 2')).disabled).toBe(false);
+    expect(mocks.add).toHaveBeenCalledTimes(1);
+  });
+
+  it('moves focus to the View link after a card save', async () => {
+    mocks.add.mockResolvedValueOnce('joke-1');
+    await render(); await generate();
+    const save = button('Save', card('batch 1 joke 0'));
+    save.focus();
+    await settle(() => save.click());
+    expect(document.activeElement?.getAttribute('href')).toBe('/joke/joke-1');
+  });
+
+  it('keeps collapsed batches mounted and leaves the batch holding focus open', async () => {
+    await render(); await generate();
+    await settle(() => thumb(0, 'good').click());
+    const reason = card('batch 1 joke 0').querySelector('input[maxlength="200"]') as HTMLInputElement;
+    reason.focus(); await settle(() => type(reason, 'draft in progress'));
+    mocks.fetch.mockResolvedValueOnce(response(batch(2))); await generate();
+    const toggles = [...container.querySelectorAll('button[aria-expanded][aria-controls^="batch-"]')];
+    expect(toggles.map(t => t.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+    expect(reason.isConnected).toBe(true);
+    expect(reason.value).toBe('draft in progress');
+    (document.activeElement as HTMLElement).blur();
+    mocks.fetch.mockResolvedValueOnce(response(batch(3))); await generate();
+    const after = [...container.querySelectorAll('button[aria-expanded][aria-controls^="batch-"]')];
+    expect(after.map(t => t.getAttribute('aria-expanded'))).toEqual(['true', 'false', 'false']);
+    const collapsed = document.getElementById(after[2].getAttribute('aria-controls')!)!;
+    expect(collapsed.hidden).toBe(true);
+    expect(collapsed.querySelector('li[data-studio-joke]')).not.toBeNull();
+  });
+
+  it('serializes feedback writes per card and sends the full state each time', async () => {
+    await render(); await generate();
+    await settle(() => thumb(0, 'good').click());
+    const reasonWrite = deferred<null>();
+    mocks.taste.setFeedback.mockImplementationOnce(() => reasonWrite.promise);
+    const reason = card('batch 1 joke 0').querySelector('input[maxlength="200"]') as HTMLInputElement;
+    await settle(() => type(reason, 'nice'));
+    await settle(() => reason.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await settle(() => thumb(0, 'bad').click());
+    expect(mocks.taste.setFeedback).toHaveBeenCalledTimes(2);
+    await settle(() => reasonWrite.resolve(null));
+    expect(mocks.taste.setFeedback).toHaveBeenCalledTimes(3);
+    expect(mocks.taste.setFeedback.mock.calls.map(([, input]) => [input.vote, input.reason, input.saved])).toEqual([
+      ['up', null, false], ['up', 'nice', false], ['down', null, false],
+    ]);
+    expect(thumb(0, 'bad').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('a vote on a saved card keeps saved true', async () => {
+    mocks.add.mockResolvedValueOnce('joke-1');
+    await render(); await generate();
+    await settle(() => button('Save', card('batch 1 joke 0')).click());
+    await settle(() => thumb(0, 'good').click());
+    expect(mocks.taste.setFeedback).toHaveBeenLastCalledWith(mocks.auth.user, { jokeText: 'batch 1 joke 0', category: 'Work', vote: 'up', reason: null, saved: true, mode: 'original', model: MODEL });
+  });
 });

@@ -2,17 +2,21 @@
 "use client";
 
 import type { FC } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm, useWatch, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Loader2, ShieldAlert } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJokes } from '@/contexts/JokeContext';
 import Link from 'next/link';
@@ -34,10 +38,18 @@ export type JokeFormPrefill = { key: string; text: string; category: string; sou
 interface AddJokeFormProps {
   /** Resolve when saved (the form resets); reject to keep the fields as typed. */
   onAddJoke: (data: JokeFormValues) => Promise<void>;
+  /**
+   * A new `key` asks to load these values. They are ignored while a save is in
+   * flight, and the user is asked first when the fields hold unsaved edits.
+   */
   prefill?: JokeFormPrefill | null;
+  /** Called once a prefill is actually loaded into the fields. */
+  onPrefillApplied?: (key: string) => void;
 }
 
-const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, prefill }) => {
+const EMPTY_VALUES = { text: '', category: '', source: '' };
+
+const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, prefill, onPrefillApplied }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   // The text field is disabled while submitting, so focus waits for re-enable.
   // A DOM ref, not `form.setFocus`: `form.reset` empties RHF's field registry
@@ -58,15 +70,44 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, prefill }) => {
     },
   });
 
-  const prefillKey = prefill?.key;
+  // `applied` is the prefill the fields were last loaded from (null = empty
+  // form); the fields are dirty when they differ from it.
+  const [applied, setApplied] = useState<JokeFormPrefill | null>(null);
+  const [asking, setAsking] = useState<JokeFormPrefill | null>(null);
+  const [seenKey, setSeenKey] = useState<string | null>(null);
+  const values = useWatch({ control: form.control });
+  const baseline = applied ?? EMPTY_VALUES;
+  const dirty = (values.text ?? '') !== baseline.text || (values.category ?? '') !== baseline.category || (values.source ?? '') !== baseline.source;
+
+  // A new key is handled once, during render (React's "adjust state when a
+  // prop changes" pattern). Mid-save it is dropped: the post-save reset would
+  // wipe it, and the caller would link a card the form never showed.
+  if (prefill && prefill.key !== seenKey) {
+    setSeenKey(prefill.key);
+    if (!isSubmitting) {
+      if (dirty) setAsking(prefill);
+      else setApplied(prefill);
+    }
+  }
+
+  const appliedKey = applied?.key;
   useEffect(() => {
-    if (!prefill) return;
+    if (!applied) return;
     // The combobox seeds its search box from the category each time it opens.
-    form.reset({ text: prefill.text, category: prefill.category, source: prefill.source });
+    form.reset({ text: applied.text, category: applied.category, source: applied.source });
     textField.current?.focus();
-    // Only a new key reloads: re-renders must not overwrite the user's edits.
+    onPrefillApplied?.(applied.key);
+    // Only a newly applied key reloads: re-renders must not overwrite edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillKey, form]);
+  }, [appliedKey, form]);
+
+  // Where focus goes back to when the user keeps their edits (the Edit
+  // button they pressed). Captured before the dialog moves focus into itself.
+  const returnFocus = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (asking) returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, [asking]);
+  const replaced = useRef(false);
 
   const focusedSave = useRef(0);
   useEffect(() => {
@@ -85,7 +126,8 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, prefill }) => {
       await onAddJoke(data);
       // Only on success. The fields are the user's work; a failed write is not
       // a reason to throw it away.
-      form.reset({ text: '', category: '', source: '' });
+      form.reset(EMPTY_VALUES);
+      setApplied(null);
       // Ready for the next joke without reaching for the mouse.
       setSaveCount(count => count + 1);
     } catch (error) {
@@ -203,6 +245,27 @@ const AddJokeForm: FC<AddJokeFormProps> = ({ onAddJoke, prefill }) => {
           </Button>
         </form>
       </Form>
+      <AlertDialog open={!!asking} onOpenChange={open => { if (!open) setAsking(null); }}>
+        <AlertDialogContent
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            if (replaced.current) textField.current?.focus();
+            else returnFocus.current?.focus();
+            replaced.current = false;
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace the joke you&apos;re editing?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The form has changes that are not saved. Replacing loads the generated joke instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { replaced.current = true; setApplied(asking); setAsking(null); }}>Replace</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

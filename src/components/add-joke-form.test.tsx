@@ -25,12 +25,13 @@ const text = () => container.querySelector('textarea')!;
 const category = () => container.querySelector('[data-category]') as HTMLInputElement;
 const source = () => container.querySelector('input[placeholder="e.g., A friend, a book"]') as HTMLInputElement;
 async function submit() { await settle(() => container.querySelector('form')!.requestSubmit()); }
+const applied = vi.fn();
 function render(onAddJoke: (data: unknown) => Promise<void>, prefill: JokeFormPrefill | null = null) {
-  return settle(() => root.render(<AddJokeForm onAddJoke={onAddJoke} prefill={prefill} />));
+  return settle(() => root.render(<AddJokeForm onAddJoke={onAddJoke} prefill={prefill} onPrefillApplied={applied} />));
 }
 
 beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); applied.mockReset();
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await settle(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -74,5 +75,60 @@ describe('AddJokeForm', () => {
     expect(source().value).toBe('');
     await render(onAddJoke, { ...first, key: 'k2' });
     expect(text().value).toBe('Generated joke');
+  });
+
+  it('ignores a prefill that arrives while a save is in flight', async () => {
+    let finish!: () => void;
+    const onAddJoke = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const first = { key: 'k1', text: 'Card A', category: 'Work', source: 'AI Assistant' };
+    await render(onAddJoke, first);
+    expect(applied).toHaveBeenLastCalledWith('k1');
+    await submit();
+    await render(onAddJoke, { key: 'k2', text: 'Card B', category: 'Work', source: 'AI Assistant' });
+    expect(applied).not.toHaveBeenCalledWith('k2');
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    await settle(() => finish());
+    expect(text().value).toBe('');
+    expect(applied).not.toHaveBeenCalledWith('k2');
+  });
+
+  it('asks before replacing edited text; Keep editing changes nothing and returns focus', async () => {
+    const editButton = document.createElement('button'); editButton.textContent = 'Edit'; document.body.append(editButton);
+    try {
+      await render(vi.fn(async () => {}), { key: 'k1', text: 'Card A', category: 'Work', source: 'AI Assistant' });
+      await settle(() => typeInto(text(), 'Card A, improved'));
+      editButton.focus();
+      await render(vi.fn(async () => {}), { key: 'k2', text: 'Card B', category: 'Puns', source: 'AI Assistant' });
+      const dialog = document.querySelector('[role="alertdialog"]')!;
+      expect(dialog.textContent).toContain("Replace the joke you're editing?");
+      expect(text().value).toBe('Card A, improved');
+      const keep = [...dialog.querySelectorAll('button')].find(el => el.textContent === 'Keep editing')!;
+      await settle(() => keep.click());
+      await settle(); // Radix restores focus in a timeout after the dialog unmounts.
+      expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+      expect(text().value).toBe('Card A, improved');
+      expect(category().value).toBe('Work');
+      expect(applied).not.toHaveBeenCalledWith('k2');
+      expect(document.activeElement).toBe(editButton);
+
+      await render(vi.fn(async () => {}), { key: 'k3', text: 'Card C', category: 'Puns', source: 'AI Assistant' });
+      const replace = [...document.querySelectorAll('[role="alertdialog"] button')].find(el => el.textContent === 'Replace') as HTMLButtonElement;
+      await settle(() => replace.click());
+      await settle();
+      expect(text().value).toBe('Card C');
+      expect(category().value).toBe('Puns');
+      expect(applied).toHaveBeenLastCalledWith('k3');
+      expect(document.activeElement).toBe(text());
+    } finally {
+      editButton.remove();
+    }
+  });
+
+  it('replaces an untouched prefill without asking', async () => {
+    await render(vi.fn(async () => {}), { key: 'k1', text: 'Card A', category: 'Work', source: 'AI Assistant' });
+    await render(vi.fn(async () => {}), { key: 'k2', text: 'Card B', category: 'Work', source: 'AI Assistant' });
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(text().value).toBe('Card B');
+    expect(applied).toHaveBeenLastCalledWith('k2');
   });
 });

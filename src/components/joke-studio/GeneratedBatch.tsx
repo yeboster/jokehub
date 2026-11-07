@@ -18,6 +18,7 @@ export type CardHandlers = {
   onAddSample: (joke: StudioJoke) => void;
   inSamples: (text: string) => boolean;
   addingSample: (text: string) => boolean;
+  editLocked: boolean;
 };
 
 type Props = CardHandlers & { batch: StudioBatch; expanded: boolean; onToggle: () => void };
@@ -27,7 +28,7 @@ export default function GeneratedBatch({ batch, expanded, onToggle, ...handlers 
   const time = new Date(batch.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const partial = batch.jokes.length < batch.requestedCount;
   return (
-    <section className="rounded-lg border bg-muted/20" aria-label={`Batch from ${time}`}>
+    <section data-batch-id={batch.id} className="rounded-lg border bg-muted/20" aria-label={`Batch from ${time}`}>
       <h4 className="m-0">
         <button
           type="button"
@@ -48,9 +49,9 @@ export default function GeneratedBatch({ batch, expanded, onToggle, ...handlers 
           <ChevronDown aria-hidden className={`mt-0.5 h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </h4>
+      {/* Collapsed bodies stay mounted (only `hidden`), so cards keep their
+          focus and any reason being typed when a new batch arrives. */}
       <div id={listId} className="px-3 pb-3" hidden={!expanded}>
-        {expanded && (
-          <>
             {partial && (
               <p className="mb-2 text-sm text-muted-foreground">
                 Only {batch.jokes.length} of {batch.requestedCount} passed the quality check.
@@ -64,6 +65,7 @@ export default function GeneratedBatch({ batch, expanded, onToggle, ...handlers 
                   position={index + 1}
                   inSamples={handlers.inSamples(joke.jokeText)}
                   addingSample={handlers.addingSample(joke.jokeText)}
+                  editLocked={handlers.editLocked}
                   onSave={() => handlers.onSave(joke)}
                   onEdit={() => handlers.onEdit(batch, joke)}
                   onVote={vote => handlers.onVote(joke, vote)}
@@ -72,8 +74,6 @@ export default function GeneratedBatch({ batch, expanded, onToggle, ...handlers 
                 />
               ))}
             </ul>
-          </>
-        )}
       </div>
     </section>
   );

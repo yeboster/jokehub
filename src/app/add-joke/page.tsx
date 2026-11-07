@@ -99,6 +99,12 @@ function AddJokeSession() {
 }
 
 type EditLink = { jokeId: string; batch: Pick<StudioBatch, 'mode' | 'model' | 'topicHint' | 'requestId'> };
+/** What the server should hold for one card's generated text. */
+type CardFeedback = { vote: FeedbackVote | null; reason?: string; saved: boolean };
+
+function savedAsGenerated(joke: StudioJoke) {
+  return joke.status === 'saved' && normalizeJokeKey(joke.savedText ?? joke.jokeText) === normalizeJokeKey(joke.jokeText);
+}
 
 function JokeStudio({ user }: { user: User }) {
   const { addJoke } = useJokes();
@@ -114,6 +120,7 @@ function JokeStudio({ user }: { user: User }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [prefill, setPrefill] = useState<JokeFormPrefill | null>(null);
   const [editing, setEditing] = useState<EditLink | null>(null);
+  const [formSaving, setFormSaving] = useState(false);
 
   const { batches, addBatch, updateJoke, updateJokes, findJoke } = useStudioBatches(user.uid);
   const feedback = useGenerationFeedback(user);
@@ -129,9 +136,11 @@ function JokeStudio({ user }: { user: User }) {
       requestedCount: result.requestedCount,
       jokes: result.jokes.map(joke => ({ id: studioId('joke'), jokeText: joke.jokeText, category: joke.category, status: 'idle', vote: null })),
     };
+    // A batch holding focus (a reason being typed, a focused button) stays open.
+    const focusedBatch = document.activeElement?.closest('[data-batch-id]')?.getAttribute('data-batch-id');
     addBatch(batch);
     // The new batch opens; older ones fold away.
-    setExpanded({ [batch.id]: true });
+    setExpanded({ [batch.id]: true, ...(focusedBatch ? { [focusedBatch]: true } : {}) });
   });
 
   const mounted = useRef(true);
@@ -140,8 +149,14 @@ function JokeStudio({ user }: { user: User }) {
     return () => { mounted.current = false; };
   }, []);
   const editLink = useRef<EditLink | null>(null);
+  // Edit links waiting for the form to accept their prefill.
+  const pendingLinks = useRef(new Map<string, EditLink>());
   const saving = useRef(new Set<string>());
   const feedbackOps = useRef(new Map<string, number>());
+  // Per card: the state the server should end with, and a write queue so
+  // writes land in order. Each write sends the whole state.
+  const desiredFeedback = useRef(new Map<string, CardFeedback>());
+  const feedbackQueue = useRef(new Map<string, Promise<unknown>>());
 
   const announceSaved = useCallback((id: string) => {
     toast({
@@ -171,6 +186,32 @@ function JokeStudio({ user }: { user: User }) {
     });
   };
 
+  const currentFeedback = (joke: StudioJoke): CardFeedback =>
+    desiredFeedback.current.get(joke.id) ?? { vote: joke.vote, reason: joke.reason, saved: savedAsGenerated(joke) };
+
+  /** Queue a write of the card's desired state behind its earlier writes. */
+  const writeCardFeedback = (joke: StudioJoke, batch: StudioBatch) => {
+    const previous = feedbackQueue.current.get(joke.id) ?? Promise.resolve();
+    const write = previous.catch(() => {}).then(() => {
+      const state = currentFeedback(joke);
+      return feedback.record({
+        jokeText: joke.jokeText, category: joke.category,
+        vote: state.vote, reason: state.reason ?? null, saved: state.saved,
+        ...batchContext(batch),
+      });
+    });
+    feedbackQueue.current.set(joke.id, write);
+    return write;
+  };
+
+  const markSavedFeedback = (joke: StudioJoke, batch: StudioBatch) => {
+    desiredFeedback.current.set(joke.id, { ...currentFeedback(joke), saved: true });
+    writeCardFeedback(joke, batch).catch(error => {
+      console.error('Error recording saved-joke feedback:', error);
+      if (mounted.current) feedbackFailed();
+    });
+  };
+
   const handleSave = async (target: StudioJoke) => {
     const found = findJoke(target.id);
     if (!found || found.joke.status !== 'idle' || saving.current.has(target.id)) return;
@@ -183,9 +224,9 @@ function JokeStudio({ user }: { user: User }) {
       const id = await addJoke({ text: joke.jokeText, category: joke.category, source: AI_SOURCE });
       if (!id) throw new Error('The joke was not saved.');
       if (!mounted.current) return;
-      updateJoke(joke.id, entry => ({ ...entry, status: 'saved', savedJokeId: id }));
+      updateJoke(joke.id, entry => ({ ...entry, status: 'saved', savedJokeId: id, savedText: joke.jokeText }));
       announceSaved(id);
-      void recordSave({ jokeText: joke.jokeText, category: joke.category, saved: true, ...batchContext(batch) });
+      markSavedFeedback(joke, batch);
     } catch (error) {
       // The context has already announced the failure.
       console.error('Error saving generated joke:', error);
@@ -195,22 +236,22 @@ function JokeStudio({ user }: { user: User }) {
     }
   };
 
-  /** Optimistic feedback change; rolled back only if no later change replaced it. */
-  const changeFeedback = async (
-    joke: StudioJoke, batch: StudioBatch,
-    next: Pick<StudioJoke, 'vote' | 'reason'>,
-    input: Omit<FeedbackUpsertInput, 'jokeText'>,
-  ) => {
-    const previous = { vote: joke.vote, reason: joke.reason };
+  /** Optimistic vote/reason change; rolled back only if no later change replaced it. */
+  const changeFeedback = async (joke: StudioJoke, batch: StudioBatch, next: Pick<CardFeedback, 'vote' | 'reason'>) => {
+    const previous = currentFeedback(joke);
     const op = (feedbackOps.current.get(joke.id) ?? 0) + 1;
     feedbackOps.current.set(joke.id, op);
+    desiredFeedback.current.set(joke.id, { ...previous, ...next });
     updateJoke(joke.id, entry => ({ ...entry, ...next }));
     try {
-      await feedback.record({ jokeText: joke.jokeText, category: joke.category, ...input, ...batchContext(batch) });
+      await writeCardFeedback(joke, batch);
     } catch (error) {
       console.error('Error recording generation feedback:', error);
       if (!mounted.current) return;
-      if (feedbackOps.current.get(joke.id) === op) updateJoke(joke.id, entry => ({ ...entry, ...previous }));
+      if (feedbackOps.current.get(joke.id) === op) {
+        desiredFeedback.current.set(joke.id, previous);
+        updateJoke(joke.id, entry => ({ ...entry, vote: previous.vote, reason: previous.reason }));
+      }
       feedbackFailed();
     }
   };
@@ -219,51 +260,89 @@ function JokeStudio({ user }: { user: User }) {
   const handleVote = (target: StudioJoke, kind: FeedbackVote) => {
     const found = findJoke(target.id);
     if (!found) return;
-    const vote = found.joke.vote === kind ? null : kind;
+    const vote = currentFeedback(found.joke).vote === kind ? null : kind;
     // A reason explains one vote; changing the vote drops it.
-    void changeFeedback(found.joke, found.batch, { vote, reason: undefined }, { vote, reason: null });
+    void changeFeedback(found.joke, found.batch, { vote, reason: undefined });
   };
 
   const handleReason = (target: StudioJoke, text: string) => {
     const found = findJoke(target.id);
-    if (!found || !found.joke.vote) return;
+    if (!found) return;
+    const state = currentFeedback(found.joke);
     const reason = text.trim();
-    if (reason === (found.joke.reason ?? '')) return;
-    void changeFeedback(found.joke, found.batch, { vote: found.joke.vote, reason: reason || undefined }, { vote: found.joke.vote, reason: reason || null });
+    if (!state.vote || reason === (state.reason ?? '')) return;
+    void changeFeedback(found.joke, found.batch, { vote: state.vote, reason: reason || undefined });
   };
 
   const handleEdit = (batch: StudioBatch, joke: StudioJoke) => {
-    const link = { jokeId: joke.id, batch: { mode: batch.mode, model: batch.model, topicHint: batch.topicHint, requestId: batch.requestId } };
+    if (formSaving) return;
+    const key = studioId('edit');
+    pendingLinks.current.set(key, { jokeId: joke.id, batch: { mode: batch.mode, model: batch.model, topicHint: batch.topicHint, requestId: batch.requestId } });
+    setPrefill({ key, text: joke.jokeText, category: joke.category, source: AI_SOURCE });
+  };
+
+  // The link moves only once the form actually shows the card's joke; a
+  // declined or ignored prefill leaves the current link alone.
+  const handlePrefillApplied = useCallback((key: string) => {
+    const link = pendingLinks.current.get(key);
+    pendingLinks.current.clear();
+    if (!link) return;
     editLink.current = link;
     setEditing(link);
-    setPrefill({ key: studioId('edit'), text: joke.jokeText, category: joke.category, source: AI_SOURCE });
-  };
+  }, []);
 
   const stopEditing = () => { editLink.current = null; setEditing(null); };
 
   const handleFormSave = async (data: JokeFormValues) => {
     const link = editLink.current;
-    // Deliberately no try/catch: `AddJokeForm` resets only when this
-    // resolves, so a failed write must reject and keep the user's text. The
-    // context announces the failure.
-    const id = await addJoke(data);
-    if (!id) throw new Error('The joke was not saved.');
-    if (!mounted.current) return;
-    announceSaved(id);
-    if (!link) return;
-    if (editLink.current === link) { editLink.current = null; setEditing(null); }
-    updateJoke(link.jokeId, entry => ({ ...entry, status: 'saved', savedJokeId: id }));
-    // The record is about the joke the user kept: the edited text.
-    void recordSave({ jokeText: data.text, category: data.category, saved: true, ...batchContext(link.batch) });
+    setFormSaving(true);
+    // The linked card cannot also be saved from its own button meanwhile.
+    if (link) { saving.current.add(link.jokeId); updateJoke(link.jokeId, entry => ({ ...entry, status: 'saving' })); }
+    try {
+      // Deliberately no catch: `AddJokeForm` resets only when this resolves,
+      // so a failed write must reject and keep the user's text. The context
+      // announces the failure.
+      const id = await addJoke(data);
+      if (!id) throw new Error('The joke was not saved.');
+      if (!mounted.current) return;
+      announceSaved(id);
+      if (!link) return;
+      if (editLink.current === link) { editLink.current = null; setEditing(null); }
+      updateJoke(link.jokeId, entry => ({ ...entry, status: 'saved', savedJokeId: id, savedText: data.text }));
+      const found = findJoke(link.jokeId);
+      if (found && normalizeJokeKey(data.text) === normalizeJokeKey(found.joke.jokeText)) {
+        // Saved unchanged: it is the card's own record, so it joins its queue.
+        markSavedFeedback(found.joke, found.batch);
+      } else {
+        // The record is about the joke the user kept: the edited text.
+        void recordSave({ jokeText: data.text, category: data.category, saved: true, ...batchContext(link.batch) });
+      }
+    } catch (error) {
+      if (link && mounted.current) updateJoke(link.jokeId, entry => entry.status === 'saving' ? { ...entry, status: 'idle' } : entry);
+      throw error;
+    } finally {
+      if (link) saving.current.delete(link.jokeId);
+      if (mounted.current) setFormSaving(false);
+    }
+  };
+
+  // The server record is gone: later writes for these cards start from nothing.
+  const forgetFeedback = (matches: (joke: StudioJoke) => boolean) => {
+    for (const batch of batches) {
+      for (const joke of batch.jokes) {
+        if (matches(joke)) desiredFeedback.current.set(joke.id, { vote: null, saved: false });
+      }
+    }
+    updateJokes(matches, joke => ({ ...joke, vote: null, reason: undefined }));
   };
 
   const handleFeedbackRemoved = (item: { jokeText: string }) => {
     const key = normalizeJokeKey(item.jokeText);
-    updateJokes(joke => normalizeJokeKey(joke.jokeText) === key, joke => ({ ...joke, vote: null, reason: undefined }));
+    forgetFeedback(joke => normalizeJokeKey(joke.jokeText) === key);
   };
 
   const handleFeedbackReset = () => {
-    updateJokes(joke => joke.vote !== null || !!joke.reason, joke => ({ ...joke, vote: null, reason: undefined }));
+    forgetFeedback(() => true);
   };
 
   const { isGenerating, progressStage, progressModel, requestId, error: generationError, elapsedSeconds } = generation;
@@ -300,7 +379,7 @@ function JokeStudio({ user }: { user: User }) {
                 )}
               </CardHeader>
               <CardContent>
-                <AddJokeForm onAddJoke={handleFormSave} prefill={prefill} />
+                <AddJokeForm onAddJoke={handleFormSave} prefill={prefill} onPrefillApplied={handlePrefillApplied} />
               </CardContent>
             </Card>
 
@@ -388,6 +467,7 @@ function JokeStudio({ user }: { user: User }) {
                           onAddSample={joke => { void samples.add(joke.jokeText); }}
                           inSamples={samples.hasSample}
                           addingSample={samples.isAdding}
+                          editLocked={formSaving}
                         />
                       ))}
                     </div>
