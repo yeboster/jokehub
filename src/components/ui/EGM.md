@@ -2,7 +2,7 @@
 
 ## Overview
 
-These are shared shadcn-style presentational primitives. Most wrap a Radix UI package. `command.tsx` wraps `cmdk` and `form.tsx` wraps `react-hook-form`. Every file merges classes through `cn` from `@/lib/utils`. Feature components in `src/components/` and its subdirectories import these primitives. They do no data fetching. Where they differ from stock shadcn, the differences are listed under Invariants and must be kept.
+These are shared shadcn-style presentational primitives. Most wrap a Radix UI package. `command.tsx` wraps `cmdk` and `form.tsx` wraps `react-hook-form`. Every file except `toaster.tsx` merges classes through `cn` from `@/lib/utils`. Feature components in `src/components/` and its subdirectories import these primitives. They do no data fetching. Where they differ from stock shadcn, the differences are listed under Invariants and must be kept.
 
 ## Interface
 
@@ -41,7 +41,7 @@ These are shared shadcn-style presentational primitives. Most wrap a Radix UI pa
 - Command. `CommandDialog` renders no `DialogTitle` or `DialogDescription`. It gets the Close button from `DialogContent` [command.tsx:CommandDialog].
 - Command. `CommandEmpty` sets `className="py-6 text-center text-sm"` before `{...props}` without `cn`, so a caller's `className` replaces it [command.tsx:CommandEmpty].
 - Forms. `useFormField` builds ids from the `FormItem` `React.useId()`: `${id}-form-item`, `${id}-form-item-description`, `${id}-form-item-message` [form.tsx:useFormField].
-- Forms. The guard `if (!fieldContext) throw ...` never fires, because the context default is `{}`, which is truthy. `getFieldState` is also called before the guard runs [form.tsx:useFormField, FormFieldContext].
+- Forms. `FormFieldContext` defaults to `null`, and `useFormField` throws "useFormField should be used within <FormField>" before calling `getFieldState` when used outside `<FormField>` [form.tsx:useFormField, FormFieldContext].
 - Forms. `FormControl` sets `id`, `aria-invalid={!!error}` and `aria-describedby` on its child. The description id is always included, and the message id is added when there is an error. These are set before `{...props}`, so caller props override them [form.tsx:FormControl].
 - Forms. `FormLabel` sets `htmlFor=formItemId` and adds `text-error` when there is an error. `FormMessage` renders `String(error.message)` or its children, and returns `null` when that text is empty [form.tsx].
 - Slider. `Slider` renders exactly one `SliderPrimitive.Thumb` and passes `thumbLabel` to that thumb's `aria-label` [slider.tsx:Slider].

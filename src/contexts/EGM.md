@@ -40,10 +40,11 @@ Client-side React context providers (`"use client"`) for authentication and joke
 
 - `JokeProvider` calls `useAuth()`, so it must be rendered inside `AuthProvider` (`JokeContext.tsx:JokeProvider`).
 - Auth `loading` stays `true` until the first `onAuthStateChanged` callback. `signIn`, `signUp`, and `signOutUser` set it to `true` and reset it to `false` in `finally` (`AuthContext.tsx:AuthProvider`).
-- `signIn` and `signUp` re-throw Firebase errors to the caller. `signOutUser` does not re-throw; it shows a destructive toast (`AuthContext.tsx:signIn/signUp/signOutUser`).
+- `signIn` and `signUp` re-throw Firebase errors to the caller. `signOutUser` does not re-throw; on success it shows the toast "Signed out" / "You are signed out of Joke Hub.", and on failure a destructive toast (`AuthContext.tsx:signIn/signUp/signOutUser`).
 - `categories` state machine (`JokeContext.tsx` categories effect):
   - `null` with `loadingCategories=true` while auth is loading, and again when a new user's subscription starts. The previous user's list is dropped.
-  - `[]` with `loadingCategories=false` when signed out or when the subscription errors.
+  - `[]` with `loadingCategories=false` when signed out or when the subscription errors. A subscription error also shows the destructive toast "Couldn't load your categories" with `error.message`.
+- Initial state: `loadingInitialJokes = true` and `hasMoreJokes = true`. The provider does not fetch jokes on its own, so `loadingInitialJokes` stays `true` until a page calls `loadJokesWithFilters`.
 - Joke fetches are guarded by the monotonic `jokeRequestIdRef`. A response is applied only if its request is still the newest (`isStale`) (`JokeContext.tsx:fetchJokesInternal`).
 - Loading flags are cleared only by the newest request of the same kind (`initial` or `more`), tracked in `newestRequestByKindRef` (`ownsLoadingFlag`).
 - An initial fetch keeps the current `jokes` in place; it does not reset them to `null`. It clears `jokesError` and resets the pagination cursor `lastVisibleJokeDocRef`. `jokes === null` means only "no list yet" (`fetchJokesInternal`).

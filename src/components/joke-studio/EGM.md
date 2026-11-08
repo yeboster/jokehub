@@ -44,14 +44,18 @@ Every component file has `"use client"`.
 - Generation controls:
   - Every control is disabled while `isGenerating`.
   - The temperature `Slider` uses `min=0`, `max=2`, `step=0.1` and `thumbLabel="Creativity (temperature)"`.
-  - The count radio maps `'5'` to 5 and any other value to 3. [GenerationControls.tsx]
+  - The count radio maps `'5'` to 5 and any other value to 3.
+  - Model options come from `GEMINI_MODEL_CATALOG`; the trigger shows `getModelInfo(model).label` and the description line shows `getModelInfo(model).description` (`@/ai/models`). [GenerationControls.tsx]
 - Samples panel:
   - `canAdd` requires all of: a truthy `normalizeJokeKey(text)`, `!api.isAdding(text)`, `!full`, and `status === 'ready'`.
   - `full` means `samples.length >= TASTE_LIMITS.maxSamples`.
   - The inputs are cleared only when `api.add` returns `'created'` or `'existing'`.
   - `maxLength` is `JOKE_GENERATION_LIMITS.contextTextChars` for the text and `TASTE_LIMITS.noteChars` for the note.
-  - Per-sample controls are disabled while `api.pending.has(sample.id)`. [SamplesPanel.tsx]
+  - Per-sample controls are disabled while `api.pending.has(sample.id)`.
+  - The text and note inputs are disabled while `full`. "Import my 5-star jokes" is disabled when `api.importing || full || status !== 'ready'`. [SamplesPanel.tsx]
 - Taste panel:
+  - The list toggle has `aria-expanded={open}` and `aria-controls={listId}`; the list is `hidden={!open}` and its items render only while open.
+  - The Reset trigger is disabled when `api.resetting || status !== 'ready'`.
   - Reset requires confirmation in an `AlertDialog`, and `onReset` is called only when `await api.reset()` returns a truthy value.
   - `onRemoved` is called only when `await api.remove(item)` returns a truthy value.
   - The remove button is disabled while `api.removing.has(item.id)`. [TastePanel.tsx]

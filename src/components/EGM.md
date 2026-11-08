@@ -11,7 +11,7 @@ This directory holds the app's feature components: the add-joke form, a category
 - `AddJokeForm` (default): props `onAddJoke: (data: JokeFormValues) => Promise<void>`, `prefill?: JokeFormPrefill | null`, `onPrefillApplied?: (key) => void`. It also exports the types `JokeFormValues` and `JokeFormPrefill` (`{ key, text, category, source }`) [add-joke-form.tsx].
 - `CategoryCombobox` (named and default, `forwardRef<HTMLButtonElement>`) and `CategoryComboboxProps`: props `value`, `onChange(category)`, `placeholder?`. Other `Button` props are forwarded to the trigger [CategoryCombobox.tsx].
 - `CSVImport` (default): props `onImport: (jokes: Omit<Joke, 'id' | 'used' | 'dateAdded' | 'userId'>[]) => Promise<void>` [csv-import.tsx].
-- `EmptyState` (default): props `icon`, `title`, `hint?`, `action?`, `className?`, `size?: 'default' | 'sm'`, `titleAs?: 'p' | 'h1' | 'h2'` [EmptyState.tsx].
+- `EmptyState` (default): props `icon`, `title`, `hint?`, `action?`, `className?`, `size?: 'default' | 'sm'` (`'default'`), `titleAs?: 'p' | 'h1' | 'h2'` (`'p'`) [EmptyState.tsx].
 - `Header` (default): props `title`, `description?`, `centered?` [header.tsx].
 - `JokeListItem` (default): props `joke: Joke`, `index?` [joke-list-item.tsx].
 - `JokeList` (default): props `jokes`, `emptyCopy?: FeedEmptyCopy`, `onClearFilters?`, `onRetry?` [joke-list.tsx].
@@ -19,7 +19,7 @@ This directory holds the app's feature components: the add-joke form, a category
 - `Navbar` (default): no props [navbar.tsx].
 - `PageLoading` (default): props `label`, `inline?`, `className?` [PageLoading.tsx].
 - `RouteFocus` (default): no props; renders `null` [RouteFocus.tsx].
-- `StarRating` (default): props `rating`, `onRatingChange?`, `maxStars?` (5), `size?` (20), `className?`, `starClassName?`, `disabled?`, `readOnly?`, `label?`, `describedBy?` [StarRating.tsx].
+- `StarRating` (default): props `rating`, `onRatingChange?`, `maxStars?` (5), `size?` (20), `className?`, `starClassName?` (`'text-primary'`), `disabled?`, `readOnly?`, `label?`, `describedBy?` [StarRating.tsx].
 - `ThemeProvider` and `ThemeToggle` (named) [theme-provider.tsx, theme-toggle.tsx].
 - Subdirectory contracts:
   - [joke](./joke/EGM.md): joke detail page components.
@@ -34,6 +34,9 @@ This directory holds the app's feature components: the add-joke form, a category
   - Fields are disabled when `!user || isSubmitting`. Loading categories is deliberately left out of this condition.
   - The submit button is also disabled while `loadingCategories`. [add-joke-form.tsx:isFormDisabled]
 - Add-joke save result. The form resets only after `onAddJoke` resolves, and keeps the fields when it rejects. The root error renders as `<p role="alert">` [add-joke-form.tsx:onSubmit].
+  - A signed-out submit sets the root error "You must be logged in to add a joke." without calling `onAddJoke`.
+  - On rejection it logs `console.error`. A message containing `'Category'` becomes a `category` field error; a message containing `'permission denied'` becomes the root error "You do not have permission to add this joke."; other errors set no form error.
+  - After a successful save, focus returns to the joke text field (the `saveCount` effect).
 - Add-joke prefill:
   - A prefill with a new key is applied only once.
   - It is dropped while submitting.
@@ -49,22 +52,25 @@ This directory holds the app's feature components: the add-joke form, a category
   - A header row and at least one data row are required.
   - The `text` and `category` columns are required. `funnyrate` and `source` are optional; header names are trimmed and lowercased.
   - A row is skipped, with its line number and reason, when its text or category is empty or its source is longer than `MAX_SOURCE_LENGTH = 100`.
-  - `funnyrate` is accepted only in the range 0 to 5 and defaults to 0 otherwise.
+  - `funnyrate` is parsed with `parseInt(…, 10)`, so non-integer values are truncated, then accepted only in the range 0 to 5; otherwise it defaults to 0 and the value is logged with `console.warn`.
   - `onImport` is called only when at least one row is valid. [csv-import.tsx]
 - CSV file input. It is disabled when `!user || isLoading`, and its value is cleared after every attempt. The `role="status"` element is always mounted [csv-import.tsx].
+  - Status text: "Processing your file…" while reading, then the import summary. When the write fails it shows `Import failed. …` and deliberately sends no toast. It is cleared when parsing fails or the file content cannot be read (those report through a destructive toast).
 - Joke card:
   - The "Used" badge shows only to the joke's owner (`joke.used && currentUser.uid === joke.userId`).
-  - The rating label is "Average rating X.X out of 5, from N rating(s)". [joke-list-item.tsx]
+  - The rating label is "Average rating X.X out of 5, from N rating(s)". Cards with `ratingCount` 0 or unset show "No ratings yet". [joke-list-item.tsx]
+  - Staggered entrance: `JokeList` computes the batch with `nextStaggerBatch` and passes `index - batch.start`; `JokeListItem` turns that into `animationDelay` with `entranceDelayMs(index)`. [joke-list.tsx, joke-list-item.tsx]
 - Joke list empty state. It offers "Try again" when `copy.offerRetry && onRetry`, otherwise "Clear filters" when `copy.offerClearFilters && onClearFilters` [joke-list.tsx].
 - Navbar:
   - The nav has `aria-label="Main"`.
   - The `/manage` link shows only to signed-in users.
-  - The Login link is hidden on `/auth`. [navbar.tsx]
+  - The Login link is hidden on `/auth`.
+  - While `useAuth().loading` is true, it renders only the logo and a spinner: no nav links, account menu or `ThemeToggle`. [navbar.tsx]
 - Route focus. On a pathname change, but not on first render, `RouteFocus` calls `document.getElementById('main-content')?.focus({ preventScroll: true })`. It depends only on the pathname, so query-string changes do not move focus [RouteFocus.tsx].
 - Star rating fill:
   - Each star's fill is `min(max(value - i, 0), 1) * 100`.
   - A fractional star clips a full-size filled `Star` (`flexShrink: 0`) inside an `overflow-hidden` span with a percentage width. The SVG is not shrunk. [StarRating.tsx:StarGlyph]
-- Star rating roles. Read-only mode is one `role="img"` with an `aria-label` derived from the rating. Interactive mode is a `role="radiogroup"` of `role="radio"` buttons with a roving tabindex. Arrow and other keys go through `ratingFromKey` and move focus to the new star [StarRating.tsx].
+- Star rating roles. Read-only mode is one `role="img"` with an `aria-label` derived from the rating. Interactive mode is a `role="radiogroup"` of `role="radio"` buttons with a roving tabindex. Arrow and other keys go through `ratingFromKey` and move focus to the new star. In interactive mode the hovered or focused star is previewed, and mouse leave or blur restores the committed rating [StarRating.tsx].
 - Other accessibility. `PageLoading` has `role="status"`. `EmptyState` has no live role. `ThemeToggle` has the sr-only label "Toggle theme" [PageLoading.tsx, EmptyState.tsx, theme-toggle.tsx].
 
 ## Side Effects
@@ -76,6 +82,7 @@ This directory holds the app's feature components: the add-joke form, a category
 - `ThemeToggle` calls `setTheme('light' | 'dark' | 'system')` from `next-themes` [theme-toggle.tsx].
 - `RouteFocus` moves DOM focus to `#main-content` [RouteFocus.tsx].
 - `AddJokeForm`, `CSVImport`, `JokeList` and `StarRating` call their callback props. The parents perform persistence.
+- Navigation links: `JokeListItem` → `/joke/${joke.id}`; `AddJokeForm` (signed out) → `/auth?redirect=/jokes`; `CSVImport` (signed out) → `/auth?redirect=/manage`; Navbar Login → `/auth?redirect=/jokes` [joke-list-item.tsx, add-joke-form.tsx, csv-import.tsx, navbar.tsx].
 
 ## Verification
 
