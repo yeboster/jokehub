@@ -50,7 +50,7 @@ Consumers outside this directory:
 
 ### `dev.ts`
 
-- Genkit dev entry point. It imports `./flows/generate-joke-flow` and `./flows/explain-joke-flow` for their side effects. The package scripts `genkit:dev` and `genkit:watch` run it (`genkit start -- tsx src/ai/dev.ts`).
+- Genkit dev entry point. It imports `./flows/generate-joke-flow` and `./flows/explain-joke-flow` for their side effects. The package script `genkit:dev` runs it with `genkit start -- tsx src/ai/dev.ts`; `genkit:watch` runs `genkit start -- tsx --watch src/ai/dev.ts`.
 
 ### Subdirectories
 

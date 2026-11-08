@@ -29,7 +29,8 @@ Sample JSON inputs (`requests.v1.json`, `synthetic-old.v1.json`, `synthetic-new.
   - `validateCapture(requests, raw)`: parses and cross-checks a capture against requests.
   - `prepare(rawRequests, rawOld, rawNew, seed)`: returns `{ blind, key }`.
   - `summarize(rawBlind, rawKey, rawRatings, rawOld?, rawNew?)`: returns the summary object
-    (`reliability`, `quality`, `telemetry`, `provenance`, `synthetic`).
+    (`schemaVersion: 1`, `packetId`, `reliability`, `quality`, `telemetry`, `provenance`,
+    `synthetic`).
 - `cli.ts`:
   - `main(argv)`: commands `prepare` (`--requests --old --new --seed --out`), `summarize`
     (`--blind --key --ratings --old --new --out`), `capture-live` (`--allow-live
@@ -54,11 +55,18 @@ Sample JSON inputs (`requests.v1.json`, `synthetic-old.v1.json`, `synthetic-new.
   `digest` over `[ALGORITHM_VERSION, seed, fixtureHash, oldHash, newHash]`; `packetId` is the
   digest of that tuple (`core.ts:prepare`, `core.ts:oldHasLabelA`).
 - `summarize` re-verifies packet integrity (`blindHash`, `packetId`, deterministic label mapping,
-  slot statuses), requires both captures or neither, rejects duplicate case/rater pairs, requires
+  slot statuses), requires both captures or neither, requires `ratings.packetId ===
+  blind.packetId` ("Ratings packet mismatch") and every rated `caseId` to exist in the blind
+  packet ("Unknown rated case"), rejects duplicate case/rater pairs, requires
   `unrateable` for cases with a failed slot, and forbids scoring unavailable slots
   (`core.ts:validatePacket`, `core.ts:validateFrozenCaptures`, `core.ts:summarize`).
 - `quality.status` is `human-ratings` only when `ratingKind` is `human`, rows exist, and neither
   capture is `synthetic`; otherwise `not-evaluated` (`core.ts:summarize`).
+- CLI option parsing: an unknown or repeated flag throws "Unknown or duplicate option"; every
+  flag except `--allow-live` takes a value, and a missing value or one starting with `--` throws
+  "Missing option value". `--max-model-calls`, `--max-cases`, `--old-max-calls` and
+  `--new-max-calls` must match `/^[1-9][0-9]*$/` and be safe integers ("Invalid integer")
+  (`cli.ts:options`, `cli.ts:integer`).
 - CLI `summarize` requires both `--old` and `--new`; `capture-live` requires the literal
   `--allow-live`, 40-hex revisions, per-variant ceilings of 2 or 4 calls, and
   `cases * (oldMax + newMax) <= --max-model-calls` (`cli.ts:main`).

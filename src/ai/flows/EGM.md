@@ -63,10 +63,14 @@ routes `src/app/api/generate-joke/route.ts` and
 - Strict mode applies when `count` is absent. Only a selection of exactly `JOKE_GENERATION_LIMITS.defaultCount` jokes is usable; otherwise the flow throws `SCARCITY_ERROR`. With `count` set, partial batches are allowed, and the flow throws `NONE_ELIGIBLE_ERROR` when nothing is eligible.
 - Default sampling temperature is `1.1`. The critic uses temperature `0.2`. The selected model is `resolveModelId(input.model) ?? DEFAULT_GENERATE_MODEL`.
 - Disliked taste items are removed from `avoidJokes` before prompting, so each appears only once, in the taste section.
+- The reference set passed to `selectJokes`, `hasRepairTrigger` and `repairFeedback` is `prefilledJokes`, `exemplarJokes`, `recentGeneratedJokes`, the original `avoidJokes` (before disliked items are removed), and every taste text (samples, liked, disliked).
+- With `mode === 'classic'`, the critic system prompt gets `CLASSIC_CRITIC_NOTE` appended, which allows well-known jokes and sets `original` false only for repeats of reference-list jokes or tired premises.
 - `parseCandidates` keeps the first `2 × count` valid candidates with unique `normalizeJokeKey` keys. It drops a `hinge` longer than 200 characters and a `mechanism` longer than 80. Fewer than `count` candidates throws `UnusableOutputError(INVALID_CANDIDATES_ERROR)`. Non-object output throws `EMPTY_CANDIDATES_ERROR`.
 - The critic fails closed. An unparseable verdict raises `UnusableOutputError(QUALITY_ERROR)`. Errors that `isRunnerError` does not recognize are rethrown as `Error(QUALITY_ERROR)`.
 - Repair runs only when `options.allowRepair === true` and `hasRepairTrigger` is true. The repaired selection replaces the baseline only if it is usable and `compareSelections(repaired, baseline) > 0`. Any error during repair is swallowed, so a usable baseline survives.
 - Returned jokes are reduced to `{ jokeText, category }` (`toVariation`). `hinge` and `mechanism` are never output.
+- `onProgress` receives `{ stage, callCount, model }`. Stages: `generating`, `reviewing`, `fallback` (from the runner's `onFallback`), `selecting`, and with repair `repairing`, `reviewing-repair`, `selecting-repair` and `repair-fallback` (repair did not replace a usable baseline).
+- Before returning, the flow calls `onLog('selected', { model, requestedCount, returnedCount })`.
 - `onProgress` and `onLog` callback exceptions are caught and ignored.
 
 ### Model runner (`model-runner.ts`)
@@ -81,11 +85,13 @@ routes `src/app/api/generate-joke/route.ts` and
   - a network or SDK error that has no provider `status`;
   - a provider `status` in `FALLBACK_STATUSES`.
 - Provider statuses outside `FALLBACK_STATUSES` are rethrown immediately.
+- A step parser error that is not an `UnusableOutputError` is rethrown immediately, with no fallback and no cool-down mark.
+- Every failed attempt calls `markModelFailure`, except a timeout whose per-attempt timeout was cut below `STEP_TIMEOUT_MS[step]` by the remaining budget (`blameModel`).
 - The runner skips fallback when less than `MIN_FALLBACK_REMAINING_MS` remains.
 - When the chain is exhausted, the runner throws one of these:
   - the last step-specific `UnusableOutputError`, if the last failure was output;
-  - `ModelRunnerError(MODELS_UNAVAILABLE_ERROR)`, if any attempt failed;
-  - `ModelRunnerError(CALL_LIMIT_ERROR)`, if no attempt was made.
+  - `ModelRunnerError(MODELS_UNAVAILABLE_ERROR)`, if any attempt failed in this `run`, or if the time budget was already used up before the next attempt (the runner records that as a timeout);
+  - `ModelRunnerError(CALL_LIMIT_ERROR)`, if the call cap was reached and this `run` has no recorded failure.
 - A caller abort throws `ModelRunnerError(DISCONNECTED_ERROR)`.
 - Per-model config adds `thinkingConfig.thinkingLevel` when the catalog entry has `thinkingLevel`. It caps `temperature` at `maxTemperature` when the entry has one.
 - Logs contain only statuses, model ids, timings, an HTTP status parsed from a `[NNN` marker, and the error class name (matching `/^[A-Za-z]{1,40}$/`, otherwise `'Error'`). They never contain provider messages or prompts.

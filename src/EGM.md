@@ -8,9 +8,11 @@ directly; the `@/` import alias resolves here (`tsconfig.json`,
 
 - `app/` routes and API handlers use `components/`, `contexts/` and `hooks/` on
   the client, and `ai/` plus `services/server/` on the server.
-- `services/` (client SDK) and `services/server/` (Admin SDK) are the only
-  Firestore access layers; `lib/` holds shared contracts and helpers used by all
-  of them.
+- `services/` (client SDK) and `services/server/` (Admin SDK) are the main
+  Firestore access layers. Two API routes also call `adminDb` from
+  `lib/admin.ts` directly: `app/api/explain-joke/route.ts` (reads and updates
+  the joke) and `app/api/jokes/add/route.ts` (creates the joke). `lib/` holds
+  shared contracts and helpers used by all of them.
 
 ## Subdirectories & Boundaries
 
@@ -22,7 +24,9 @@ directly; the `@/` import alias resolves here (`tsconfig.json`,
   (`/`, `/jokes`, `/joke/[jokeId]`, `/add-joke`, `/edit-joke/[jokeId]`,
   `/manage`, `/auth`) and API routes (`/api/generate-joke`,
   `/api/explain-joke`, `/api/generated-joke-feedback`, `/api/joke-samples`,
-  `/api/jokes/add`, `/api/jokes/top`), each authenticating itself.
+  `/api/jokes/add`, `/api/jokes/top`), each authenticating itself; also the
+  `robots.ts` and `sitemap.ts` metadata routes and the `error.tsx`,
+  `global-error.tsx` and `not-found.tsx` boundaries.
 - components: [./components/EGM.md](./components/EGM.md) - Feature components
   (add-joke form, CSV import, feed list, star rating, navbar) and the `joke`,
   `jokes`, `joke-studio` and `ui` primitive packages; persistence goes through
