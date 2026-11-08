@@ -72,6 +72,7 @@ const CSVImport: FC<CSVImportProps> = ({ onImport }) => {
         // The destructive toast is the report for this path.
         setStatusMessage('');
         setIsLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
 
