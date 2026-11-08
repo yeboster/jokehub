@@ -5,9 +5,10 @@
  * collection (also read by the avoid-examples downvote reader), one document
  * per user and joke text: `${uid}_${tasteDocId(text)}`. Samples live at
  * `users/{uid}/jokeSamples/{tasteDocId(text)}`. Neither path has client rules;
- * the Admin SDK bypasses them. Per-user feedback reads use an equality-only
- * filter and sort in memory, and samples use a single-field `orderBy`, so no
- * composite index is needed.
+ * the Admin SDK bypasses them. Per-user feedback reads use the
+ * (userId, updatedAt desc) composite index from firestore.indexes.json, with an
+ * unordered fallback until it is deployed. Samples use a single-field `orderBy`
+ * and need no composite index.
  */
 import { createHash } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
