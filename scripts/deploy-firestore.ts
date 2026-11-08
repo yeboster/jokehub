@@ -45,9 +45,13 @@ function readCredentials(): Credentials {
   );
 }
 
-deployFirestore(readCredentials(), { checkOnly: process.argv.includes('--check') }).catch(
-  (err) => {
-    console.error(err.message ?? err);
-    process.exit(1);
-  }
-);
+// Inside an async function so a readCredentials() throw reaches the handler
+// below instead of escaping as an uncaught exception.
+async function main(): Promise<void> {
+  await deployFirestore(readCredentials(), { checkOnly: process.argv.includes('--check') });
+}
+
+main().catch((err) => {
+  console.error(err.message ?? err);
+  process.exit(1);
+});
