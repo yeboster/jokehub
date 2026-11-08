@@ -8,7 +8,7 @@ The `/joke/[jokeId]` route: the detail page for a single joke. It shows the joke
 - `default JokeLayout` in `layout.tsx`. It sets `metadata.title = 'Joke'` and renders its children unchanged.
 - Context functions used, from `useJokes()`: `getJokeById`, `fetchAllRatingsForJoke`, `submitUserRating`, `toggleUsed`.
 - Child components: `JokeHeader`, `ExplanationCard`, `RatingForm`, `CommunityRatings`, `BackToFeedButton`, `CopyLinkButton`, `EmptyState`.
-- `streamExplanation(jokeId)` is module-private. It sends `POST /api/explain-joke` with `{ jokeId }` and `Authorization: Bearer <idToken>`, then reads the response body as a text stream.
+- `streamExplanation(jokeId)` is a `useCallback` declared inside `JokeShowPage`, not at module scope. It sends `POST /api/explain-joke` with `{ jokeId }` and `Authorization: Bearer <idToken>`, then reads the response body as a text stream.
 
 ## Invariants
 - An explanation is requested only from an explicit user click (`ExplanationCard` `onExplain`), never on page view. Signed-out users get a "Sign in required" toast instead.

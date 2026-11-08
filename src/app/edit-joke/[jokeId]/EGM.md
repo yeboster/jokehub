@@ -21,6 +21,7 @@ The `/edit-joke/[jokeId]` route: an owner-only form for editing or deleting a jo
 ## Invariants
 - Signed-out users are redirected to `/auth?redirect=/edit-joke/<jokeId>`.
 - Ownership is checked on the client: when `fetchedJoke.userId !== user.uid`, the page shows "You do not have permission to edit this joke." `onSubmit` checks ownership again before writing.
+- A missing joke sets the error 'Joke not found.' and shows a "Couldn't load that joke" toast; a failed fetch sets 'Failed to load joke data.' and shows a toast. Both render the error card with a "Back to Jokes" button.
 - A comment says the `funnyRate` range mirrors the `funnyRate >= 0 && funnyRate <= 5` create rule in `firestore.rules`. `0` means unrated.
 - When nothing has changed, submitting shows a "Nothing to save" toast and navigates to `/jokes` without writing.
 - On update failure:

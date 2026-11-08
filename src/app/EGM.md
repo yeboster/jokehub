@@ -5,11 +5,12 @@ The Next.js App Router root. It holds the root layout (providers, navigation, sk
 
 ## Interface
 - `layout.tsx`:
-  - `metadata` sets `metadataBase: new URL(SITE_URL)`, the title template `'%s · Joke Hub'` (default `'Joke Hub'`), Open Graph and Twitter `summary` cards using `/logo.png`, and the icon `/favicon.svg`.
+  - `metadata` sets `metadataBase: new URL(SITE_URL)`, the title template `'%s · Joke Hub'` (default `'Joke Hub'`), `description: SITE_DESCRIPTION` (`'Collect, filter and rate jokes. Yours and everyone else’s.'`, also used in the Open Graph and Twitter blocks), Open Graph and Twitter `summary` cards using `/logo.png`, and the icon `/favicon.svg`.
+  - It loads the `Geist` font as the CSS variable `--font-geist-sans` and applies it on `<body>`.
   - `default RootLayout` nests `ThemeProvider`, `AuthProvider` and `JokeProvider`. Inside them it renders a "Skip to content" link to `#main-content`, then `Navbar`, `RouteFocus`, `<main id="main-content" tabIndex={-1}>` and `Toaster`.
 - `page.tsx`: `default LandingPage` (client). It loads exactly three public jokes with the module constant `HOME_PAGE_FILTERS` (`scope: 'public'`, `limit: 3`) and shows links that depend on sign-in state.
 - `error.tsx`: `default RouteError({ error, reset })` (client). The error boundary for route segments. It shows the headline `ERROR_HEADLINE = 'Something went wrong.'` and a "Try again" button that calls `reset`.
-- `global-error.tsx`: `default GlobalError({ error, reset })` (client). The boundary for errors in the root layout. It renders its own `<html>` and `<body>`, imports `./globals.css`, and has a "Reload" button.
+- `global-error.tsx`: `default GlobalError({ error, reset })` (client). The boundary for errors in the root layout. It renders its own `<html>` and `<body>`, imports `./globals.css`, and has a button labelled "Reload" that calls `reset`; it does not reload the page.
 - `not-found.tsx`: `default NotFound` (server component). It shows "That page doesn’t exist." and a link to `/jokes`.
 - `robots.ts`: `default robots()`. It allows `/`, disallows `/api/`, `/add-joke`, `/edit-joke/`, `/manage` and `/auth`, and points to `${SITE_URL}/sitemap.xml`.
 - `sitemap.ts`: `default sitemap()`. It lists exactly two entries: `${SITE_URL}/` (priority 1) and `${SITE_URL}/jokes` (priority 0.8), both with `changeFrequency: 'daily'`.

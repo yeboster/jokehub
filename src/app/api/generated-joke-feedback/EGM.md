@@ -23,14 +23,15 @@ Route handlers for `/api/generated-joke-feedback`. They record and manage per-us
 
 ## Invariants
 - GET and DELETE accept only Firebase ID-token users. `requireUser` returns `403` with `USER_REQUIRED` when `via !== 'id-token'`, applies its own rate limit, and sends `Cache-Control: no-store` through `jsonResponse`.
-- POST keeps its original contract, so API-token callers are allowed (doc comment in `route.ts`). Only callers whose `via` is not `'api-token'` are rate-limited, under the key scope `'generated-joke-feedback'`.
+- POST keeps its original contract, so API-token callers are allowed (doc comment in `route.ts`). It writes under `authResult.userId`, which for API-token callers is always `'api-user'`, so all API-token feedback is stored under that id. Only callers whose `via` is not `'api-token'` are rate-limited, under the key scope `'generated-joke-feedback'`.
 - The POST error log records only `error.name`, never the request content.
+- When GET or DELETE throws, the handler returns `internalError(MANAGE_SCOPE, <METHOD>, error)` (`@/lib/userRouteGuard`): `500` with `{ error: 'Something went wrong. Please try again.', code: 'INTERNAL_ERROR' }`.
 - A comment on the GET handler says the summary counts cover every record read (up to 500), not only the returned page.
 
 ## Side Effects
 - Firestore writes and reads through `upsertFeedback`, `summarizeFeedback` and `clearFeedback` (`@/services/server/tasteStore`). DELETE removes all of the user's feedback records.
 - Updates in-memory rate-limit state.
-- Logs to `console.error` when a POST write fails.
+- Logs to `console.error` when a POST write fails (`[generated-joke-feedback]`), and when GET or DELETE fails (`[taste-api]`, through `internalError`).
 
 ## Verification
 - Focused: `npm test -- src/app/api/generated-joke-feedback/route.test.ts`

@@ -9,7 +9,7 @@ Route handler for `POST /api/generate-joke`. It validates the request, loads ser
   - Auth: `verifyRequestAuth(request)`. On failure it returns `{ error }` with `authResult.status ?? 401`.
   - Body (`ApiInputSchema`, zod; every field is optional):
     - `topicHint`: string, at most `JOKE_GENERATION_LIMITS.topicHintChars` characters.
-    - `prefilledJokes`, `exemplarJokes`, `recentGeneratedJokes`: arrays of `ContextTextSchema`, each capped by its `JOKE_GENERATION_LIMITS.*` entry.
+    - `prefilledJokes`, `exemplarJokes`, `recentGeneratedJokes`: arrays of `ContextTextSchema`, each capped by its `JOKE_GENERATION_LIMITS.*` entry. `ContextTextSchema` caps each text at `JOKE_GENERATION_LIMITS.contextTextChars` and rejects text that is empty after `normalizeJokeKey`.
     - `model`: must satisfy `resolveModelId(value) !== null`.
     - `temperature`: finite number in `[0, 2]`.
     - `useServerExemplars`: boolean.
@@ -18,11 +18,11 @@ Route handler for `POST /api/generate-joke`. It validates the request, loads ser
     - `useTasteProfile`: boolean.
   - Every response carries an `x-request-id` header, a fresh `randomUUID()`.
   - Without `Accept: application/x-ndjson`: `200` returns the flow output as JSON.
-  - With `Accept: application/x-ndjson`: returns an `application/x-ndjson; charset=utf-8` stream of `GenerationFrame` lines (`@/lib/generationProgress`):
+  - With `Accept: application/x-ndjson`: returns an `application/x-ndjson; charset=utf-8` stream of `GenerationFrame` lines (`@/lib/generationProgress`), with the extra headers `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no`:
     - `progress`, with `requestId`, `elapsedMs`, `stage`, `callCount` and `model`
-    - `heartbeat`, every 5000 ms
-    - `result`, with `output`
-    - `error`, with `error` and `code`
+    - `heartbeat`, every 5000 ms, with `requestId` and `elapsedMs`
+    - `result`, with `requestId` and `output`
+    - `error`, with `requestId`, `error` and `code`
   - Other responses:
 
     | Status | Body | Condition |

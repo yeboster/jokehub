@@ -7,7 +7,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
 - `default AuthPage` in `page.tsx`. It wraps `AuthPageComponent` in `Suspense`, with fallback `PageLoading`.
 - Module-private:
   - `AuthPageComponent`: the form.
-  - `looksLikeEmail(value)`: a minimal shape check that requires an `@`, then a `.` after it, not as the last character.
+  - `looksLikeEmail(value)`: a minimal shape check: an `@` that is not the first character, then a `.` with at least one character between the `@` and it, and the `.` not the last character.
 - `default AuthLayout` in `layout.tsx`. It sets `metadata.title = 'Log in'` and renders its children unchanged.
 - Query param `redirect`: where to go after sign-in. Defaults to `'/jokes'`.
 
@@ -27,7 +27,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
   - `auth/invalid-credential`, `auth/user-not-found` and `auth/wrong-password` share one message.
   - `auth/email-already-in-use` and `auth/invalid-email` each have their own message.
   - Other errors show `error.message`, or a default when it is empty.
-- Auth errors appear inline in a `role="alert"` element, not as toasts.
+- Auth errors appear inline in a `role="alert"` element, not as toasts. The email and password field errors also use `role="alert"`.
 - Field errors use `aria-invalid` and `aria-describedby`. `aria-describedby` points only at elements that are rendered: the error, or the sign-up-only `password-hint`.
 - Inputs set `autoComplete` to `email`, `current-password` or `new-password`.
 

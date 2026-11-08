@@ -25,6 +25,8 @@ The `/add-joke` route, called the "joke studio" in the UI. It has a manual add-j
 - A reason is recorded only while a vote is set.
 - An edit link moves to a card only after the form reports that it applied the prefill (`handlePrefillApplied`).
 - A direct save of a card ends any edit linked to that card.
+- Edit on a generated card is ignored while the form is saving: `handleEdit` returns early when `formSaving` is set, and `GeneratedBatch` gets `editLocked={formSaving}`.
+- A successful save shows a "Joke saved" toast whose `ToastAction` links to `/joke/<id>`.
 - `handleFormSave` deliberately re-throws on failure, so `AddJokeForm` does not reset and the user keeps their text. While the form saves, its linked card is marked `'saving'`.
 - A save of the edited text records feedback for the edited text. An unchanged save joins the card's own feedback queue.
 - When the server reports feedback removed or reset, the matching cards' local votes and reasons are cleared (`forgetFeedback`).
