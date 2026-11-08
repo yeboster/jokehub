@@ -125,7 +125,8 @@ export default function EditJokePage() {
      if (
        data.text === joke.text &&
        data.category === joke.category &&
-       data.source === joke.source &&
+       // The form loads a missing source as '', so compare the same way.
+       (data.source ?? '') === (joke.source ?? '') &&
        data.funnyRate === (joke.funnyRate ?? 0) &&
        data.used === joke.used
      ) {
