@@ -45,7 +45,8 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
 - `listFeedback(uid, limit = TASTE_LIMITS.feedbackPage): Promise<GenerationFeedback[]>`.
 - `summarizeFeedback(uid, limit = TASTE_LIMITS.feedbackPage): Promise<{ feedback; counts }>`.
 - `clearFeedback(uid): Promise<number>`: number of documents deleted.
-- `listSamples(uid): Promise<JokeSample[]>`.
+- `listSamples(uid): Promise<JokeSample[]>`: `orderBy('createdAt', 'desc').limit(TASTE_LIMITS.maxSamples)`;
+  malformed documents are skipped.
 - `createSample(uid, input: SampleCreate): Promise<{ sample; created }>`.
 - `updateSample(uid, input: SampleUpdate): Promise<JokeSample | null>`.
 - `deleteSample(uid, id): Promise<boolean>`.
@@ -70,11 +71,14 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   `/` with `Error('Invalid user id')`.
 - `upsertFeedback` merge rules: for `vote`/`reason`, `undefined` = unchanged,
   `null` (or legacy `'none'`) = clear. For `saved`, `category`, `topicHint`,
-  `model`, `undefined` = unchanged. A reason is kept only alongside a vote; a
+  `model`, `requestId`, `undefined` = unchanged. `mode` is `change.mode`, or
+  the existing `mode` when not given. A reason is kept only alongside a vote; a
   changed vote without a new reason drops the old reason. A cleared vote is
   stored as `null`, never `'none'`. When the result has no vote and is not
   saved, the document is deleted and `null` is returned. `createdAt` is
-  preserved from the existing document (falling back to its `updatedAt`).
+  preserved from the existing document (falling back to its `updatedAt`) only
+  when that document parses as valid feedback; a malformed existing document
+  gets `createdAt = now`.
 - Legacy feedback documents without `saved`, or with `vote: 'none'`, read as
   not saved and no vote. Records with no vote and not saved are excluded from
   listings. Malformed feedback and sample documents are skipped, not thrown.
@@ -87,15 +91,15 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
 - Feedback listing first queries `userId ==` with `orderBy('updatedAt', 'desc')`
   (the `generatedJokeFeedback` composite index in `firestore.indexes.json`); on
   a missing-index error (`isMissingIndexError`) it warns and falls back to an
-  unordered equality-only read. Note: the file header comment says per-user
-  feedback reads need no composite index; `readUserFeedbackDocs` does use one,
-  with this fallback.
+  unordered equality-only read. Documents whose id does not start with
+  `${uid}_` are skipped.
 - Samples are capped at `TASTE_LIMITS.maxSamples` (50). `createSample` is
   idempotent by normalized text: an existing sample returns `created: false`,
   is re-activated, and has its note replaced only when a non-blank note is
   given. A new sample beyond the cap throws `SampleLimitError`.
 - `updateSample`: `active`/`note` `undefined` = unchanged; `null` or blank
-  clears the note; returns `null` when the sample is missing. `deleteSample`
+  clears the note; returns `null` when the sample is missing or the existing
+  document fails `JokeSampleSchema`. `deleteSample`
   returns `false` for an id failing `TasteDocIdSchema` or a missing document.
 - `loadTasteProfile` never throws: an empty or non-string uid, or any storage
   error, yields `emptyTasteProfile()`. It keeps active samples with valid
@@ -111,9 +115,21 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   are never padded with unrated jokes. Exemplar ordering prefers website
   sources (`isWebsiteSource`), then higher average, then a random draw, then
   document id.
+- `fetchJokeExemplars` runs a second query (`jokes`
+  `orderBy('dateAdded', 'desc').limit(200)`) whenever the primary pool has
+  fewer than `JOKE_GENERATION_LIMITS.exemplarJokes` items or fewer than 2
+  distinct non-empty categories, not only when the primary query fails.
+- Exemplar, avoid and library readers take the text from `text`, falling back
+  to `jokeText`; either must pass `validText` (at most `contextTextChars`
+  characters and a non-empty normalized key).
+- The downvote reader is not scoped to a user: it reads
+  `generatedJokeFeedback where vote == 'down' limit 50` across all users and
+  sorts by `updatedAt` in memory.
 - Read failures in `jokeExemplars.ts` are swallowed: the exemplar fallback
   query keeps any already qualified pool, avoid examples degrade to empty
   parts, and `fetchLibraryJokeTexts` returns `[]` without caching the failure.
+  `fetchJokeExemplars` and `fetchAvoidExamples` cache whatever they computed
+  for 60 seconds, including empty results after swallowed failures.
 
 ## Side Effects
 
@@ -122,7 +138,9 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
 - Firestore writes via the Admin SDK: `upsertFeedback` (transactional
   `set`/`delete` on `generatedJokeFeedback`), `clearFeedback` (batched deletes,
   400 per batch), `createSample`/`updateSample` (transactional `set`),
-  `deleteSample` (`delete`). Feedback documents store `userId`, `jokeText`,
+  `deleteSample` (`delete`). Sample documents store `text`, `note`, `active`,
+  `createdAt`, `updatedAt`; `active` reads as `true` when absent. Feedback
+  documents store `userId`, `jokeText`,
   `category`, `vote`, `reason`, `saved`, `topicHint`, `model`, `mode`,
   `requestId`, `createdAt`, `updatedAt`.
 - Module-level in-memory caches in `jokeExemplars.ts` (`cache`, `avoidCache`,

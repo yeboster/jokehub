@@ -86,10 +86,13 @@ Admin-SDK (server-only) operations live in the `server/` subdirectory.
   `funnyRate`. Unrated band = `ratingCount == 0`; other bands =
   `averageRating >= bucket.gte` with `orderBy('averageRating', 'desc')` placed
   before `orderBy('dateAdded', 'desc')`.
-- Missing-index handling (`isMissingIndexError`): `fetchJokes` either drops
-  the rating band from the query and applies it client-side
-  (`ratingFilterDegraded: true`, sticky across pages pulled by one call), or
-  drops the ordering and sorts by `dateAdded` client-side. The cursor
+- Missing-index handling (`isMissingIndexError`) in `fetchJokes`: for rating
+  bands 1-5 (`shouldDegradeRatingFilter`; the unrated band 0 never degrades),
+  the fallback first retries without the rating band, keeping the `dateAdded`
+  ordering, and applies the band client-side (`ratingFilterDegraded: true`,
+  sticky across pages pulled by one call). If that retry also misses an index,
+  or for every other filter combination, it drops the ordering and sorts by
+  `dateAdded` client-side. Both can apply to one call. The cursor
   (`lastVisible`) and `hasMore` always come from the raw query docs.
   `fetchUserFiveStarJokes` and `fetchAllRatingsForJoke` drop `orderBy` and
   sort client-side on the same error.
@@ -101,8 +104,9 @@ Admin-SDK (server-only) operations live in the `server/` subdirectory.
 - `toggleJokeUsed`, `updateJoke` and `deleteJoke` throw unless the stored
   `userId` equals the caller's `userId`; a missing joke throws
   `Joke not found.` (`getJokeById` returns `null` instead).
-- `updateJoke`: changing `text` regenerates `keywords` and clears
-  `explanation` unless an explicit `explanation` is passed; an empty patch
+- `updateJoke`: `text` in the patch always regenerates `keywords`, even when
+  unchanged; `explanation` is set to `''` only when the new text differs from
+  the stored text, unless an explicit `explanation` is passed; an empty patch
   makes no write. A non-empty `category` in the patch goes through
   `ensureCategoryExists`.
 - `deleteJoke` deletes every `jokeRatings` doc for the joke, then the joke
@@ -112,12 +116,19 @@ Admin-SDK (server-only) operations live in the `server/` subdirectory.
   default `''`, `funnyRate` default 0.
 - Ratings: one document per user per joke (`ratingDocId`). `stars` must be
   1-5 and `comment` at most 1000 characters, else `submitUserRating` throws.
+  It also throws `Joke ${jokeId} not found.` when the joke document is
+  missing, and stores `comment` trimmed, or `null` when blank or absent.
+- `fetchAllRatingsForJoke` wraps any non-index failure, and any failure of the
+  fallback query, as `Error('Failed to fetch ratings for joke ${jokeId}.')`.
   The transaction reads the joke and rating docs before any write, updates
   `ratingSum`, `ratingCount` and `averageRating` (rounded to one decimal), and
   preserves the rating's `createdAt` on update. Legacy jokes without
   `ratingSum` derive it as `round(averageRating * ratingCount)`.
-- `ensureCategoryExists` throws on a blank name; `subscribeToUserCategories`
-  drops documents without a non-blank string `name`.
+- `ensureCategoryExists` throws on a blank name and looks the category up with
+  an exact, case-sensitive `name ==` match on the trimmed name.
+- `subscribeToUserCategories` drops documents without a non-blank string
+  `name` and emits each name trimmed. Its error callback receives a generic
+  `new Error('Could not load user categories.')`, not the Firestore error.
 - `tasteService.ts` sends `Authorization: Bearer <ID token>` on every request
   and validates every response body with a zod schema.
 

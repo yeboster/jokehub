@@ -56,7 +56,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
   - `readGenerationStream(body, onFrame)` reads the stream and resolves with the output of the `result` frame.
 - `tasteProfile.ts`:
   - Constants: `FEEDBACK_API_PATH` (`'/api/generated-joke-feedback'`), `SAMPLES_API_PATH` (`'/api/joke-samples'`), and `TASTE_LIMITS`.
-  - Schemas: `TasteDocIdSchema`, `FeedbackVoteSchema`, `FeedbackUpsertSchema`, `GenerationFeedbackSchema`, `FeedbackCountsSchema`, `SampleCreateSchema`, `SampleUpdateSchema`, and `JokeSampleSchema`, each with an inferred type.
+  - Schemas: `TasteDocIdSchema`, `FeedbackVoteSchema`, `FeedbackUpsertSchema`, `GenerationFeedbackSchema`, `FeedbackCountsSchema`, `SampleCreateSchema`, `SampleUpdateSchema`, and `JokeSampleSchema`. Each has an exported inferred type except `TasteDocIdSchema`; `FeedbackUpsertInput` (`z.input<typeof FeedbackUpsertSchema>`) is also exported.
   - Types: `TasteExample` and `TasteProfile`.
   - Functions: `emptyTasteProfile()` and `isEmptyTasteProfile(profile)`.
 - `studioBatches.ts`:
@@ -125,7 +125,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
 - **Rate limiter (`rateLimit`):**
   - Each key has a fixed window that starts at its first request.
   - Denied requests still increment the count.
-  - `retryAfterSeconds` is at least 1.
+  - The first request in a window returns `retryAfterSeconds = Math.ceil(windowMs / 1000)`. Later requests return at least 1.
   - Expired windows are pruned on every call.
 - **Client IP (`clientIpFrom`):** the first hop of `x-forwarded-for`, then `x-real-ip`, then `'unknown'`.
 - **Rate-limit keys (`rateLimitKeyFor`):** `${scope}:user:${userId}` when a user ID is given, otherwise `${scope}:ip:${ip}`.
@@ -147,16 +147,19 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
   - `JokeVariationSchema.category` must contain non-whitespace.
   - `GenerationResultSchema` requires 1–5 jokes, a non-empty `model`, and an integer `requestedCount` from 1 to 5.
 - **Normalization:** `normalizeJokeKey` applies NFKC and lowercase, strips everything except letters, numbers, marks, and whitespace, collapses whitespace, and trims.
-- **Merging:** `mergeUniqueJokeTexts` reads `primary` then `secondary` and stops at `cap`. It keeps the first occurrence of each normalized key and does not validate input bounds.
+- **Merging:** `mergeUniqueJokeTexts` reads `primary` then `secondary` and stops at `cap`. It keeps the first occurrence of each normalized key, skips texts whose normalized key is empty, and does not validate input bounds.
 - **Near-duplicates (`isNearDuplicateJoke`):**
-  - Equal keys are duplicates.
+  - If either normalized key is empty, the result is false (two texts that both normalize to `''` are not duplicates).
+  - Otherwise equal keys are duplicates.
   - Otherwise stopwords are removed. If either side has fewer than 3 remaining words (`NEAR_DUPLICATE_MIN_WORDS`), the result is false.
   - Otherwise the result is a Jaccard similarity of at least 0.6 (`NEAR_DUPLICATE_SIMILARITY`).
 - **Stream format (`readGenerationStream`):**
   - The body is NDJSON, one frame per `\n`-delimited line. Blank lines are skipped.
   - Every frame needs a non-empty `requestId` that matches the first frame's.
   - No frame may follow the `result` frame.
-  - A `progress` frame needs a known stage, a finite `elapsedMs >= 0`, and an integer `callCount` from 0 to `MAX_GENERATION_CALLS`.
+  - A `progress` frame needs a known stage, a finite `elapsedMs >= 0`, an integer `callCount` from 0 to `MAX_GENERATION_CALLS`, and a string `model` when `model` is present.
+  - An `error` frame needs string `error` and `code` fields. A `heartbeat` frame needs a finite `elapsedMs >= 0`.
+  - A frame `type` other than `progress`, `heartbeat`, `error` or `result` is rejected.
 - **Stream handling (`readGenerationStream`):**
   - `onFrame` runs before error or result handling.
   - An `error` frame throws `frame.error`.
@@ -164,7 +167,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
   - Frames and chunks have no size cap, on purpose.
   - The `finally` block always cancels the reader and releases its lock.
 - **Taste schemas:**
-  - `TASTE_LIMITS` sets `maxSamples: 50`, `feedbackPage: 100`, `noteChars: 200`, `categoryChars: 100`, and `modelChars: 100`.
+  - `TASTE_LIMITS` sets `maxSamples: 50`, `feedbackPage: 100`, `noteChars: 200`, `reasonChars: JOKE_GENERATION_LIMITS.tasteReasonChars` (200), `categoryChars: 100`, and `modelChars: 100`.
   - `TasteDocIdSchema` is `/^[a-f0-9]{32}$/`.
   - In `FeedbackUpsertSchema`, the vote `'none'` becomes `null`.
 - **Stored studio batches:**
@@ -193,7 +196,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
   - Picker values map as 0 to unrated, 1–4 to `{ gte: n }`, and 5 to `{ gte: 4.5 }`. Any other value maps to `null`.
   - `ratingBucketLabel` returns `'Any rating'` by default.
 - **Degraded rating filter:** `shouldDegradeRatingFilter` is true only for a missing-index error with a non-unrated rating bucket. In that case the feed retries without the rating constraint and applies the band on the client.
-- **Search tokens:** keywords are lowercase, stripped of punctuation, longer than 2 characters, and unique in first-seen order. `generateSearchTokens` returns at most 10.
+- **Search tokens:** keywords are lowercase, split on whitespace, stripped of the characters `. , ! ? ; : ( ) " '` and backtick (other punctuation such as `-` is kept), longer than 2 characters, and unique in first-seen order. `generateSearchTokens` returns at most 10.
 
 ### UI copy and helpers
 - **Feed URL storage:** `rememberFeedUrl` and `readFeedUrl` accept only `'/jokes'` or URLs that start with `'/jokes?'`. `readFeedUrl` falls back to `FEED_PATH`. Storage errors are swallowed.
@@ -223,7 +226,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
   - Logs with `console.error` or `console.warn` on configuration problems and verification failures.
 - **`rateLimit.ts`:** keeps a module-level mutable `Map` (`windows`) of counters per process. Nothing is shared across instances. `userRouteGuard.requireUser` changes this state.
 - **`userRouteGuard.ts`:** `readJson` consumes `request.json()`. `internalError` logs `console.error('[taste-api]', { scope, method, code, errorName })`.
-- **`firestoreErrors.ts`:** `warnMissingIndex` calls `console.warn` and includes the Firebase console index URL when one is present.
+- **`firestoreErrors.ts`:** `warnMissingIndex` calls `console.warn` and includes the Firebase console index URL when one is present; otherwise it includes the full error message.
 - **`siteUrl.ts`:** `SITE_URL` reads `NEXT_PUBLIC_SITE_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, and `VERCEL_URL` once at import, using static `process.env` member access.
 - **`feedReturn.ts`:** reads and writes the `jokehub:last-feed-url` key on a storage object the caller passes in.
 - **`studioBatches.ts`:**
