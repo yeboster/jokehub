@@ -73,3 +73,5 @@ evaluation toolkit in a subdirectory. Script tests are picked up by Vitest via t
 - Run: `npm test -- scripts` (all script suites)
 - Focused: `npm test -- scripts/firestore-deploy.test.ts` (mocks `google-auth-library` and
   stubs global `fetch`; no live Firebase calls)
+- Focused: `npm test -- scripts/deploy-firestore.test.ts` (CLI wrapper; mocks `dotenv/config`,
+  `fs` and `./firestore-deploy`)

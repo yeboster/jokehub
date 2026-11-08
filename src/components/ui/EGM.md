@@ -61,4 +61,4 @@ These are shared shadcn-style presentational primitives. Most wrap a Radix UI pa
 
 ## Verification
 
-- Run: `npm test`. This directory has no test files of its own.
+- Focused: `npm test -- src/components/ui/form.test.tsx` (the `useFormField` guard and label/control ids). Full suite: `npm test`.

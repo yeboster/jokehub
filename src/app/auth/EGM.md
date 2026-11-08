@@ -7,7 +7,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
 - `default AuthPage` in `page.tsx`. It wraps `AuthPageComponent` in `Suspense`, with fallback `PageLoading`.
 - Module-private:
   - `AuthPageComponent`: the form.
-  - `looksLikeEmail(value)`: a minimal shape check: an `@` that is not the first character, then a `.` with at least one character between the `@` and it, and the `.` not the last character.
+  - `looksLikeEmail(value)`: a minimal shape check: an `@` that is not the first character; the first `.` after the `@` must have at least one character between it and the `@`, and must not be the last character.
 - `default AuthLayout` in `layout.tsx`. It sets `metadata.title = 'Log in'` and renders its children unchanged.
 - Query param `redirect`: where to go after sign-in. Defaults to `'/jokes'`.
 

@@ -86,7 +86,7 @@ routes `src/app/api/generate-joke/route.ts` and
   - a provider `status` in `FALLBACK_STATUSES`.
 - Provider statuses outside `FALLBACK_STATUSES` are rethrown immediately.
 - A step parser error that is not an `UnusableOutputError` is rethrown immediately, with no fallback and no cool-down mark.
-- Every failed attempt calls `markModelFailure`, except a timeout whose per-attempt timeout was cut below `STEP_TIMEOUT_MS[step]` by the remaining budget (`blameModel`).
+- Every failed attempt that falls through to fallback calls `markModelFailure`, except a timeout whose per-attempt timeout was cut below `STEP_TIMEOUT_MS[step]` by the remaining budget (`blameModel`). Attempts that throw instead (a provider status outside `FALLBACK_STATUSES`, a caller abort, or a non-`UnusableOutputError` parser error) are not marked.
 - The runner skips fallback when less than `MIN_FALLBACK_REMAINING_MS` remains.
 - When the chain is exhausted, the runner throws one of these:
   - the last step-specific `UnusableOutputError`, if the last failure was output;

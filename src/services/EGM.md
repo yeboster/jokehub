@@ -118,12 +118,12 @@ Admin-SDK (server-only) operations live in the `server/` subdirectory.
   1-5 and `comment` at most 1000 characters, else `submitUserRating` throws.
   It also throws `Joke ${jokeId} not found.` when the joke document is
   missing, and stores `comment` trimmed, or `null` when blank or absent.
-- `fetchAllRatingsForJoke` wraps any non-index failure, and any failure of the
-  fallback query, as `Error('Failed to fetch ratings for joke ${jokeId}.')`.
   The transaction reads the joke and rating docs before any write, updates
   `ratingSum`, `ratingCount` and `averageRating` (rounded to one decimal), and
   preserves the rating's `createdAt` on update. Legacy jokes without
   `ratingSum` derive it as `round(averageRating * ratingCount)`.
+- `fetchAllRatingsForJoke` wraps any non-index failure, and any failure of the
+  fallback query, as `Error('Failed to fetch ratings for joke ${jokeId}.')`.
 - `ensureCategoryExists` throws on a blank name and looks the category up with
   an exact, case-sensitive `name ==` match on the trimmed name.
 - `subscribeToUserCategories` drops documents without a non-blank string

@@ -119,8 +119,9 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   `orderBy('dateAdded', 'desc').limit(200)`) whenever the primary pool has
   fewer than `JOKE_GENERATION_LIMITS.exemplarJokes` items or fewer than 2
   distinct non-empty categories, not only when the primary query fails.
-- Exemplar, avoid and library readers take the text from `text`, falling back
-  to `jokeText`; either must pass `validText` (at most `contextTextChars`
+- Exemplar, library and low-rated avoid readers take the text from `text`,
+  falling back to `jokeText`; the downvote reader reads only `jokeText`. Either
+  must pass `validText` (at most `contextTextChars`
   characters and a non-empty normalized key).
 - The downvote reader is not scoped to a user: it reads
   `generatedJokeFeedback where vote == 'down' limit 50` across all users and

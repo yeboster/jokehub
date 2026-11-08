@@ -36,4 +36,4 @@ The `/edit-joke/[jokeId]` route: an owner-only form for editing or deleting a jo
 - Toasts, and client navigation to `/jokes` or `/auth`.
 
 ## Verification
-- No colocated test file in this directory. Run the full suite: `npm test`
+- Focused: `npm test -- 'src/app/edit-joke/[jokeId]/page.test.tsx'` (the "Nothing to save" check). Full suite: `npm test`
