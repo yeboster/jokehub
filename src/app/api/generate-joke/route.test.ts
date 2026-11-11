@@ -157,6 +157,18 @@ describe('generation route context', () => {
     expect(input.libraryJokes).toEqual(['Library joke']);
     expect(mocks.limit).toHaveBeenCalledWith(1000);
   });
+  it.each([
+    { via: 'firebase', userId: 'downvoter' },
+    { via: 'api-token', userId: 'api-user' },
+  ])('avoids only the $via caller own thumbs-down jokes', async ({ via, userId }) => {
+    mocks.auth.mockResolvedValue({ success: true, via, userId });
+    const where = vi.fn();
+    where.mockReturnValue({ where, limit: () => ({ get: async () => ({ docs: [doc('d', { jokeText: `Dud for ${userId}`, vote: 'down' })] }) }) });
+    mocks.collection.mockImplementation((name: string) => name === 'generatedJokeFeedback' ? { where } : { orderBy: mocks.order });
+    expect((await POST(request({}))).status).toBe(200);
+    expect(where).toHaveBeenCalledWith('userId', '==', userId);
+    expect(mocks.generate.mock.calls[0][0].avoidJokes).toEqual([`Dud for ${userId}`]);
+  });
   it('skips every server read when the caller opts out; clients cannot supply avoid examples', async () => {
     expect((await POST(request({ useServerExemplars: false, avoidJokes: ['client cannot inject'] }))).status).toBe(200);
     expect(mocks.get).not.toHaveBeenCalled();

@@ -5,7 +5,7 @@ type Exemplar = { id: string; text: string; category: string; average: number; f
 type Document = { id: string; data(): Record<string, unknown> };
 type Band = { min: number; max: number };
 const cache = new Map<number, { texts: string[]; expiresAt: number }>();
-const avoidCache: { texts: string[]; expiresAt: number } = { texts: [], expiresAt: 0 };
+const avoidCache = new Map<string, { texts: string[]; expiresAt: number }>();
 const libraryCache: { texts: string[]; expiresAt: number } = { texts: [], expiresAt: 0 };
 const TTL_MS = 60_000;
 /** Thumbs up/down on generated jokes; written by `/api/generated-joke-feedback`. */
@@ -65,15 +65,16 @@ export async function fetchJokeExemplars(limitCount: number = JOKE_GENERATION_LI
   const cached = cache.get(limitCount);
   if (cached && cached.expiresAt > now) return [...cached.texts];
   const pool: Exemplar[] = [];
+  let readFailed = false;
   try {
     const snapshot = await adminDb.collection('jokes').orderBy('averageRating', 'desc').limit(POOL_SIZE).get();
     qualify(snapshot.docs, pool, GOOD);
-  } catch { /* Missing index/network: try bounded recent pool below. */ }
+  } catch { readFailed = true; /* Missing index/network: try bounded recent pool below. */ }
   if (pool.length < JOKE_GENERATION_LIMITS.exemplarJokes || new Set(pool.map(item => item.category).filter(Boolean)).size < 2) {
     try {
       const snapshot = await adminDb.collection('jokes').orderBy('dateAdded', 'desc').limit(POOL_SIZE).get();
       qualify(snapshot.docs, pool, GOOD);
-    } catch { /* Preserve qualified primary pool when fallback fails. */ }
+    } catch { readFailed = true; /* Preserve qualified primary pool when fallback fails. */ }
   }
   const buckets = new Map<string, Exemplar[]>();
   for (const item of pool) {
@@ -93,7 +94,8 @@ export async function fetchJokeExemplars(limitCount: number = JOKE_GENERATION_LI
     }
     if (!added) break;
   }
-  cache.set(limitCount, { texts, expiresAt: now + TTL_MS });
+  // A result built after a failed read is served once but not cached.
+  if (!readFailed) cache.set(limitCount, { texts, expiresAt: now + TTL_MS });
   return [...texts];
 }
 
@@ -102,36 +104,46 @@ function toMillis(value: unknown): number {
   return typeof millis === 'number' && Number.isFinite(millis) ? millis : 0;
 }
 
-/** Most recent thumbs-down generated jokes; equality-only query needs no composite index. */
-async function fetchRecentDownvotes(): Promise<string[]> {
+/** The user's most recent thumbs-down generated jokes; equality-only query needs no composite index. Null on a failed read. */
+async function fetchRecentDownvotes(userId: string): Promise<string[] | null> {
   try {
-    const snapshot = await adminDb.collection(GENERATED_JOKE_FEEDBACK_COLLECTION).where('vote', '==', 'down').limit(DOWNVOTE_POOL_SIZE).get();
+    const snapshot = await adminDb.collection(GENERATED_JOKE_FEEDBACK_COLLECTION)
+      .where('userId', '==', userId).where('vote', '==', 'down').limit(DOWNVOTE_POOL_SIZE).get();
     return snapshot.docs
       .map((doc: Document) => doc.data())
       .filter(data => validText(data.jokeText))
       .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt))
       .map(data => data.jokeText as string);
   } catch {
-    return []; // Avoid examples are optional context.
+    return null; // Avoid examples are optional context.
   }
 }
 
-/** Recent thumbs-down generated jokes first, then jokes rated 1–2 stars, lowest first. */
-export async function fetchAvoidExamples(): Promise<string[]> {
+/**
+ * The user's recent thumbs-down generated jokes first, then jokes rated 1–2 stars,
+ * lowest first. Without a user id, only the low-rated jokes are used.
+ */
+export async function fetchAvoidExamples(userId?: string): Promise<string[]> {
   const now = Date.now();
-  if (avoidCache.expiresAt > now) return [...avoidCache.texts];
+  const key = userId ?? '';
+  const cached = avoidCache.get(key);
+  if (cached && cached.expiresAt > now) return [...cached.texts];
   const pool: Exemplar[] = [];
-  const [downvotes] = await Promise.all([
-    fetchRecentDownvotes(),
+  const [downvotes, lowRatedRead] = await Promise.all([
+    userId ? fetchRecentDownvotes(userId) : Promise.resolve([]),
     adminDb.collection('jokes').orderBy('averageRating', 'asc').limit(AVOID_POOL_SIZE).get()
-      .then(snapshot => qualify(snapshot.docs, pool, BAD))
-      .catch(() => { /* Avoid examples are optional context. */ }),
+      .then(snapshot => { qualify(snapshot.docs, pool, BAD); return true; })
+      .catch(() => false), // Avoid examples are optional context.
   ]);
   const lowRated = pool
     .sort((a, b) => a.average - b.average || a.draw - b.draw || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map(item => item.text);
-  const texts = mergeUniqueJokeTexts(mergeUniqueJokeTexts(downvotes, [], DOWNVOTE_LIMIT), lowRated, AVOID_LIMIT);
-  Object.assign(avoidCache, { texts, expiresAt: now + TTL_MS });
+  const texts = mergeUniqueJokeTexts(mergeUniqueJokeTexts(downvotes ?? [], [], DOWNVOTE_LIMIT), lowRated, AVOID_LIMIT);
+  // A result built after a failed read is served once but not cached.
+  if (downvotes && lowRatedRead) {
+    for (const [cachedKey, entry] of avoidCache) if (entry.expiresAt <= now) avoidCache.delete(cachedKey);
+    avoidCache.set(key, { texts, expiresAt: now + TTL_MS });
+  }
   return [...texts];
 }
 

@@ -11,7 +11,7 @@ beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(0);
   mocks.collection.mockImplementation((name: string) => name === 'generatedJokeFeedback'
     ? { where: mocks.where } : { orderBy: mocks.order });
-  mocks.where.mockReturnValue({ limit: () => ({ get: mocks.feedback }) });
+  mocks.where.mockImplementation(() => ({ where: mocks.where, limit: () => ({ get: mocks.feedback }) }));
   mocks.feedback.mockResolvedValue({ docs: [] });
   mocks.order.mockReturnValue({ limit: mocks.limit });
   mocks.limit.mockReturnValue({ get: mocks.get });
@@ -70,6 +70,17 @@ describe('fetchJokeExemplars', () => {
     mocks.get.mockRejectedValue(new Error('offline'));
     expect(await (await fetcher())()).toEqual([]);
   });
+  it.each([
+    { name: 'primary', setup: () => mocks.get.mockRejectedValueOnce(new Error('primary')).mockResolvedValueOnce({ docs: [doc('fallback')] }) },
+    { name: 'fallback', setup: () => mocks.get.mockResolvedValueOnce({ docs: [doc('primary')] }).mockRejectedValueOnce(new Error('fallback')) },
+    { name: 'primary and fallback', setup: () => mocks.get.mockRejectedValueOnce(new Error('primary')).mockRejectedValueOnce(new Error('fallback')) },
+  ])('does not cache a result computed after a failed $name read', async ({ setup }) => {
+    setup();
+    const fetch = await fetcher();
+    await fetch(5);
+    mocks.get.mockResolvedValue({ docs: [doc('later')] });
+    expect(await fetch(5)).toEqual(['Joke later']);
+  });
   it('dense varied pool avoids fallback; dense single category still falls back', async () => {
     mocks.get.mockResolvedValue({ docs: Array.from({ length: 25 }, (_, i) => doc(`${i}`, { category: i % 2 ? 'Space' : 'Work' })) });
     expect(await (await fetcher())()).toHaveLength(25);
@@ -118,8 +129,32 @@ describe('fetchAvoidExamples', () => {
     const vote = (id: string, jokeText: string, at: number) => ({ id, data: () => ({ jokeText, vote: 'down', updatedAt: { toMillis: () => at } }) });
     mocks.feedback.mockResolvedValueOnce({ docs: [vote('old', 'Old dud', 1), vote('new', 'New dud', 3), vote('mid', 'Mid dud', 2), vote('x', 'Joke one', 4), vote('older', 'Oldest dud', 0)] });
     mocks.get.mockResolvedValueOnce({ docs: [doc('one', { averageRating: 1 }), doc('two', { averageRating: 2 })] });
-    expect(await (await avoider())()).toEqual(['Joke one', 'New dud', 'Mid dud', 'Old dud', 'Joke two']);
+    expect(await (await avoider())('u1')).toEqual(['Joke one', 'New dud', 'Mid dud', 'Old dud', 'Joke two']);
     expect(mocks.where).toHaveBeenCalledWith('vote', '==', 'down');
+  });
+  it('reads only the requesting user downvotes and caches them per user', async () => {
+    const vote = (jokeText: string) => ({ id: jokeText, data: () => ({ jokeText, vote: 'down', updatedAt: { toMillis: () => 1 } }) });
+    mocks.feedback.mockImplementation(async () => ({ docs: [vote(`Dud of ${mocks.where.mock.calls.at(-2)?.[2]}`)] }));
+    const fetch = await avoider();
+    expect(await fetch('u1')).toEqual(['Dud of u1']);
+    expect(await fetch('u2')).toEqual(['Dud of u2']);
+    expect(await fetch('u1')).toEqual(['Dud of u1']);
+    expect(mocks.where.mock.calls).toEqual([['userId', '==', 'u1'], ['vote', '==', 'down'], ['userId', '==', 'u2'], ['vote', '==', 'down']]);
+  });
+  it('reads no downvotes without a user id', async () => {
+    mocks.get.mockResolvedValueOnce({ docs: [doc('one', { averageRating: 1 })] });
+    expect(await (await avoider())()).toEqual(['Joke one']);
+    expect(mocks.collection).not.toHaveBeenCalledWith('generatedJokeFeedback');
+  });
+  it.each([
+    { name: 'downvote read', fail: () => mocks.feedback.mockRejectedValueOnce(new Error('offline')) },
+    { name: 'low-rated read', fail: () => mocks.get.mockRejectedValueOnce(new Error('offline')) },
+  ])('does not cache a result computed after a failed $name', async ({ fail }) => {
+    fail();
+    const fetch = await avoider();
+    await fetch('u1');
+    mocks.get.mockResolvedValue({ docs: [doc('one', { averageRating: 1 })] });
+    expect(await fetch('u1')).toEqual(['Joke one']);
   });
   it('degrades to no examples when the read fails', async () => {
     mocks.get.mockRejectedValue(new Error('offline'));

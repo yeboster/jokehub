@@ -27,9 +27,11 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   joke texts whose `averageRating` is 4-5 and `ratingCount >= 1`, round-robin
   across normalized categories. Throws `RangeError` when `limitCount` is not an
   integer from 1 to `JOKE_GENERATION_LIMITS.exemplarJokes`.
-- `fetchAvoidExamples(): Promise<string[]>`: up to 4 recent thumbs-down
-  generated jokes (`vote == 'down'`), then jokes rated 1-2 stars (lowest
-  first), at most 6 texts in total, merged through `mergeUniqueJokeTexts`.
+- `fetchAvoidExamples(userId?: string): Promise<string[]>`: up to 4 recent
+  thumbs-down generated jokes of `userId` (`userId == userId`,
+  `vote == 'down'`), then jokes rated 1-2 stars (lowest first), at most 6
+  texts in total, merged through `mergeUniqueJokeTexts`. Without `userId`, no
+  downvotes are read.
 - `fetchLibraryJokeTexts(): Promise<string[]>`: saved joke texts, newest
   `dateAdded` first, up to `JOKE_GENERATION_LIMITS.libraryJokes`.
 
@@ -111,7 +113,8 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
 - Undefined values are stripped (`compact`) before any Firestore write.
 - `jokeExemplars.ts` reads are bounded (`POOL_SIZE` 200, `AVOID_POOL_SIZE`
   100, `DOWNVOTE_POOL_SIZE` 50) and results are cached in module memory for 60
-  seconds (`TTL_MS`); callers receive copies of cached arrays. Exemplar pools
+  seconds (`TTL_MS`), avoid examples per `userId`; callers receive copies of
+  cached arrays. Exemplar pools
   are never padded with unrated jokes. Exemplar ordering prefers website
   sources (`isWebsiteSource`), then higher average, then a random draw, then
   document id.
@@ -123,14 +126,13 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   falling back to `jokeText`; the downvote reader reads only `jokeText`. Either
   must pass `validText` (at most `contextTextChars`
   characters and a non-empty normalized key).
-- The downvote reader is not scoped to a user: it reads
-  `generatedJokeFeedback where vote == 'down' limit 50` across all users and
-  sorts by `updatedAt` in memory.
+- The downvote reader is scoped to one user: it reads
+  `generatedJokeFeedback where userId == userId where vote == 'down' limit 50`
+  and sorts by `updatedAt` in memory.
 - Read failures in `jokeExemplars.ts` are swallowed: the exemplar fallback
   query keeps any already qualified pool, avoid examples degrade to empty
-  parts, and `fetchLibraryJokeTexts` returns `[]` without caching the failure.
-  `fetchJokeExemplars` and `fetchAvoidExamples` cache whatever they computed
-  for 60 seconds, including empty results after swallowed failures.
+  parts, and `fetchLibraryJokeTexts` returns `[]`. A result computed after any
+  failed read is returned but not cached, so the next call reads again.
 
 ## Side Effects
 
@@ -145,7 +147,8 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   `category`, `vote`, `reason`, `saved`, `topicHint`, `model`, `mode`,
   `requestId`, `createdAt`, `updatedAt`.
 - Module-level in-memory caches in `jokeExemplars.ts` (`cache`, `avoidCache`,
-  `libraryCache`).
+  `libraryCache`). Expired `avoidCache` entries are removed when a new entry is
+  stored.
 - `console.warn` on a missing feedback index (`[taste-store]`) and on a failed
   taste-profile load (`[taste-profile]`).
 

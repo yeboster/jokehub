@@ -51,7 +51,7 @@ Route handler for `POST /api/generate-joke`. It validates the request, loads ser
 
 ## Side Effects
 - Paid AI calls through `generateJoke(...)`.
-- Firestore reads through `fetchJokeExemplars`, `fetchAvoidExamples` and `fetchLibraryJokeTexts` (`@/services/server/jokeExemplars`), and through `loadTasteProfile` (`@/services/server/tasteStore`).
+- Firestore reads through `fetchJokeExemplars`, `fetchAvoidExamples(authResult.userId)` and `fetchLibraryJokeTexts` (`@/services/server/jokeExemplars`), and through `loadTasteProfile` (`@/services/server/tasteStore`).
 - Structured logs to `console.info` and `console.error` under the `[joke-generation]` tag. Records carry `requestId`, stage, model, call count and timings.
 - Updates in-memory rate-limit state (`@/lib/rateLimit`).
 

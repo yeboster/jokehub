@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         ? Promise.resolve().then(() => loadTasteProfile(userId)).then(sanitizeTasteProfile).catch(() => { log('taste-unavailable'); return undefined; })
         : Promise.resolve(undefined);
       const [[serverExemplars, avoidJokes, libraryJokes], taste] = useServer || userId ? await Promise.all([
-        useServer ? Promise.all([fetchJokeExemplars(), fetchAvoidExamples(), fetchLibraryJokeTexts()]) : Promise.resolve([[], [], []] as string[][]),
+        useServer ? Promise.all([fetchJokeExemplars(), fetchAvoidExamples(authResult.userId), fetchLibraryJokeTexts()]) : Promise.resolve([[], [], []] as string[][]),
         tasteLoad,
       ]) : [[[], [], []] as string[][], undefined];
       if (taste) log('taste-loaded', { samples: taste.samples.length, liked: taste.liked.length, disliked: taste.disliked.length });
