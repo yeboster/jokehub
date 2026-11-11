@@ -23,7 +23,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
   | Password | Shorter than 6 characters | `'Passwords are at least 6 characters.'` |
 
 - After a failed check, focus moves to the first invalid field.
-- The email is validated after `trim()`, but `signIn`/`signUp` receive the untrimmed value.
+- The email field is `type="email"`, whose value the browser sanitizes by stripping leading and trailing whitespace, so `signIn`/`signUp` receive it trimmed (pinned in `page.test.tsx`).
 - Firebase error codes are mapped to user copy:
   - `auth/invalid-credential`, `auth/user-not-found` and `auth/wrong-password` share one message.
   - `auth/email-already-in-use` and `auth/invalid-email` each have their own message.
@@ -38,4 +38,4 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
 - Logs errors with `console.error('Auth error:', ...)`.
 
 ## Verification
-- No colocated test file in this directory. Run the full suite: `npm test`
+- Focused: `npm test -- src/app/auth/page.test.tsx` (the email reaches `signIn`/`signUp` trimmed). Full suite: `npm test`
