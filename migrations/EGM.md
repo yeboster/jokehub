@@ -58,7 +58,9 @@ infrastructure.
   path. Both paths are relative to the process working directory, not this
   directory.
 - `001`: only handles jokes with `funnyRate > 0`. It adds a `jokeRatings` doc
-  for (`jokeId`, `userId` = joke owner) only if none exists. It then sets the
+  for (`jokeId`, `userId` = joke owner) only if none exists, created with
+  `add()`, so its id is auto-generated, not the `{jokeId}_{userId}` id the app
+  uses elsewhere. It then sets the
   joke's `averageRating` to
   `Math.floor(sum of stars / number of ratings)` and `ratingCount` to the
   number of ratings.

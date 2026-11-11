@@ -43,7 +43,8 @@ Route handler for `POST /api/generate-joke`. It validates the request, loads ser
 - A taste profile is loaded only when `authResult.via === 'id-token'` and `useTasteProfile !== false`.
 - Taste-profile loading never fails the request. Any error is logged as `taste-unavailable` and generation continues without taste.
 - Stored taste data is treated as untrusted. `sanitizeTasteProfile` drops invalid texts and enforces the `JOKE_GENERATION_LIMITS.taste*` caps.
-- Server exemplars are fetched unless `useServerExemplars === false`.
+- Unless `useServerExemplars === false`, the route fetches server exemplars, avoid examples and library jokes. With `false`, all three are empty.
+- Avoid examples use the caller's own thumbs-down feedback: `fetchAvoidExamples(authResult.userId)`, which is `'api-user'` for API-token callers. This does not depend on `useTasteProfile`.
 - Client and server exemplars are merged with `mergeUniqueJokeTexts`. They are not repeated in `prefilledJokes`.
 - `allowRepair` is enabled only when `process.env.JOKEHUB_ENABLE_JOKE_REPAIR === 'true'`.
 - A client disconnect (`request.signal` abort, or stream `cancel`) aborts the flow through an `AbortController` and clears the heartbeat interval.

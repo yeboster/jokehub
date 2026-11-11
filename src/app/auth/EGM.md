@@ -9,7 +9,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
   - `AuthPageComponent`: the form.
   - `looksLikeEmail(value)`: a minimal shape check: an `@` that is not the first character; the first `.` after the `@` must have at least one character between it and the `@`, and must not be the last character.
 - `default AuthLayout` in `layout.tsx`. It sets `metadata.title = 'Log in'` and renders its children unchanged.
-- Query param `redirect`: where to go after sign-in. Defaults to `'/jokes'`.
+- Query param `redirect`: where to go after sign-in. Defaults to `'/jokes'`. It is passed to `router.push` as given, with no same-origin or path check.
 
 ## Invariants
 - Once auth has loaded and `user` is set, the page calls `router.push(redirectPath)`.
@@ -23,6 +23,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
   | Password | Shorter than 6 characters | `'Passwords are at least 6 characters.'` |
 
 - After a failed check, focus moves to the first invalid field.
+- The email is validated after `trim()`, but `signIn`/`signUp` receive the untrimmed value.
 - Firebase error codes are mapped to user copy:
   - `auth/invalid-credential`, `auth/user-not-found` and `auth/wrong-password` share one message.
   - `auth/email-already-in-use` and `auth/invalid-email` each have their own message.

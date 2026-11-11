@@ -50,6 +50,7 @@ The Next.js App Router root. It holds the root layout (providers, navigation, sk
 - Full: `npm test`
 - Focused tests in this subtree:
   - `npm test -- src/app/add-joke/page.test.tsx`
+  - `npm test -- 'src/app/edit-joke/[jokeId]/page.test.tsx'`
   - `npm test -- src/app/api/generate-joke/route.test.ts`
   - `npm test -- src/app/api/generate-joke/route.integration.test.ts`
   - `npm test -- src/app/api/generated-joke-feedback/route.test.ts`

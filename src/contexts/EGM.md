@@ -49,7 +49,7 @@ Client-side React context providers (`"use client"`) for authentication and joke
 - Loading flags are cleared only by the newest request of the same kind (`initial` or `more`), tracked in `newestRequestByKindRef` (`ownsLoadingFlag`).
 - An initial fetch keeps the current `jokes` in place; it does not reset them to `null`. It clears `jokesError` and resets the pagination cursor `lastVisibleJokeDocRef`. `jokes === null` means only "no list yet" (`fetchJokesInternal`).
 - `loadedFilters` is set from the result of the newest successful initial fetch, a failed initial fetch, or the signed-out `scope === 'user'` short-circuit. It is never set at request time (`fetchJokesInternal`).
-- `jokesError` is set only by a failed initial fetch, and that fetch also sets `jokes` to `[]`. A failed load-more sets only `hasMoreJokes=false` and shows a toast (`fetchJokesInternal`).
+- Any failed joke fetch shows the destructive toast "Couldn't load jokes" (with `err.message`) and sets `hasMoreJokes=false`. Only a failed initial fetch also sets `jokes` to `[]` and sets `jokesError` (`fetchJokesInternal`).
 - `filters.scope === 'user'` with no signed-in user returns an empty list without calling `jokeService` and sets `hasMoreJokes=false`. On an initial fetch it also sets `jokesError=null` (`fetchJokesInternal`).
 - `loadMoreFilteredJokes` does nothing when `!hasMoreJokes || loadingMoreJokes`, and it reuses the filters from the last `loadJokesWithFilters` call (`activeFiltersRef`).
 - The provider has no auto-fetch effect. Pages call `loadJokesWithFilters` themselves (comment in `JokeContext.tsx`).
@@ -80,6 +80,6 @@ Client-side React context providers (`"use client"`) for authentication and joke
 ## Verification
 
 - No test files exist in this directory.
-- Test files that reference these modules: `src/app/add-joke/page.test.tsx`, `src/components/add-joke-form.test.tsx`, and `src/components/jokes/JokeFilterDialog.test.tsx`.
+- Test files that reference these modules: `src/app/add-joke/page.test.tsx`, `src/app/edit-joke/[jokeId]/page.test.tsx`, `src/components/add-joke-form.test.tsx`, `src/components/csv-import.test.tsx`, and `src/components/jokes/JokeFilterDialog.test.tsx`.
 - Run: `npm test`
 - Focused: `npm test -- src/components/add-joke-form.test.tsx`

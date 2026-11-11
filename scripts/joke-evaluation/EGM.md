@@ -69,9 +69,11 @@ Sample JSON inputs (`requests.v1.json`, `synthetic-old.v1.json`, `synthetic-new.
   (`cli.ts:options`, `cli.ts:integer`).
 - CLI `summarize` requires both `--old` and `--new`; `capture-live` requires the literal
   `--allow-live`, 40-hex revisions, per-variant ceilings of 2 or 4 calls, and
-  `cases * (oldMax + newMax) <= --max-model-calls` (`cli.ts:main`).
+  `cases <= --max-cases` and `cases * (oldMax + newMax) <= --max-model-calls`; otherwise it
+  throws "Declared allocation exceeds budget" (`cli.ts:main`).
 - `captureLive` charges each attempted model call before execution (including rejected calls),
-  enforces per-variant and total budgets, requires the adapter's declared `plan` to equal the
+  throws "Case budget exceeded" when `cases.length > maxCases`, enforces per-variant and total
+  budgets, requires the adapter's declared `plan` to equal the
   options, and records failures as `MODEL_BUDGET_EXHAUSTED`, `ADAPTER_FAILURE`, or
   `INVALID_ADAPTER_RESULT` (`live.ts:captureLive`).
 - The adapter import is a trust boundary, not a sandbox: only trusted audited code may be passed

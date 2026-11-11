@@ -9,7 +9,7 @@ Route handler for `POST /api/jokes/add`. A server-to-server endpoint for adding 
   - Body (`AddJokeSchema`, zod): `text: string (min 1)`, `category: string (min 1)`, `source?: string`.
   - `201` returns `{ id, text, category }`.
   - `400` returns `{ error: 'Invalid input', details }` when the schema check fails.
-  - `500` returns `{ error }` when `JOKEHUB_JARVIS_USER_ID` is unset or the write throws.
+  - `500` returns `{ error }` when `JOKEHUB_JARVIS_USER_ID` is unset, the body is not valid JSON (`request.json()` throws), or the write throws.
 
 ## Invariants
 - Only callers with the shared API token are accepted (`verifyApiToken`). Firebase ID tokens are not accepted here.
@@ -19,7 +19,7 @@ Route handler for `POST /api/jokes/add`. A server-to-server endpoint for adding 
 
 ## Side Effects
 - Firestore write: `adminDb.collection('jokes').doc().set(...)` creates a new `jokes/{autoId}` document. The Admin SDK bypasses security rules, as the comment in `route.ts` notes.
-- Logs to `console.error` when the env var is missing or the write fails.
+- Logs to `console.error` when the env var is missing, the body is not valid JSON, or the write fails.
 
 ## Verification
 - No colocated test file in this directory. Run the full suite: `npm test`

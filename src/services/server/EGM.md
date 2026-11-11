@@ -52,6 +52,9 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
 - `createSample(uid, input: SampleCreate): Promise<{ sample; created }>`.
 - `updateSample(uid, input: SampleUpdate): Promise<JokeSample | null>`.
 - `deleteSample(uid, id): Promise<boolean>`.
+- `upsertFeedback`, `createSample` and `updateSample` validate their input with
+  zod `.parse` (`FeedbackUpsertSchema`, `SampleCreateSchema`,
+  `SampleUpdateSchema`) and throw `ZodError` on invalid input.
 - `loadTasteProfile(uid): Promise<TasteProfile>`.
 
 ### `topJokes.ts`
@@ -73,7 +76,10 @@ Schemas, limits and types come from `@/lib/tasteProfile` and
   `/` with `Error('Invalid user id')`.
 - `upsertFeedback` merge rules: for `vote`/`reason`, `undefined` = unchanged,
   `null` (or legacy `'none'`) = clear. For `saved`, `category`, `topicHint`,
-  `model`, `requestId`, `undefined` = unchanged. `mode` is `change.mode`, or
+  `model`, `requestId`, `undefined` = unchanged. A blank or whitespace-only
+  `reason`, `category`, `topicHint`, `model` or `requestId` is trimmed to
+  `undefined` (`optionalText`) and dropped from the stored document, so it
+  clears the field. `mode` is `change.mode`, or
   the existing `mode` when not given. A reason is kept only alongside a vote; a
   changed vote without a new reason drops the old reason. A cleared vote is
   stored as `null`, never `'none'`. When the result has no vote and is not

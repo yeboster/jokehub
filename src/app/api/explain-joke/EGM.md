@@ -27,6 +27,7 @@ Route handler for `POST /api/explain-joke`. It streams an AI explanation of a st
 - The route checks that the joke exists before it generates or writes anything.
 - The explanation is saved with `jokeRef.update` (not `set`), so a joke deleted mid-stream is not recreated. It is saved only when the trimmed full explanation is non-empty.
 - A failed save is logged with `console.warn` and does not fail the stream.
+- When the flow fails after the `200` stream has started, the stream is ended with `controller.error(error)` instead of a JSON error body, and no explanation is saved. The `500` row covers only errors thrown before the response is returned.
 
 ## Side Effects
 - Firestore read: `adminDb.collection('jokes').doc(jokeId).get()`.

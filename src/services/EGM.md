@@ -30,6 +30,9 @@ Admin-SDK (server-only) operations live in the `server/` subdirectory.
   band of `averageRating`.
 - `buildJokesQuery(filters, userId?, lastVisibleJokeDoc?, { orderByDateAdded = true })`:
   exported for tests; returns `null` for `scope: 'user'` without a `userId`.
+  `scope: 'user'` adds `where('userId', '==', userId)`; `scope: 'public'` adds
+  no owner filter, so it returns every user's jokes. `usageStatus` `'used'` /
+  `'unused'` adds `where('used', '==', true | false)`.
 - `fetchJokes(filters, userId?, lastVisibleJokeDoc?)`: resolves to
   `{ jokes, lastVisible, hasMore, ratingFilterDegraded }`.
 - `addJoke({ text, category, source?, funnyRate? }, userId): Promise<string>`:
@@ -137,7 +140,8 @@ Admin-SDK (server-only) operations live in the `server/` subdirectory.
 - Client Firestore reads: `jokes`, `jokeRatings`, `categories`;
   `subscribeToUserCategories` opens a realtime `onSnapshot` listener.
 - Client Firestore writes: `jokes` (`addDoc`, batched `set`, `updateDoc`,
-  batched `delete`), `jokeRatings` (transactional `set` with merge, batched
+  batched `delete`, and the transactional `update` of `ratingSum`,
+  `ratingCount` and `averageRating` in `submitUserRating`), `jokeRatings` (transactional `set` with merge, batched
   `delete` in `deleteJoke`), `categories` (`addDoc`).
 - HTTP requests from `tasteService.ts` to `/api/generated-joke-feedback` and
   `/api/joke-samples`.

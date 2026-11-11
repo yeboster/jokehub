@@ -7,7 +7,7 @@ Route handlers for `/api/generated-joke-feedback`. They record and manage per-us
 - `POST(request: NextRequest)`:
   - Auth: `verifyRequestAuth`. It requires `success` and a `userId`, and accepts both API-token and ID-token callers. On failure it returns `{ error }` with `authResult.status ?? 401`.
   - Body: `FeedbackUpsertSchema` (`@/lib/tasteProfile`).
-  - `200` returns `{ ok: true, feedback }` from `upsertFeedback(userId, data)`.
+  - `200` returns `{ ok: true, feedback }` from `upsertFeedback(userId, data)`. `feedback` is `null` when the resulting vote is `null` and `saved` is false: the record is deleted.
   - Errors: `400` returns `{ error: 'Invalid input', code: 'INVALID_INPUT' }`. `429` returns `{ error }` with a `Retry-After` header. `500` returns `{ error: 'Could not save feedback. Please try again.', code: 'INTERNAL_ERROR' }`.
 - `GET(request: NextRequest)`:
   - Auth: `requireUser(request, 'taste-feedback')` from `@/lib/userRouteGuard`.
