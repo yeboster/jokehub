@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/co
 import { useToast } from '@/hooks/use-toast';
 import PageLoading from '@/components/PageLoading';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { safeRedirectPath } from '@/lib/authRedirect';
 
 /**
  * The shape check the browser used to do for `type="email"` before `noValidate`
@@ -45,7 +46,7 @@ function AuthPageComponent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const redirectPath = searchParams.get('redirect') || '/jokes'; // Default redirect to /jokes
+  const redirectPath = safeRedirectPath(searchParams.get('redirect'));
 
   useEffect(() => {
     if (!authLoading && user) {

@@ -82,6 +82,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
 - `feedAnnounce.ts`: `FeedCountSnapshot`, `FeedSnapshot`, `describeFeedAppend`, `describeFeedStatus`, and `describeFeedTally`.
 - `feedEmptyState.ts`: `FeedEmptyCopy`, `FeedEmptyInput`, `describeEmptyFeed`, and `emptyFeedAnnouncement`.
 - `feedReturn.ts`: `FEED_PATH` (`'/jokes'`), `StorageLike`, `rememberFeedUrl(storage, url)`, and `readFeedUrl(storage)`.
+- `authRedirect.ts`: `DEFAULT_AUTH_REDIRECT` (`'/jokes'`) and `safeRedirectPath(value: string | null): string`.
 - `jokeStatus.ts`: `JOKE_NOT_FOUND_TITLE`, `JOKE_NOT_FOUND_HINT`, `JokeLoadResult`, and `describeJokeLoadResult`.
 - `motion.ts`: `STAGGER_STEP_MS` (`40`), `MAX_STAGGERED_ITEMS` (`12`), `entranceDelayMs(index)`, `StaggerBatch`, and `nextStaggerBatch(previous, firstId, count)`.
 - `starRating.ts`: `ratingFromKey(key, current, maxStars)` and `tabbableStarIndex(rating, maxStars)`.
@@ -199,6 +200,7 @@ Cross-package dependencies: `jokeFilters.ts` imports the `FilterParams` type fro
 - **Search tokens:** keywords are lowercase, split on whitespace, stripped of the characters `. , ! ? ; : ( ) " '` and backtick (other punctuation such as `-` is kept), longer than 2 characters, and unique in first-seen order. `generateSearchTokens` returns at most 10.
 
 ### UI copy and helpers
+- **Auth redirect:** `safeRedirectPath` returns the value only when it starts with `/` and, parsed with `new URL` against a placeholder origin, stays on that origin; it returns `pathname + search + hash`. Anything else (missing, empty, absolute, `//host`, `/\host`, control characters that browsers strip) returns `DEFAULT_AUTH_REDIRECT`.
 - **Feed URL storage:** `rememberFeedUrl` and `readFeedUrl` accept only `'/jokes'` or URLs that start with `'/jokes?'`. `readFeedUrl` falls back to `FEED_PATH`. Storage errors are swallowed.
 - **Feed status:** `describeFeedStatus` never returns `''`. Its priority is loading (`count === null`), then empty, then append, then count.
 - **Feed append:** `describeFeedAppend` returns `''` unless the key is the same and the count grew from a non-zero value.

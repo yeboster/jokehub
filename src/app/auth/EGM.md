@@ -9,7 +9,7 @@ The `/auth` route: a combined email/password log-in and sign-up form backed by `
   - `AuthPageComponent`: the form.
   - `looksLikeEmail(value)`: a minimal shape check: an `@` that is not the first character; the first `.` after the `@` must have at least one character between it and the `@`, and must not be the last character.
 - `default AuthLayout` in `layout.tsx`. It sets `metadata.title = 'Log in'` and renders its children unchanged.
-- Query param `redirect`: where to go after sign-in. Defaults to `'/jokes'`. It is passed to `router.push` as given, with no same-origin or path check.
+- Query param `redirect`: where to go after sign-in. It goes through `safeRedirectPath` (`@/lib/authRedirect`), which keeps only paths on this site and otherwise returns `'/jokes'`.
 
 ## Invariants
 - Once auth has loaded and `user` is set, the page calls `router.push(redirectPath)`.
