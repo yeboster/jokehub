@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: authResult.error ?? 'Unauthorized' }, { status: authResult.status ?? 401 });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try { body = await request.json(); } catch {
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+    }
     const parsedInput = AddJokeSchema.safeParse(body);
 
     if (!parsedInput.success) {
