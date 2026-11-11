@@ -330,19 +330,18 @@ export const JokeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const getJokeById = useCallback(
+    // `null` means the joke does not exist. A failed read is rethrown, not
+    // turned into `null`, so the calling page can show its own failure copy
+    // instead of "not found", and only that page shows a toast.
     async (jokeId: string): Promise<Joke | null> => {
       try {
-        const joke = await jokeService.getJokeById(jokeId);
-        return joke;
+        return await jokeService.getJokeById(jokeId);
       } catch (error) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore get-by-id errors expose `.message`/`.code`; unknown narrows too aggressively for the toast description string.
-            const err = error as any;
-            console.error('Error in getJokeById (JokeContext):', err);
-            toast({ title: "Couldn't load that joke", description: err.message || 'Could not fetch joke details.', variant: 'destructive' });
-            return null;
-          }
+        console.error('Error in getJokeById (JokeContext):', error);
+        throw error;
+      }
     },
-    [toast] 
+    []
   );
   
   const updateJoke = useCallback(

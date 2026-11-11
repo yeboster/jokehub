@@ -78,3 +78,18 @@ describe('submit with a changed source', () => {
     expect(toastTitles()).not.toContain('Nothing to save');
   });
 });
+
+describe('loading the joke', () => {
+  it.each([
+    { name: 'missing joke', setup: () => mocks.getJokeById.mockResolvedValue(null), message: 'Joke not found.', description: 'It may have been deleted.' },
+    { name: 'failed read', setup: () => mocks.getJokeById.mockRejectedValue(new Error('offline')), message: 'Failed to load joke data.', description: 'Please reload and try again.' },
+  ])('$name shows its own error and one toast', async ({ setup, message, description }) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    setup();
+    await act(async () => root.render(<EditJokePage />));
+    await flush();
+    expect(container.textContent).toContain(message);
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(mocks.toast.mock.calls[0][0]).toMatchObject({ title: "Couldn't load that joke", description });
+  });
+});

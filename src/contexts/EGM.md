@@ -59,7 +59,8 @@ Client-side React context providers (`"use client"`) for authentication and joke
   - `handleApiCall` also checks for a user. When there is none, it shows a "Sign in required" toast and returns `undefined`.
 - `handleApiCall` shows exactly one success toast when `success` is non-null. `addJoke`, `importJokes`, and `submitUserRating` pass `null`, so their callers announce success.
 - `handleApiCall` re-throws errors. It shows no error toast when the message contains `Category name cannot be empty` or `permission denied`.
-- `getJokeById` and `fetchAllRatingsForJoke` never throw. On error they show a toast and return `null` or `[]`.
+- `getJokeById` returns `null` only when the joke does not exist. A failed read is logged with `console.error` and rethrown, with no toast, so the calling page shows its own failure state.
+- `fetchAllRatingsForJoke` never throws. On error it shows the destructive toast "Couldn't load the ratings" and returns `[]`.
 - Successful mutations patch local `jokes` in place instead of refetching:
   - `toggleUsed` flips `used`.
   - `updateJoke` merges `updatedData`.
@@ -79,7 +80,7 @@ Client-side React context providers (`"use client"`) for authentication and joke
 
 ## Verification
 
-- No test files exist in this directory.
+- `JokeContext.test.tsx` covers `getJokeById` (missing joke vs. failed read). Focused: `npm test -- src/contexts/JokeContext.test.tsx`.
 - Test files that reference these modules: `src/app/add-joke/page.test.tsx`, `src/app/edit-joke/[jokeId]/page.test.tsx`, `src/components/add-joke-form.test.tsx`, `src/components/csv-import.test.tsx`, and `src/components/jokes/JokeFilterDialog.test.tsx`.
 - Run: `npm test`
 - Focused: `npm test -- src/components/add-joke-form.test.tsx`
